@@ -419,7 +419,7 @@ export function setupProcessesCommands(
     pi.registerCommand("processes", {
       description: "View and manage background processes",
       handler: async (_args, ctx) => {
-        await ctx.ui.custom((tui, theme, done) => {
+        await ctx.ui.custom((tui, theme, _keybindings, done) => {
           return new ProcessesComponent(
             tui,
             theme,

@@ -411,23 +411,21 @@ export function setupProcessesCommands(
   pi: ExtensionAPI,
   manager: ProcessManager,
 ) {
-  // Defer registration to session_start so we can check if UI is available.
-  // Commands are only useful in interactive mode.
-  pi.on("session_start", async (_event, ctx) => {
-    if (!ctx.hasUI) return;
-
-    pi.registerCommand("processes", {
-      description: "View and manage background processes",
-      handler: async (_args, ctx) => {
-        await ctx.ui.custom((tui, theme, _keybindings, done) => {
-          return new ProcessesComponent(
-            tui,
-            theme,
-            () => done(undefined),
-            manager,
-          );
-        });
-      },
-    });
+  pi.registerCommand("processes", {
+    description: "View and manage background processes",
+    handler: async (_args, ctx) => {
+      if (!ctx.hasUI) {
+        ctx.ui.notify("/processes requires interactive mode", "error");
+        return;
+      }
+      await ctx.ui.custom((tui, theme, _keybindings, done) => {
+        return new ProcessesComponent(
+          tui,
+          theme,
+          () => done(undefined),
+          manager,
+        );
+      });
+    },
   });
 }

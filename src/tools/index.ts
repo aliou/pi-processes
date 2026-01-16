@@ -33,6 +33,24 @@ const ProcessesParams = Type.Object({
         "Process ID or name to match (required for output/kill/logs). Can be proc_N or friendly name.",
     }),
   ),
+  notifyOnSuccess: Type.Optional(
+    Type.Boolean({
+      description:
+        "Notify when process completes successfully (default: false). Use for builds/tests where you need confirmation.",
+    }),
+  ),
+  notifyOnFailure: Type.Optional(
+    Type.Boolean({
+      description:
+        "Notify when process fails/crashes (default: true). Use to be alerted of unexpected failures.",
+    }),
+  ),
+  notifyOnKill: Type.Optional(
+    Type.Boolean({
+      description:
+        "Notify when process is killed by external signal (default: false). Note: killing via tool never notifies.",
+    }),
+  ),
 });
 
 type ProcessesParamsType = Static<typeof ProcessesParams>;
@@ -81,17 +99,28 @@ function truncateCmd(cmd: string, max = 40): string {
   return `${cmd.slice(0, max - 3)}...`;
 }
 
-export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
+export function setupProcessesTools(
+  pi: ExtensionAPI,
+  manager: ProcessManager,
+  statusUpdater: { update: () => void },
+) {
   pi.registerTool<typeof ProcessesParams, ProcessesDetails>({
     name: "processes",
     label: "Processes",
     description: `Manage background processes. Actions:
 - start: Run command in background (requires 'command', optional 'name' for friendly display name)
+  - notifyOnSuccess (default: false): Get notified when process completes successfully
+  - notifyOnFailure (default: true): Get notified when process crashes/fails
+  - notifyOnKill (default: false): Get notified if killed by external signal (killing via tool never notifies)
 - list: Show all managed processes with their IDs and names
 - output: Get recent stdout/stderr (requires 'id' - can be proc_N or name match)
 - logs: Get log file paths to inspect with read tool (requires 'id')
 - kill: Terminate a process (requires 'id' - can be proc_N or name match like "backend")
-- clear: Remove all finished processes from the list`,
+- clear: Remove all finished processes from the list
+
+Important: You DON'T need to poll or wait for processes. Notifications arrive automatically based on your preferences. Start processes and continue with other work - you'll be informed if something requires attention.
+
+Note: User always sees notifications in UI. Notification preferences only control whether YOU (the agent) are informed.`,
 
     parameters: ProcessesParams,
 
@@ -116,7 +145,12 @@ export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
               },
             };
           }
-          const proc = manager.start(params.command, ctx.cwd, params.name);
+          const proc = manager.start(params.command, ctx.cwd, params.name, {
+            notifyOnSuccess: params.notifyOnSuccess,
+            notifyOnFailure: params.notifyOnFailure,
+            notifyOnKill: params.notifyOnKill,
+          });
+          statusUpdater.update();
           const message = `Started "${proc.name}" (${proc.id}, PID: ${proc.pid})\nLogs: ${proc.stdoutFile}`;
           return {
             content: [{ type: "text", text: message }],
@@ -299,6 +333,7 @@ export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
             };
           }
           const killed = manager.kill(proc.id);
+          statusUpdater.update();
           if (killed) {
             const message = `Killed "${proc.name}" (${proc.id})`;
             return {
@@ -323,6 +358,7 @@ export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
 
         case "clear": {
           const cleared = manager.clearFinished();
+          statusUpdater.update();
           const message =
             cleared > 0
               ? `Cleared ${cleared} finished process(es)`

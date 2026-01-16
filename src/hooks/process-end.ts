@@ -49,6 +49,12 @@ export function setupProcessEndHook(pi: ExtensionAPI, manager: ProcessManager) {
 
   // Set callback for process end events
   manager.onProcessEnd = (info: ProcessInfo) => {
+    // Check notification preferences
+    const shouldNotify =
+      (info.status === "killed" && info.notifyOnKill) ||
+      (info.status === "exited" && info.success && info.notifyOnSuccess) ||
+      (info.status === "exited" && !info.success && info.notifyOnFailure);
+
     const runtime = formatRuntime(info.startTime, info.endTime);
 
     // Build notification message
@@ -66,30 +72,32 @@ export function setupProcessEndHook(pi: ExtensionAPI, manager: ProcessManager) {
       level = "error";
     }
 
-    // Notify user via UI if available
+    // Always notify user via UI
     if (latestContext?.hasUI) {
       latestContext.ui.notify(message, level);
     }
 
-    // Send message to session for the agent
-    const details: ProcessUpdateDetails = {
-      processId: info.id,
-      processName: info.name,
-      command: info.command,
-      status: info.status as "exited" | "killed",
-      exitCode: info.exitCode,
-      success: info.success ?? false,
-      runtime,
-    };
+    // Only send message to agent if notification preferences allow
+    if (shouldNotify) {
+      const details: ProcessUpdateDetails = {
+        processId: info.id,
+        processName: info.name,
+        command: info.command,
+        status: info.status as "exited" | "killed",
+        exitCode: info.exitCode,
+        success: info.success ?? false,
+        runtime,
+      };
 
-    pi.sendMessage(
-      {
-        customType: MESSAGE_TYPE_PROCESS_UPDATE,
-        content: message,
-        display: true,
-        details,
-      },
-      { triggerTurn: false, deliverAs: "followUp" },
-    );
+      pi.sendMessage(
+        {
+          customType: MESSAGE_TYPE_PROCESS_UPDATE,
+          content: message,
+          display: true,
+          details,
+        },
+        { triggerTurn: false },
+      );
+    }
   };
 }

@@ -2,7 +2,7 @@
 # Test script that exits successfully (exit code 0)
 # Usage: ./test-exit-success.sh [seconds]
 
-WAIT_SECONDS=${1:-5}
+WAIT_SECONDS=${1:-13}
 
 echo "Starting successful task..."
 echo "Will complete in ${WAIT_SECONDS} seconds"

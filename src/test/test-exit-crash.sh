@@ -2,7 +2,7 @@
 # Test script that simulates a crash (exit code 137 - like SIGKILL)
 # Usage: ./test-exit-crash.sh [seconds]
 
-WAIT_SECONDS=${1:-5}
+WAIT_SECONDS=${1:-17}
 
 echo "Starting unstable task..."
 echo "Will crash in ${WAIT_SECONDS} seconds"

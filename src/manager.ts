@@ -22,6 +22,9 @@ export interface ProcessInfo {
   success: boolean | null; // null if running, true if exit code 0, false otherwise
   stdoutFile: string;
   stderrFile: string;
+  notifyOnSuccess: boolean;
+  notifyOnFailure: boolean;
+  notifyOnKill: boolean;
 }
 
 interface ManagedProcess extends ProcessInfo {
@@ -94,7 +97,16 @@ export class ProcessManager {
     this.onProcessEnd?.(info);
   }
 
-  start(command: string, cwd: string, name?: string): ProcessInfo {
+  start(
+    command: string,
+    cwd: string,
+    name?: string,
+    options?: {
+      notifyOnSuccess?: boolean;
+      notifyOnFailure?: boolean;
+      notifyOnKill?: boolean;
+    },
+  ): ProcessInfo {
     const id = `proc_${++this.counter}`;
     const friendlyName = name || inferName(command);
     const stdoutFile = join(this.logDir, `${id}-stdout.log`);
@@ -123,6 +135,9 @@ export class ProcessManager {
       success: null,
       stdoutFile,
       stderrFile,
+      notifyOnSuccess: options?.notifyOnSuccess ?? false,
+      notifyOnFailure: options?.notifyOnFailure ?? true,
+      notifyOnKill: options?.notifyOnKill ?? false,
       process: child,
     };
 
@@ -245,6 +260,9 @@ export class ProcessManager {
       return true;
     }
 
+    // Disable kill notification since this is intentional
+    managed.notifyOnKill = false;
+
     managed.status = "killed";
     managed.endTime = Date.now();
     managed.success = false;
@@ -343,6 +361,9 @@ export class ProcessManager {
       success: managed.success,
       stdoutFile: managed.stdoutFile,
       stderrFile: managed.stderrFile,
+      notifyOnSuccess: managed.notifyOnSuccess,
+      notifyOnFailure: managed.notifyOnFailure,
+      notifyOnKill: managed.notifyOnKill,
     };
   }
 }

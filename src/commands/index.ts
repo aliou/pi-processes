@@ -418,14 +418,17 @@ export function setupProcessesCommands(
         ctx.ui.notify("/processes requires interactive mode", "error");
         return;
       }
-      await ctx.ui.custom((tui, theme, _keybindings, done) => {
-        return new ProcessesComponent(
-          tui,
-          theme,
-          () => done(undefined),
-          manager,
-        );
-      });
+      await ctx.ui.custom(
+        (tui, theme, _keybindings, done) => {
+          return new ProcessesComponent(
+            tui,
+            theme,
+            () => done(undefined),
+            manager,
+          );
+        },
+        { overlay: true },
+      );
     },
   });
 }

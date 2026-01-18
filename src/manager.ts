@@ -76,7 +76,7 @@ function inferName(command: string): string {
 
   // Extract first meaningful word
   const words = command.split(/\s+/);
-  const firstWord = words[0]
+  const firstWord = (words[0] ?? "process")
     .replace(/^\.\//, "")
     .replace(/\.(sh|js|ts|py)$/, "");
   return firstWord.slice(0, 20);

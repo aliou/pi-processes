@@ -116,7 +116,7 @@ class ProcessesComponent implements Component {
     if (data === "x" || data === "X") {
       if (processes.length > 0 && this.selectedIndex < processes.length) {
         const proc = processes[this.selectedIndex];
-        if (proc.status === "running") {
+        if (proc && proc.status === "running") {
           this.manager.kill(proc.id);
           this.invalidate();
           this.tui.requestRender();
@@ -243,6 +243,7 @@ class ProcessesComponent implements Component {
       // Process rows
       for (let i = 0; i < processes.length; i++) {
         const proc = processes[i];
+        if (!proc) continue;
         const isSelected = i === this.selectedIndex;
         const sizes = this.manager.getFileSize(proc.id);
         const totalSize = sizes ? sizes.stdout + sizes.stderr : 0;
@@ -271,6 +272,7 @@ class ProcessesComponent implements Component {
       // Output section for selected process
       if (this.selectedIndex < processes.length) {
         const selected = processes[this.selectedIndex];
+        if (!selected) return lines;
         const output = this.manager.getOutput(selected.id, 200);
         const sizes = this.manager.getFileSize(selected.id);
 

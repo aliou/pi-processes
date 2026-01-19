@@ -186,18 +186,23 @@ export class ProcessManager {
   }
 
   list(): ProcessInfo[] {
+    // Check if any "running" processes have actually exited
+    this.checkRunningProcesses();
     return Array.from(this.processes.values()).map((p) =>
       this.toProcessInfo(p),
     );
   }
 
   get(id: string): ProcessInfo | null {
+    this.checkRunningProcesses();
     const managed = this.processes.get(id);
     return managed ? this.toProcessInfo(managed) : null;
   }
 
   // Find by ID or name (partial match)
   find(query: string): ProcessInfo | null {
+    this.checkRunningProcesses();
+
     // Exact ID match first
     const byId = this.processes.get(query);
     if (byId) return this.toProcessInfo(byId);
@@ -308,6 +313,35 @@ export class ProcessManager {
   killAll(): void {
     for (const [id] of this.processes) {
       this.kill(id);
+    }
+  }
+
+  // Check if a PID is still alive (works across platforms)
+  private isProcessAlive(pid: number): boolean {
+    try {
+      // Signal 0 checks if process exists without actually sending a signal
+      process.kill(pid, 0);
+      return true;
+    } catch (error) {
+      // If error code is ESRCH, process doesn't exist
+      // If error code is EPERM, process exists but we don't have permission (still alive)
+      const err = error as NodeJS.ErrnoException;
+      return err.code === "EPERM";
+    }
+  }
+
+  // Check all running processes and update status if they've exited
+  private checkRunningProcesses(): void {
+    for (const managed of this.processes.values()) {
+      if (managed.status === "running" && !this.isProcessAlive(managed.pid)) {
+        // Process is no longer alive but we didn't get the close event yet
+        // Mark it as exited with unknown exit code
+        managed.status = "exited";
+        managed.exitCode = null;
+        managed.success = false;
+        managed.endTime = Date.now();
+        this.emitProcessEnd(this.toProcessInfo(managed));
+      }
     }
   }
 

@@ -158,12 +158,14 @@ export class ProcessManager {
     });
 
     child.on("close", (code, signal) => {
+      // Already handled (e.g., by checkRunningProcesses detecting external kill)
+      if (managed.status !== "running") {
+        return;
+      }
       managed.exitCode = code;
       managed.endTime = Date.now();
       managed.success = code === 0;
-      if (managed.status === "running") {
-        managed.status = signal ? "killed" : "exited";
-      }
+      managed.status = signal ? "killed" : "exited";
       this.emitProcessEnd(this.toProcessInfo(managed));
     });
 

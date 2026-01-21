@@ -164,7 +164,10 @@ class ProcessesComponent implements Component {
       return this.cachedLines;
     }
 
-    const box = createBoxRenderer(width, dim, { leadingSpace: true });
+    const box = createBoxRenderer(width, dim, {
+      leadingSpace: true,
+      trailingSpace: true,
+    });
     const lines: string[] = [];
     const processes = this.manager.list();
 

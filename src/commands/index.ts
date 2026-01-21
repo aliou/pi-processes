@@ -389,6 +389,8 @@ class ProcessesComponent implements Component {
   }
 }
 
+const WIDGET_ID = "processes-status";
+
 export function setupProcessesCommands(
   pi: ExtensionAPI,
   manager: ProcessManager,
@@ -411,6 +413,25 @@ export function setupProcessesCommands(
         },
         { overlay: true },
       );
+    },
+  });
+
+  pi.registerCommand("processes:clear", {
+    description: "Clear finished processes and hide widget",
+    handler: async (_args, ctx) => {
+      const cleared = manager.clearFinished();
+      const remaining = manager.list();
+
+      // Hide widget if no processes remain
+      if (remaining.length === 0 && ctx.hasUI) {
+        ctx.ui.setWidget(WIDGET_ID, undefined);
+      }
+
+      if (cleared > 0) {
+        ctx.ui.notify(`Cleared ${cleared} finished process(es)`, "info");
+      } else {
+        ctx.ui.notify("No finished processes to clear", "info");
+      }
     },
   });
 }

@@ -10,9 +10,7 @@ export function setupProcessesHooks(pi: ExtensionAPI, manager: ProcessManager) {
   setupProcessEndHook(pi, manager);
 
   // Set up widget AFTER process-end so it chains onto the existing callback
-  const widgetUpdater = setupProcessWidget(pi, manager);
+  setupProcessWidget(pi, manager);
 
   setupMessageRenderer(pi);
-
-  return widgetUpdater;
 }

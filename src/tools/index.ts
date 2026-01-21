@@ -99,11 +99,7 @@ function truncateCmd(cmd: string, max = 40): string {
   return `${cmd.slice(0, max - 3)}...`;
 }
 
-export function setupProcessesTools(
-  pi: ExtensionAPI,
-  manager: ProcessManager,
-  statusUpdater: { update: () => void },
-) {
+export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
   pi.registerTool<typeof ProcessesParams, ProcessesDetails>({
     name: "processes",
     label: "Processes",
@@ -150,7 +146,6 @@ Note: User always sees notifications in UI. Notification preferences only contro
             notifyOnFailure: params.notifyOnFailure,
             notifyOnKill: params.notifyOnKill,
           });
-          statusUpdater.update();
           const message = `Started "${proc.name}" (${proc.id}, PID: ${proc.pid})\nLogs: ${proc.stdoutFile}`;
           return {
             content: [{ type: "text", text: message }],
@@ -333,7 +328,6 @@ Note: User always sees notifications in UI. Notification preferences only contro
             };
           }
           const killed = manager.kill(proc.id);
-          statusUpdater.update();
           if (killed) {
             const message = `Killed "${proc.name}" (${proc.id})`;
             return {
@@ -358,7 +352,6 @@ Note: User always sees notifications in UI. Notification preferences only contro
 
         case "clear": {
           const cleared = manager.clearFinished();
-          statusUpdater.update();
           const message =
             cleared > 0
               ? `Cleared ${cleared} finished process(es)`

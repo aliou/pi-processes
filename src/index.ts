@@ -7,8 +7,7 @@ import { setupProcessesTools } from "./tools";
 export default function (pi: ExtensionAPI) {
   const manager = new ProcessManager();
 
-  const statusUpdater = setupProcessesHooks(pi, manager);
-
-  setupProcessesTools(pi, manager, statusUpdater);
+  setupProcessesHooks(pi, manager);
+  setupProcessesTools(pi, manager);
   setupProcessesCommands(pi, manager);
 }

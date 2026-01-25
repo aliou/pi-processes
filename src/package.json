@@ -9,6 +9,10 @@
     "pi",
     "processes"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aliou/pi-extensions"
+  },
   "pi": {
     "extensions": [
       "./index.ts"

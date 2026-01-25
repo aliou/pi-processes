@@ -1,7 +1,11 @@
-import { createBoxRenderer } from "@aliou/tui-utils";
 import type { ExtensionAPI, Theme } from "@mariozechner/pi-coding-agent";
 import { type Component, matchesKey, visibleWidth } from "@mariozechner/pi-tui";
 import type { ProcessInfo, ProcessManager } from "../manager";
+
+// Max visible processes in the list (scrollable if more)
+const MAX_VISIBLE_PROCESSES = 8;
+// Max log lines shown
+const MAX_LOG_LINES = 12;
 
 function formatRuntime(startTime: number, endTime: number | null): string {
   const end = endTime ?? Date.now();
@@ -35,20 +39,14 @@ function truncate(str: string, maxLen: number): string {
   return `${str.slice(0, maxLen - 3)}...`;
 }
 
-// ANSI helpers
-const dim = (s: string) => `\x1b[2m${s}\x1b[22m`;
-const bold = (s: string) => `\x1b[1m${s}\x1b[22m`;
-const green = (s: string) => `\x1b[32m${s}\x1b[0m`;
-const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
-const red = (s: string) => `\x1b[31m${s}\x1b[0m`;
-const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`;
-
 class ProcessesComponent implements Component {
   private tui: { requestRender: () => void };
+  private theme: Theme;
   private onClose: () => void;
   private manager: ProcessManager;
 
   private selectedIndex = 0;
+  private processScrollOffset = 0;
   private logScrollOffset = 0;
   private scrollInfo = { above: 0, below: 0 };
   private cachedLines: string[] = [];
@@ -57,11 +55,12 @@ class ProcessesComponent implements Component {
 
   constructor(
     tui: { requestRender: () => void },
-    _theme: Theme,
+    theme: Theme,
     onClose: () => void,
     manager: ProcessManager,
   ) {
     this.tui = tui;
+    this.theme = theme;
     this.onClose = onClose;
     this.manager = manager;
 
@@ -82,6 +81,7 @@ class ProcessesComponent implements Component {
           processes.length - 1,
         );
         this.logScrollOffset = 0;
+        this.ensureProcessVisible(processes.length);
         this.invalidate();
         this.tui.requestRender();
       }
@@ -92,6 +92,7 @@ class ProcessesComponent implements Component {
       if (processes.length > 0) {
         this.selectedIndex = Math.max(this.selectedIndex - 1, 0);
         this.logScrollOffset = 0;
+        this.ensureProcessVisible(processes.length);
         this.invalidate();
         this.tui.requestRender();
       }
@@ -135,6 +136,7 @@ class ProcessesComponent implements Component {
         if (this.selectedIndex >= remaining.length) {
           this.selectedIndex = Math.max(0, remaining.length - 1);
         }
+        this.ensureProcessVisible(remaining.length);
         this.invalidate();
         this.tui.requestRender();
       }
@@ -154,6 +156,19 @@ class ProcessesComponent implements Component {
     return true;
   }
 
+  private ensureProcessVisible(totalProcesses: number): void {
+    const visibleCount = Math.min(MAX_VISIBLE_PROCESSES, totalProcesses);
+    if (this.selectedIndex < this.processScrollOffset) {
+      this.processScrollOffset = this.selectedIndex;
+    } else if (this.selectedIndex >= this.processScrollOffset + visibleCount) {
+      this.processScrollOffset = this.selectedIndex - visibleCount + 1;
+    }
+    this.processScrollOffset = Math.max(
+      0,
+      Math.min(this.processScrollOffset, totalProcesses - visibleCount),
+    );
+  }
+
   invalidate(): void {
     this.cachedWidth = 0;
     this.cachedLines = [];
@@ -164,29 +179,42 @@ class ProcessesComponent implements Component {
       return this.cachedLines;
     }
 
-    const box = createBoxRenderer(width, dim, {
-      leadingSpace: true,
-      trailingSpace: true,
-    });
+    const theme = this.theme;
+    const dim = (s: string) => theme.fg("dim", s);
+    const accent = (s: string) => theme.fg("accent", s);
+    const warning = (s: string) => theme.fg("warning", s);
+    const bold = (s: string) => theme.bold(s);
+    const border = (s: string) => theme.fg("dim", s);
+
     const lines: string[] = [];
     const processes = this.manager.list();
+    const innerWidth = width - 2; // 1 char padding each side
+
+    // Helper to pad line
+    const padLine = (content: string): string => {
+      const len = visibleWidth(content);
+      return ` ${content}${" ".repeat(Math.max(0, innerWidth - len))} `;
+    };
 
     // Top border with title
+    const title = " Background Processes ";
+    const titleLen = title.length;
+    const borderLen = Math.max(0, width - titleLen);
+    const leftBorder = Math.floor(borderLen / 2);
+    const rightBorder = borderLen - leftBorder;
     lines.push(
-      box.padLine(
-        box.topWithTitle("Background Processes", (s: string) => bold(cyan(s))),
-      ),
+      border("─".repeat(leftBorder)) +
+        accent(bold(title)) +
+        border("─".repeat(rightBorder)),
     );
 
     if (processes.length === 0) {
-      lines.push(box.padLine(box.empty()));
-      lines.push(box.padLine(box.row(dim("No background processes"))));
-      lines.push(
-        box.padLine(box.row(dim("Use the processes tool to start commands"))),
-      );
-      lines.push(box.padLine(box.empty()));
+      lines.push(padLine(""));
+      lines.push(padLine(dim("No background processes")));
+      lines.push(padLine(dim("Use the processes tool to start commands")));
+      lines.push(padLine(""));
     } else {
-      // Calculate column widths (account for 2-char selection prefix)
+      // Calculate column widths
       const prefixWidth = 2; // "> " or "  "
       const idWidth = 9;
       const nameWidth = 15;
@@ -195,7 +223,7 @@ class ProcessesComponent implements Component {
       const sizeWidth = 8;
       const cmdWidth = Math.max(
         20,
-        box.innerWidth -
+        innerWidth -
           prefixWidth -
           idWidth -
           nameWidth -
@@ -204,21 +232,36 @@ class ProcessesComponent implements Component {
           sizeWidth,
       );
 
-      // Header (with prefix spacing to align with rows)
-      lines.push(box.padLine(box.empty()));
+      // Header with scroll indicator if needed
+      const hasProcessScroll = processes.length > MAX_VISIBLE_PROCESSES;
+      const headerSuffix = hasProcessScroll
+        ? dim(
+            ` [${this.processScrollOffset + 1}-${Math.min(this.processScrollOffset + MAX_VISIBLE_PROCESSES, processes.length)}/${processes.length}]`,
+          )
+        : "";
+
+      lines.push(padLine(""));
       const header =
-        "  " + // Same prefix width as rows
+        "  " +
         dim("ID".padEnd(idWidth)) +
         dim("Name".padEnd(nameWidth)) +
         dim("Command".padEnd(cmdWidth)) +
         dim("Status".padEnd(statusWidth)) +
         dim("Time".padEnd(timeWidth)) +
-        dim("Size".padStart(sizeWidth));
-      lines.push(box.padLine(box.row(header)));
-      lines.push(box.padLine(box.divider()));
+        dim("Size".padStart(sizeWidth)) +
+        headerSuffix;
+      lines.push(padLine(header));
+      lines.push(border("─".repeat(width)));
 
-      // Process rows
-      for (let i = 0; i < processes.length; i++) {
+      // Process rows (limited to MAX_VISIBLE_PROCESSES)
+      const visibleProcessCount = Math.min(
+        MAX_VISIBLE_PROCESSES,
+        processes.length,
+      );
+      const startIdx = this.processScrollOffset;
+      const endIdx = startIdx + visibleProcessCount;
+
+      for (let i = startIdx; i < endIdx; i++) {
         const proc = processes[i];
         if (!proc) continue;
         const isSelected = i === this.selectedIndex;
@@ -231,7 +274,7 @@ class ProcessesComponent implements Component {
 
         const row =
           (isSelected
-            ? cyan(proc.id.padEnd(idWidth))
+            ? accent(proc.id.padEnd(idWidth))
             : proc.id.padEnd(idWidth)) +
           truncate(proc.name, nameWidth - 1).padEnd(nameWidth) +
           truncate(proc.command, cmdWidth - 1).padEnd(cmdWidth) +
@@ -240,32 +283,40 @@ class ProcessesComponent implements Component {
           formatBytes(totalSize).padStart(sizeWidth);
 
         if (isSelected) {
-          lines.push(box.padLine(box.row(`${cyan(">")} ${row}`)));
+          lines.push(padLine(`${accent(">")} ${row}`));
         } else {
-          lines.push(box.padLine(box.row(`  ${row}`)));
+          lines.push(padLine(`  ${row}`));
         }
+      }
+
+      // Pad process list to fixed height
+      for (let i = visibleProcessCount; i < MAX_VISIBLE_PROCESSES; i++) {
+        lines.push(padLine(""));
       }
 
       // Output section for selected process
       if (this.selectedIndex < processes.length) {
         const selected = processes[this.selectedIndex];
-        if (!selected) return lines;
+        if (!selected) {
+          this.cachedLines = lines;
+          this.cachedWidth = width;
+          return this.cachedLines;
+        }
         const output = this.manager.getOutput(selected.id, 200);
         const sizes = this.manager.getFileSize(selected.id);
 
-        lines.push(box.padLine(box.divider()));
+        lines.push(border("─".repeat(width)));
 
         // Output header with size info
-        const logTitle = `Output: ${cyan(selected.name)} ${dim(`(${selected.id})`)}`;
+        const logTitle = `Output: ${accent(selected.name)} ${dim(`(${selected.id})`)}`;
         const sizeInfo = sizes
           ? dim(
               ` stdout: ${formatBytes(sizes.stdout)}, stderr: ${formatBytes(sizes.stderr)}`,
             )
           : "";
-        lines.push(box.padLine(box.row(logTitle + sizeInfo)));
-        lines.push(box.padLine(box.empty()));
+        lines.push(padLine(logTitle + sizeInfo));
+        lines.push(padLine(""));
 
-        const maxLogLines = 12;
         let renderedLines = 0;
 
         if (output) {
@@ -278,12 +329,12 @@ class ProcessesComponent implements Component {
           }
 
           if (logLines.length === 0) {
-            lines.push(box.padLine(box.row(dim("(no output yet)"))));
+            lines.push(padLine(dim("(no output yet)")));
             renderedLines = 1;
           } else {
             const startIdx = Math.max(
               0,
-              logLines.length - maxLogLines - this.logScrollOffset,
+              logLines.length - MAX_LOG_LINES - this.logScrollOffset,
             );
             const endIdx = Math.max(0, logLines.length - this.logScrollOffset);
             const visibleLines = logLines.slice(startIdx, endIdx);
@@ -294,11 +345,11 @@ class ProcessesComponent implements Component {
               this.logScrollOffset > 0 ? logLines.length - endIdx : 0;
 
             for (const line of visibleLines) {
-              const displayLine = truncate(line.text, box.innerWidth - 2);
+              const displayLine = truncate(line.text, innerWidth - 2);
               if (line.type === "stderr") {
-                lines.push(box.padLine(box.row(yellow(displayLine))));
+                lines.push(padLine(warning(displayLine)));
               } else {
-                lines.push(box.padLine(box.row(displayLine)));
+                lines.push(padLine(displayLine));
               }
               renderedLines++;
             }
@@ -306,17 +357,17 @@ class ProcessesComponent implements Component {
         }
 
         // Pad to fixed height
-        while (renderedLines < maxLogLines) {
-          lines.push(box.padLine(box.empty()));
+        while (renderedLines < MAX_LOG_LINES) {
+          lines.push(padLine(""));
           renderedLines++;
         }
       }
     }
 
-    // Footer with all controls
-    lines.push(box.padLine(box.divider()));
+    // Footer divider
+    lines.push(border("─".repeat(width)));
 
-    // Build footer with scroll info if applicable
+    // Footer with controls
     const footerLeft =
       `${dim("j/k")} select  ` +
       `${dim("x")} kill  ` +
@@ -337,16 +388,13 @@ class ProcessesComponent implements Component {
 
     const footerLeftLen = visibleWidth(footerLeft);
     const footerRightLen = visibleWidth(footerRight);
-    const footerGap = Math.max(
-      2,
-      box.innerWidth - footerLeftLen - footerRightLen,
-    );
+    const footerGap = Math.max(2, innerWidth - footerLeftLen - footerRightLen);
     const footer = footerLeft + " ".repeat(footerGap) + footerRight;
 
-    lines.push(box.padLine(box.row(footer)));
+    lines.push(padLine(footer));
 
     // Bottom border
-    lines.push(box.padLine(box.bottom()));
+    lines.push(border("─".repeat(width)));
 
     this.cachedLines = lines;
     this.cachedWidth = width;
@@ -355,18 +403,24 @@ class ProcessesComponent implements Component {
   }
 
   private formatStatus(proc: ProcessInfo): string {
+    const theme = this.theme;
+    const dim = (s: string) => theme.fg("dim", s);
+    const success = (s: string) => theme.fg("success", s);
+    const warning = (s: string) => theme.fg("warning", s);
+    const error = (s: string) => theme.fg("error", s);
+
     const icon = this.getStatusIcon(proc.status, proc.success);
 
     switch (proc.status) {
       case "running":
-        return green(`${icon} running`);
+        return success(`${icon} running`);
       case "exited":
         if (proc.success) {
           return dim(`${icon} exit(0)`);
         }
-        return red(`${icon} exit(${proc.exitCode ?? "?"})`);
+        return error(`${icon} exit(${proc.exitCode ?? "?"})`);
       case "killed":
-        return yellow(`${icon} killed`);
+        return warning(`${icon} killed`);
       default:
         return proc.status;
     }
@@ -402,17 +456,14 @@ export function setupProcessesCommands(
         ctx.ui.notify("/processes requires interactive mode", "error");
         return;
       }
-      await ctx.ui.custom(
-        (tui, theme, _keybindings, done) => {
-          return new ProcessesComponent(
-            tui,
-            theme,
-            () => done(undefined),
-            manager,
-          );
-        },
-        { overlay: true },
-      );
+      await ctx.ui.custom((tui, theme, _keybindings, done) => {
+        return new ProcessesComponent(
+          tui,
+          theme,
+          () => done(undefined),
+          manager,
+        );
+      });
     },
   });
 

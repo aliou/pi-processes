@@ -11,20 +11,19 @@
   ],
   "pi": {
     "extensions": [
-      "./dist/index.ts"
+      "./index.ts"
     ]
   },
   "publishConfig": {
     "access": "public"
   },
   "files": [
-    "dist",
+    "*.ts",
+    "commands",
+    "hooks",
+    "tools",
     "README.md"
   ],
-  "scripts": {
-    "build": "tsx ../../scripts/build-processes.ts",
-    "prepack": "pnpm run build"
-  },
   "dependencies": {
     "@sinclair/typebox": "^0.34.41"
   },

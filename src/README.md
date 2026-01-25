@@ -2,6 +2,33 @@
 
 Manage background processes from Pi. Start long-running commands (dev servers, build watchers, log tailers) without blocking the conversation.
 
+## Installation
+
+Install via npm:
+
+```bash
+pi install npm:@aliou/pi-processes
+```
+
+Or via the pi-extensions package:
+
+```bash
+pi install git:github.com/aliou/pi-extensions
+```
+
+Or selectively in your `settings.json`:
+
+```json
+{
+  "packages": [
+    {
+      "source": "git:github.com/aliou/pi-extensions",
+      "extensions": ["extensions/processes"]
+    }
+  ]
+}
+```
+
 ## Features
 
 - **Tool**: `processes` with actions: `start`, `list`, `output`, `logs`, `kill`, `clear`

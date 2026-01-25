@@ -16,12 +16,23 @@ Manage background processes from Pi. Start long-running commands (dev servers, b
 
 ```
 processes start "pnpm dev" name="backend-dev"
+processes start "pnpm build" name="build" notifyOnSuccess=true
+processes start "pnpm test" notifyOnFailure=true
 processes list
 processes output id="backend"
 processes logs id="proc_1"
 processes kill id="backend"
 processes clear
 ```
+
+**Notification parameters** (for `start` action):
+- `notifyOnSuccess` (default: false) - Get notified when process completes successfully. Use for builds/tests where you need confirmation.
+- `notifyOnFailure` (default: true) - Get notified when process crashes/fails. Use to be alerted of unexpected failures.
+- `notifyOnKill` (default: false) - Get notified if killed by external signal. Note: killing via tool never notifies.
+
+**Important:** You don't need to poll or wait for processes. Notifications arrive automatically based on your preferences. Start processes and continue with other work - you'll be informed if something requires attention.
+
+Note: User always sees notifications in UI. Notification preferences only control whether the agent is informed.
 
 ### Command (interactive)
 
@@ -44,8 +55,6 @@ Test scripts in `test/` directory:
 ```
 
 ## Future Improvements
-
-- [ ] **Process exit notifications**: Notify agent/LLM when a process exits by injecting a message into context or emitting an event. Include exit code and reason (success, failure, signal).
 
 - [ ] **Expandable log view**: Allow toggling between collapsed (current fixed height) and expanded (full height) log view in the `/processes` panel.
 

@@ -2,13 +2,15 @@ import { StringEnum } from "@mariozechner/pi-ai";
 import type {
   AgentToolResult,
   ExtensionAPI,
-  ExtensionContext,
   Theme,
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
 import { type Static, Type } from "@sinclair/typebox";
-import type { ProcessInfo, ProcessManager } from "../manager";
+import type { ProcessesDetails } from "../constants";
+import type { ProcessManager } from "../manager";
+import { formatRuntime, truncateCmd } from "../utils";
+import { executeAction } from "./actions";
 
 const ProcessesParams = Type.Object({
   action: StringEnum(
@@ -24,7 +26,7 @@ const ProcessesParams = Type.Object({
   name: Type.Optional(
     Type.String({
       description:
-        "Friendly name for the process (optional for start, e.g. 'backend-dev', 'test-runner')",
+        "Friendly name for the process (required for start, e.g. 'backend-dev', 'test-runner')",
     }),
   ),
   id: Type.Optional(
@@ -55,56 +57,12 @@ const ProcessesParams = Type.Object({
 
 type ProcessesParamsType = Static<typeof ProcessesParams>;
 
-interface ProcessesDetails {
-  action: string;
-  success: boolean;
-  message: string;
-  process?: ProcessInfo;
-  processes?: ProcessInfo[];
-  output?: { stdout: string[]; stderr: string[]; status: string };
-  logFiles?: { stdoutFile: string; stderrFile: string };
-  cleared?: number;
-}
-
-interface ExecuteResult {
-  content: Array<{ type: "text"; text: string }>;
-  details: ProcessesDetails;
-}
-
-function formatRuntime(startTime: number, endTime: number | null): string {
-  const end = endTime ?? Date.now();
-  const ms = end - startTime;
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-
-  if (hours > 0) {
-    return `${hours}h ${minutes % 60}m`;
-  }
-  if (minutes > 0) {
-    return `${minutes}m ${seconds % 60}s`;
-  }
-  return `${seconds}s`;
-}
-
-function formatStatus(proc: ProcessInfo): string {
-  if (proc.status === "running") return "running";
-  if (proc.status === "killed") return "killed";
-  if (proc.success) return "exited(0)";
-  return `exited(${proc.exitCode ?? "?"})`;
-}
-
-function truncateCmd(cmd: string, max = 40): string {
-  if (cmd.length <= max) return cmd;
-  return `${cmd.slice(0, max - 3)}...`;
-}
-
 export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
   pi.registerTool<typeof ProcessesParams, ProcessesDetails>({
     name: "processes",
     label: "Processes",
     description: `Manage background processes. Actions:
-- start: Run command in background (requires 'command', optional 'name' for friendly display name)
+- start: Run command in background (requires 'name' and 'command')
   - notifyOnSuccess (default: false): Get notified when process completes successfully
   - notifyOnFailure (default: true): Get notified when process crashes/fails
   - notifyOnKill (default: false): Get notified if killed by external signal (killing via tool never notifies)
@@ -120,265 +78,8 @@ Note: User always sees notifications in UI. Notification preferences only contro
 
     parameters: ProcessesParams,
 
-    async execute(
-      _toolCallId: string,
-      params: ProcessesParamsType,
-      _onUpdate: unknown,
-      ctx: ExtensionContext,
-      _signal?: AbortSignal,
-    ): Promise<ExecuteResult> {
-      switch (params.action) {
-        case "start": {
-          if (!params.command) {
-            return {
-              content: [
-                { type: "text", text: "Missing required parameter: command" },
-              ],
-              details: {
-                action: "start",
-                success: false,
-                message: "Missing required parameter: command",
-              },
-            };
-          }
-          const proc = manager.start(params.command, ctx.cwd, params.name, {
-            notifyOnSuccess: params.notifyOnSuccess,
-            notifyOnFailure: params.notifyOnFailure,
-            notifyOnKill: params.notifyOnKill,
-          });
-          const message = `Started "${proc.name}" (${proc.id}, PID: ${proc.pid})\nLogs: ${proc.stdoutFile}`;
-          return {
-            content: [{ type: "text", text: message }],
-            details: {
-              action: "start",
-              success: true,
-              message,
-              process: proc,
-            },
-          };
-        }
-
-        case "list": {
-          const processes = manager.list();
-          if (processes.length === 0) {
-            return {
-              content: [
-                { type: "text", text: "No background processes running" },
-              ],
-              details: {
-                action: "list",
-                success: true,
-                message: "No background processes running",
-                processes: [],
-              },
-            };
-          }
-          const summary = processes
-            .map(
-              (p) =>
-                `${p.id} "${p.name}": ${truncateCmd(p.command)} [${formatStatus(p)}] ${formatRuntime(p.startTime, p.endTime)}`,
-            )
-            .join("\n");
-          const message = `${processes.length} process(es):\n${summary}`;
-          return {
-            content: [{ type: "text", text: message }],
-            details: {
-              action: "list",
-              success: true,
-              message,
-              processes,
-            },
-          };
-        }
-
-        case "output": {
-          if (!params.id) {
-            return {
-              content: [
-                { type: "text", text: "Missing required parameter: id" },
-              ],
-              details: {
-                action: "output",
-                success: false,
-                message: "Missing required parameter: id",
-              },
-            };
-          }
-          const proc = manager.find(params.id);
-          if (!proc) {
-            const message = `Process not found: ${params.id}`;
-            return {
-              content: [{ type: "text", text: message }],
-              details: {
-                action: "output",
-                success: false,
-                message,
-              },
-            };
-          }
-          const output = manager.getOutput(proc.id);
-          if (!output) {
-            const message = `Could not read output for: ${proc.id}`;
-            return {
-              content: [{ type: "text", text: message }],
-              details: {
-                action: "output",
-                success: false,
-                message,
-              },
-            };
-          }
-          const stdoutLines = output.stdout.length;
-          const stderrLines = output.stderr.length;
-          const message = `"${proc.name}" (${proc.id}) [${formatStatus(proc)}]: ${stdoutLines} stdout lines, ${stderrLines} stderr lines`;
-
-          const outputParts: string[] = [message];
-          if (output.stdout.length > 0) {
-            outputParts.push("\n--- stdout (last 100 lines) ---");
-            outputParts.push(...output.stdout.slice(-100));
-          }
-          if (output.stderr.length > 0) {
-            outputParts.push("\n--- stderr (last 100 lines) ---");
-            outputParts.push(...output.stderr.slice(-100));
-          }
-
-          return {
-            content: [{ type: "text", text: outputParts.join("\n") }],
-            details: {
-              action: "output",
-              success: true,
-              message,
-              output,
-            },
-          };
-        }
-
-        case "logs": {
-          if (!params.id) {
-            return {
-              content: [
-                { type: "text", text: "Missing required parameter: id" },
-              ],
-              details: {
-                action: "logs",
-                success: false,
-                message: "Missing required parameter: id",
-              },
-            };
-          }
-          const proc = manager.find(params.id);
-          if (!proc) {
-            const message = `Process not found: ${params.id}`;
-            return {
-              content: [{ type: "text", text: message }],
-              details: {
-                action: "logs",
-                success: false,
-                message,
-              },
-            };
-          }
-          const logFiles = manager.getLogFiles(proc.id);
-          if (!logFiles) {
-            const message = `Could not get log files for: ${proc.id}`;
-            return {
-              content: [{ type: "text", text: message }],
-              details: {
-                action: "logs",
-                success: false,
-                message,
-              },
-            };
-          }
-          const message = `Log files for "${proc.name}" (${proc.id}):\n  stdout: ${logFiles.stdoutFile}\n  stderr: ${logFiles.stderrFile}\n\nUse the read tool to inspect these files.`;
-          return {
-            content: [{ type: "text", text: message }],
-            details: {
-              action: "logs",
-              success: true,
-              message,
-              logFiles,
-            },
-          };
-        }
-
-        case "kill": {
-          if (!params.id) {
-            return {
-              content: [
-                { type: "text", text: "Missing required parameter: id" },
-              ],
-              details: {
-                action: "kill",
-                success: false,
-                message: "Missing required parameter: id",
-              },
-            };
-          }
-          const proc = manager.find(params.id);
-          if (!proc) {
-            const message = `Process not found: ${params.id}`;
-            return {
-              content: [{ type: "text", text: message }],
-              details: {
-                action: "kill",
-                success: false,
-                message,
-              },
-            };
-          }
-          const killed = manager.kill(proc.id);
-          if (killed) {
-            const message = `Killed "${proc.name}" (${proc.id})`;
-            return {
-              content: [{ type: "text", text: message }],
-              details: {
-                action: "kill",
-                success: true,
-                message,
-              },
-            };
-          }
-          const message = `Failed to kill "${proc.name}" (${proc.id})`;
-          return {
-            content: [{ type: "text", text: message }],
-            details: {
-              action: "kill",
-              success: false,
-              message,
-            },
-          };
-        }
-
-        case "clear": {
-          const cleared = manager.clearFinished();
-          const message =
-            cleared > 0
-              ? `Cleared ${cleared} finished process(es)`
-              : "No finished processes to clear";
-          return {
-            content: [{ type: "text", text: message }],
-            details: {
-              action: "clear",
-              success: true,
-              message,
-              cleared,
-            },
-          };
-        }
-
-        default:
-          return {
-            content: [
-              { type: "text", text: `Unknown action: ${params.action}` },
-            ],
-            details: {
-              action: params.action,
-              success: false,
-              message: `Unknown action: ${params.action}`,
-            },
-          };
-      }
+    async execute(_toolCallId, params, _onUpdate, ctx) {
+      return executeAction(params, manager, ctx);
     },
 
     renderCall(args: ProcessesParamsType, theme: Theme): Text {
@@ -491,12 +192,28 @@ Note: User always sees notifications in UI. Notification preferences only contro
           theme.fg("success", `${details.processes.length} process(es):`),
         );
         for (const p of details.processes) {
-          const status =
-            p.status === "running"
-              ? theme.fg("accent", "running")
-              : p.success
+          let status: string;
+          switch (p.status) {
+            case "running":
+              status = theme.fg("accent", "running");
+              break;
+            case "terminating":
+              status = theme.fg("warning", "terminating");
+              break;
+            case "terminate_timeout":
+              status = theme.fg("error", "terminate_timeout");
+              break;
+            case "killed":
+              status = theme.fg("warning", "killed");
+              break;
+            case "exited":
+              status = p.success
                 ? theme.fg("success", "exit(0)")
-                : theme.fg("error", `exit(${p.exitCode})`);
+                : theme.fg("error", `exit(${p.exitCode ?? "?"})`);
+              break;
+            default:
+              status = theme.fg("muted", p.status);
+          }
           lines.push(
             `  ${p.id} ${theme.fg("accent", `"${p.name}"`)}: ${truncateCmd(p.command)} [${status}] ${formatRuntime(p.startTime, p.endTime)}`,
           );

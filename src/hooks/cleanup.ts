@@ -3,6 +3,8 @@ import type { ProcessManager } from "../manager";
 
 export function setupCleanupHook(pi: ExtensionAPI, manager: ProcessManager) {
   pi.on("session_shutdown", async () => {
+    manager.stopWatcher();
+    await manager.shutdownKillAll();
     manager.cleanup();
   });
 }

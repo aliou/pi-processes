@@ -1,4 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import { EventEmitter } from "node:events";
 import {
   appendFileSync,
   mkdirSync,
@@ -9,122 +10,134 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-export interface ProcessInfo {
-  id: string;
-  name: string; // Friendly name for display
-  pid: number;
-  command: string;
-  cwd: string;
-  startTime: number;
-  endTime: number | null;
-  status: "running" | "exited" | "killed";
-  exitCode: number | null;
-  success: boolean | null; // null if running, true if exit code 0, false otherwise
-  stdoutFile: string;
-  stderrFile: string;
-  notifyOnSuccess: boolean;
-  notifyOnFailure: boolean;
-  notifyOnKill: boolean;
-}
+import {
+  type KillResult,
+  LIVE_STATUSES,
+  type ManagerEvent,
+  type ProcessInfo,
+  type ProcessStatus,
+  type StartOptions,
+} from "./constants";
+import { isProcessGroupAlive, killProcessGroup } from "./utils";
 
 interface ManagedProcess extends ProcessInfo {
   process: ChildProcess;
-}
-
-// Generate a friendly name from command
-function inferName(command: string): string {
-  const cmd = command.toLowerCase();
-
-  // Dev servers
-  if (cmd.includes("dev") && cmd.includes("backend")) return "backend-dev";
-  if (cmd.includes("dev") && cmd.includes("frontend")) return "frontend-dev";
-  if (cmd.includes("dev") && cmd.includes("api")) return "api-dev";
-  if (
-    cmd.includes("pnpm dev") ||
-    cmd.includes("npm run dev") ||
-    cmd.includes("yarn dev")
-  )
-    return "dev-server";
-  if (cmd.includes("vite")) return "vite-dev";
-  if (cmd.includes("next dev")) return "next-dev";
-
-  // Build
-  if (cmd.includes("build")) return "build";
-  if (cmd.includes("compile")) return "compile";
-
-  // Tests
-  if (cmd.includes("test") || cmd.includes("jest") || cmd.includes("vitest"))
-    return "tests";
-
-  // Watch
-  if (cmd.includes("watch")) return "watcher";
-
-  // Logs
-  if (cmd.includes("tail")) return "log-tail";
-
-  // Docker
-  if (cmd.includes("docker-compose") || cmd.includes("docker compose"))
-    return "docker";
-
-  // Database
-  if (
-    cmd.includes("postgres") ||
-    cmd.includes("mysql") ||
-    cmd.includes("mongo")
-  )
-    return "database";
-
-  // Extract first meaningful word
-  const words = command.split(/\s+/);
-  const firstWord = (words[0] ?? "process")
-    .replace(/^\.\//, "")
-    .replace(/\.(sh|js|ts|py)$/, "");
-  return firstWord.slice(0, 20);
+  lastSignalSent: NodeJS.Signals | null;
 }
 
 export class ProcessManager {
   private processes: Map<string, ManagedProcess> = new Map();
   private counter = 0;
   private logDir: string;
-  onProcessEnd?: (info: ProcessInfo) => void;
+  private events = new EventEmitter();
+  private watcher: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     this.logDir = join(tmpdir(), `pi-processes-${Date.now()}`);
     mkdirSync(this.logDir, { recursive: true });
   }
 
-  private emitProcessEnd(info: ProcessInfo): void {
-    this.onProcessEnd?.(info);
+  onEvent(listener: (event: ManagerEvent) => void): () => void {
+    this.events.on("event", listener);
+    return () => this.events.off("event", listener);
+  }
+
+  private emit(event: ManagerEvent): void {
+    this.events.emit("event", event);
+  }
+
+  private transition(managed: ManagedProcess, next: ProcessStatus): void {
+    if (managed.status === next) return;
+    const prev = managed.status;
+    managed.status = next;
+
+    this.emit({
+      type: "process_status_changed",
+      info: this.toProcessInfo(managed),
+      prev,
+    });
+
+    if (next === "exited" || next === "killed") {
+      this.emit({ type: "process_ended", info: this.toProcessInfo(managed) });
+    }
+
+    this.ensureWatcherRunning();
+    this.stopWatcherIfIdle();
+  }
+
+  private ensureWatcherRunning(): void {
+    if (this.watcher) return;
+    if (!this.hasAliveishProcesses()) return;
+
+    this.watcher = setInterval(() => {
+      this.livenessTick();
+    }, 5000);
+  }
+
+  private stopWatcherIfIdle(): void {
+    if (!this.watcher) return;
+    if (this.hasAliveishProcesses()) return;
+
+    clearInterval(this.watcher);
+    this.watcher = null;
+  }
+
+  private hasAliveishProcesses(): boolean {
+    for (const p of this.processes.values()) {
+      if (LIVE_STATUSES.has(p.status)) return true;
+    }
+    return false;
+  }
+
+  private livenessTick(): void {
+    for (const managed of this.processes.values()) {
+      if (!LIVE_STATUSES.has(managed.status)) continue;
+      if (!managed.pid || managed.pid <= 0) continue;
+
+      const alive = isProcessGroupAlive(managed.pid);
+      if (alive) continue;
+
+      if (!managed.endTime) {
+        managed.endTime = Date.now();
+      }
+
+      if (managed.lastSignalSent) {
+        managed.success = false;
+        managed.exitCode = null;
+        this.transition(managed, "killed");
+      } else {
+        managed.success = false;
+        managed.exitCode = null;
+        this.transition(managed, "exited");
+      }
+    }
   }
 
   start(
+    name: string,
     command: string,
     cwd: string,
-    name?: string,
-    options?: {
-      notifyOnSuccess?: boolean;
-      notifyOnFailure?: boolean;
-      notifyOnKill?: boolean;
-    },
+    options?: StartOptions,
   ): ProcessInfo {
     const id = `proc_${++this.counter}`;
-    const friendlyName = name || inferName(command);
     const stdoutFile = join(this.logDir, `${id}-stdout.log`);
     const stderrFile = join(this.logDir, `${id}-stderr.log`);
 
     appendFileSync(stdoutFile, "");
     appendFileSync(stderrFile, "");
 
-    const child = spawn(command, {
+    const child = spawn("/bin/bash", ["-lc", command], {
       cwd,
-      shell: true,
+      env: process.env,
       stdio: ["ignore", "pipe", "pipe"],
-      detached: false,
+      detached: true,
     });
+
+    child.unref();
 
     const managed: ManagedProcess = {
       id,
-      name: friendlyName,
+      name,
       pid: child.pid ?? -1,
       command,
       cwd,
@@ -139,13 +152,29 @@ export class ProcessManager {
       notifyOnFailure: options?.notifyOnFailure ?? true,
       notifyOnKill: options?.notifyOnKill ?? false,
       process: child,
+      lastSignalSent: null,
     };
+
+    this.processes.set(id, managed);
+
+    if (!child.pid) {
+      try {
+        appendFileSync(stderrFile, "Spawn error: missing pid\n");
+      } catch {
+        // Ignore
+      }
+      managed.exitCode = -1;
+      managed.success = false;
+      managed.endTime = Date.now();
+      this.transition(managed, "exited");
+      return this.toProcessInfo(managed);
+    }
 
     child.stdout?.on("data", (data: Buffer) => {
       try {
         appendFileSync(stdoutFile, data);
       } catch {
-        // Ignore write errors
+        // Ignore
       }
     });
 
@@ -153,20 +182,22 @@ export class ProcessManager {
       try {
         appendFileSync(stderrFile, data);
       } catch {
-        // Ignore write errors
+        // Ignore
       }
     });
 
     child.on("close", (code, signal) => {
-      // Already handled (e.g., by checkRunningProcesses detecting external kill)
-      if (managed.status !== "running") {
-        return;
-      }
+      if (managed.endTime) return;
+
       managed.exitCode = code;
       managed.endTime = Date.now();
       managed.success = code === 0;
-      managed.status = signal ? "killed" : "exited";
-      this.emitProcessEnd(this.toProcessInfo(managed));
+
+      if (signal) {
+        this.transition(managed, "killed");
+      } else {
+        this.transition(managed, "exited");
+      }
     });
 
     child.on("error", (err) => {
@@ -175,41 +206,36 @@ export class ProcessManager {
       } catch {
         // Ignore
       }
-      managed.status = "exited";
-      managed.exitCode = -1;
-      managed.success = false;
-      managed.endTime = Date.now();
-      this.emitProcessEnd(this.toProcessInfo(managed));
+
+      if (!managed.endTime) {
+        managed.exitCode = -1;
+        managed.success = false;
+        managed.endTime = Date.now();
+        this.transition(managed, "exited");
+      }
     });
 
-    this.processes.set(id, managed);
+    this.emit({ type: "process_started", info: this.toProcessInfo(managed) });
+    this.ensureWatcherRunning();
 
     return this.toProcessInfo(managed);
   }
 
   list(): ProcessInfo[] {
-    // Check if any "running" processes have actually exited
-    this.checkRunningProcesses();
     return Array.from(this.processes.values()).map((p) =>
       this.toProcessInfo(p),
     );
   }
 
   get(id: string): ProcessInfo | null {
-    this.checkRunningProcesses();
     const managed = this.processes.get(id);
     return managed ? this.toProcessInfo(managed) : null;
   }
 
-  // Find by ID or name (partial match)
   find(query: string): ProcessInfo | null {
-    this.checkRunningProcesses();
-
-    // Exact ID match first
     const byId = this.processes.get(query);
     if (byId) return this.toProcessInfo(byId);
 
-    // Search by name (case insensitive, partial match)
     const queryLower = query.toLowerCase();
     for (const managed of this.processes.values()) {
       if (managed.name.toLowerCase().includes(queryLower)) {
@@ -259,113 +285,150 @@ export class ProcessManager {
     };
   }
 
-  kill(id: string): boolean {
+  async kill(
+    id: string,
+    opts?: { signal?: NodeJS.Signals; timeoutMs?: number },
+  ): Promise<KillResult> {
     const managed = this.processes.get(id);
-    if (!managed) return false;
-
-    if (managed.status !== "running") {
-      return true;
+    if (!managed) {
+      return {
+        ok: false,
+        info: {
+          id,
+          name: "(unknown)",
+          pid: -1,
+          command: "",
+          cwd: "",
+          startTime: 0,
+          endTime: null,
+          status: "exited",
+          exitCode: null,
+          success: false,
+          stdoutFile: "",
+          stderrFile: "",
+          notifyOnSuccess: false,
+          notifyOnFailure: true,
+          notifyOnKill: false,
+        },
+        reason: "not_found",
+      };
     }
 
-    // Disable kill notification since this is intentional
+    const signal = opts?.signal ?? "SIGTERM";
+    const timeoutMs = opts?.timeoutMs ?? 3000;
+
     managed.notifyOnKill = false;
 
-    managed.status = "killed";
-    managed.endTime = Date.now();
-    managed.success = false;
+    if (!LIVE_STATUSES.has(managed.status)) {
+      return { ok: true, info: this.toProcessInfo(managed) };
+    }
+
+    this.transition(managed, "terminating");
 
     try {
-      managed.process.kill("SIGTERM");
-
-      setTimeout(() => {
-        try {
-          if (!managed.process.killed) {
-            managed.process.kill("SIGKILL");
-          }
-        } catch {
-          // Process may already be dead
-        }
-      }, 3000);
-
-      return true;
-    } catch {
-      return false;
+      killProcessGroup(managed.pid, signal);
+      managed.lastSignalSent = signal;
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+      if (err.code !== "EPERM") {
+        return {
+          ok: false,
+          info: this.toProcessInfo(managed),
+          reason: "error",
+        };
+      }
     }
+
+    const graceMs = signal === "SIGKILL" ? 200 : timeoutMs;
+
+    await new Promise((r) => setTimeout(r, graceMs));
+
+    const alive = isProcessGroupAlive(managed.pid);
+
+    if (alive) {
+      this.transition(managed, "terminate_timeout");
+      return {
+        ok: false,
+        info: this.toProcessInfo(managed),
+        reason: "timeout",
+      };
+    }
+
+    if (!managed.endTime) {
+      managed.endTime = Date.now();
+      managed.exitCode = null;
+      managed.success = false;
+    }
+
+    this.transition(managed, "killed");
+    return { ok: true, info: this.toProcessInfo(managed) };
   }
 
-  // Clear finished processes (not running)
   clearFinished(): number {
     let cleared = 0;
     for (const [id, managed] of this.processes) {
-      if (managed.status !== "running") {
-        // Clean up log files
-        try {
-          rmSync(managed.stdoutFile, { force: true });
-          rmSync(managed.stderrFile, { force: true });
-        } catch {
-          // Ignore
-        }
-        this.processes.delete(id);
-        cleared++;
+      if (LIVE_STATUSES.has(managed.status)) {
+        continue;
       }
+
+      try {
+        rmSync(managed.stdoutFile, { force: true });
+        rmSync(managed.stderrFile, { force: true });
+      } catch {
+        // Ignore
+      }
+
+      this.processes.delete(id);
+      cleared++;
     }
+
+    if (cleared > 0) {
+      this.emit({ type: "processes_changed" });
+    }
+
+    this.stopWatcherIfIdle();
     return cleared;
   }
 
-  killAll(): void {
-    for (const [id] of this.processes) {
-      this.kill(id);
-    }
-  }
+  async shutdownKillAll(): Promise<void> {
+    const aliveish = Array.from(this.processes.values()).filter((p) =>
+      LIVE_STATUSES.has(p.status),
+    );
 
-  // Check if a PID is still alive (works across platforms)
-  private isProcessAlive(pid: number): boolean {
-    try {
-      // Signal 0 checks if process exists without actually sending a signal
-      process.kill(pid, 0);
-      return true;
-    } catch (error) {
-      // If error code is ESRCH, process doesn't exist
-      // If error code is EPERM, process exists but we don't have permission (still alive)
-      const err = error as NodeJS.ErrnoException;
-      return err.code === "EPERM";
-    }
-  }
-
-  // Check all running processes and update status if they've exited
-  private checkRunningProcesses(): void {
-    for (const managed of this.processes.values()) {
-      if (managed.status === "running" && !this.isProcessAlive(managed.pid)) {
-        // Process is no longer alive but we didn't get the close event yet
-        // Mark it as exited with unknown exit code
-        managed.status = "exited";
-        managed.exitCode = null;
-        managed.success = false;
-        managed.endTime = Date.now();
-        this.emitProcessEnd(this.toProcessInfo(managed));
+    for (const p of aliveish) {
+      const term = await this.kill(p.id, {
+        signal: "SIGTERM",
+        timeoutMs: 3000,
+      });
+      if (!term.ok && term.reason === "timeout") {
+        await this.kill(p.id, { signal: "SIGKILL", timeoutMs: 200 });
       }
+    }
+  }
+
+  stopWatcher(): void {
+    if (this.watcher) {
+      clearInterval(this.watcher);
+      this.watcher = null;
     }
   }
 
   cleanup(): void {
-    this.killAll();
+    this.stopWatcher();
+
+    for (const p of this.processes.values()) {
+      if (!LIVE_STATUSES.has(p.status)) continue;
+      try {
+        killProcessGroup(p.pid, "SIGKILL");
+      } catch {
+        // Ignore
+      }
+    }
+
     try {
       rmSync(this.logDir, { recursive: true, force: true });
     } catch {
-      // Ignore cleanup errors
-    }
-  }
-
-  private readTailLines(filePath: string, lines: number): string[] {
-    try {
-      const content = readFileSync(filePath, "utf-8");
-      const allLines = content.split("\n");
-      if (allLines.length > 0 && allLines[allLines.length - 1] === "") {
-        allLines.pop();
-      }
-      return allLines.slice(-lines);
-    } catch {
-      return [];
+      // Ignore
     }
   }
 
@@ -380,6 +443,19 @@ export class ProcessManager {
       };
     } catch {
       return { stdout: 0, stderr: 0 };
+    }
+  }
+
+  private readTailLines(filePath: string, lines: number): string[] {
+    try {
+      const content = readFileSync(filePath, "utf-8");
+      const allLines = content.split("\n");
+      if (allLines.length > 0 && allLines[allLines.length - 1] === "") {
+        allLines.pop();
+      }
+      return allLines.slice(-lines);
+    } catch {
+      return [];
     }
   }
 
@@ -403,3 +479,5 @@ export class ProcessManager {
     };
   }
 }
+
+export type { ProcessInfo, ProcessStatus, ManagerEvent, KillResult };

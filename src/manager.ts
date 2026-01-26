@@ -390,18 +390,13 @@ export class ProcessManager {
     return cleared;
   }
 
-  async shutdownKillAll(): Promise<void> {
-    const aliveish = Array.from(this.processes.values()).filter((p) =>
-      LIVE_STATUSES.has(p.status),
-    );
-
-    for (const p of aliveish) {
-      const term = await this.kill(p.id, {
-        signal: "SIGTERM",
-        timeoutMs: 3000,
-      });
-      if (!term.ok && term.reason === "timeout") {
-        await this.kill(p.id, { signal: "SIGKILL", timeoutMs: 200 });
+  shutdownKillAll(): void {
+    for (const p of this.processes.values()) {
+      if (!LIVE_STATUSES.has(p.status)) continue;
+      try {
+        killProcessGroup(p.pid, "SIGKILL");
+      } catch {
+        // Ignore - process may already be dead
       }
     }
   }

@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.2.1
+
+### Patch Changes
+
+- 5f27afd: Bump to Pi v0.50.0.
+
 ## 0.2.0
 
 ### Minor Changes

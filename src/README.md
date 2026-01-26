@@ -2,6 +2,10 @@
 
 Manage background processes from Pi. Start long-running commands (dev servers, build watchers, log tailers) without blocking the conversation.
 
+## Demo
+
+<video src="https://assets.aliou.me/pi-extensions/2026-01-26-processes-demo.mp4" controls playsinline muted></video>
+
 ## Installation
 
 Install via npm:

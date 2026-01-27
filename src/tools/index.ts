@@ -9,7 +9,7 @@ import { Text } from "@mariozechner/pi-tui";
 import { type Static, Type } from "@sinclair/typebox";
 import type { ProcessesDetails } from "../constants";
 import type { ProcessManager } from "../manager";
-import { formatRuntime, truncateCmd } from "../utils";
+import { formatRuntime, hasAnsi, stripAnsi, truncateCmd } from "../utils";
 import { executeAction } from "./actions";
 
 const ProcessesParams = Type.Object({
@@ -144,12 +144,15 @@ Note: User always sees notifications in UI. Notification preferences only contro
         const lines: string[] = [];
         lines.push(theme.fg("muted", details.message));
 
+        let hadAnsi = false;
+
         if (details.output.stdout.length > 0) {
           lines.push("");
           lines.push(theme.fg("accent", "stdout:"));
           const stdoutLines = details.output.stdout.slice(-20);
           for (const line of stdoutLines) {
-            lines.push(line);
+            if (!hadAnsi && hasAnsi(line)) hadAnsi = true;
+            lines.push(stripAnsi(line));
           }
           if (details.output.stdout.length > 20) {
             lines.push(
@@ -166,7 +169,8 @@ Note: User always sees notifications in UI. Notification preferences only contro
           lines.push(theme.fg("warning", "stderr:"));
           const stderrLines = details.output.stderr.slice(-10);
           for (const line of stderrLines) {
-            lines.push(theme.fg("warning", line));
+            if (!hadAnsi && hasAnsi(line)) hadAnsi = true;
+            lines.push(theme.fg("warning", stripAnsi(line)));
           }
           if (details.output.stderr.length > 10) {
             lines.push(
@@ -176,6 +180,13 @@ Note: User always sees notifications in UI. Notification preferences only contro
               ),
             );
           }
+        }
+
+        if (hadAnsi) {
+          lines.push("");
+          lines.push(
+            theme.fg("muted", "ANSI escape codes were stripped from output"),
+          );
         }
 
         return new Text(lines.join("\n"), 0, 0);

@@ -2,6 +2,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
+import { visibleWidth } from "@mariozechner/pi-tui";
 import type { ProcessInfo } from "../constants";
 import type { ProcessManager } from "../manager";
 
@@ -36,6 +37,7 @@ function formatProcessStatus(
 function renderWidget(
   processes: ProcessInfo[],
   theme: ExtensionContext["ui"]["theme"],
+  maxWidth?: number,
 ): string[] {
   if (processes.length === 0) {
     return [];
@@ -54,27 +56,48 @@ function renderWidget(
       p.status !== "terminate_timeout",
   );
 
-  const parts: string[] = [];
-
-  for (const proc of aliveish) {
-    parts.push(formatProcessStatus(proc, theme));
-  }
-
-  const recentFinished = finished
-    .sort((a, b) => (b.endTime ?? 0) - (a.endTime ?? 0))
-    .slice(0, 3);
-
-  for (const proc of recentFinished) {
-    parts.push(formatProcessStatus(proc, theme));
-  }
-
-  const hiddenCount = finished.length - recentFinished.length;
-  if (hiddenCount > 0) {
-    parts.push(theme.fg("dim", `+${hiddenCount} more`));
-  }
+  const allProcs: ProcessInfo[] = [
+    ...aliveish,
+    ...finished.sort((a, b) => (b.endTime ?? 0) - (a.endTime ?? 0)),
+  ];
 
   const prefix = theme.fg("dim", "processes: ");
-  return [prefix + parts.join(theme.fg("dim", " | "))];
+  const prefixLen = visibleWidth(prefix);
+  const separator = theme.fg("dim", " | ");
+  const separatorLen = visibleWidth(separator);
+  const effectiveMax = maxWidth ?? 200;
+
+  const parts: string[] = [];
+  let currentLen = prefixLen;
+  let includedCount = 0;
+
+  for (const proc of allProcs) {
+    const formatted = formatProcessStatus(proc, theme);
+    const formattedLen = visibleWidth(formatted);
+
+    // Check if adding this part would exceed the width
+    const needed =
+      includedCount > 0 ? separatorLen + formattedLen : formattedLen;
+
+    if (currentLen + needed > effectiveMax && includedCount > 0) {
+      // Show how many are hidden
+      const remaining = allProcs.length - includedCount;
+      if (remaining > 0) {
+        parts.push(theme.fg("dim", `+${remaining} more`));
+      }
+      break;
+    }
+
+    parts.push(formatted);
+    currentLen += needed;
+    includedCount++;
+  }
+
+  if (parts.length === 0) {
+    return [];
+  }
+
+  return [prefix + parts.join(separator)];
 }
 
 export function setupProcessWidget(pi: ExtensionAPI, manager: ProcessManager) {
@@ -84,7 +107,8 @@ export function setupProcessWidget(pi: ExtensionAPI, manager: ProcessManager) {
     if (!latestContext?.hasUI) return;
 
     const processes = manager.list();
-    const lines = renderWidget(processes, latestContext.ui.theme);
+    const maxWidth = process.stdout.columns || 120;
+    const lines = renderWidget(processes, latestContext.ui.theme, maxWidth);
 
     if (lines.length === 0) {
       latestContext.ui.setWidget(WIDGET_ID, undefined);

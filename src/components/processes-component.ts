@@ -2,6 +2,7 @@ import type { Theme } from "@mariozechner/pi-coding-agent";
 import { type Component, matchesKey, visibleWidth } from "@mariozechner/pi-tui";
 import type { ProcessInfo } from "../constants";
 import type { ProcessManager } from "../manager";
+import { stripAnsi } from "../utils";
 import { statusIcon, statusLabel } from "./status-format";
 
 // Max visible processes in the list (scrollable if more)
@@ -223,23 +224,25 @@ export class ProcessesComponent implements Component {
       const statusWidth = 18;
       const timeWidth = 8;
       const sizeWidth = 8;
+
+      const hasProcessScroll = processes.length > MAX_VISIBLE_PROCESSES;
+      const headerSuffixText = hasProcessScroll
+        ? ` [${this.processScrollOffset + 1}-${Math.min(this.processScrollOffset + MAX_VISIBLE_PROCESSES, processes.length)}/${processes.length}]`
+        : "";
+      const headerSuffixLen = hasProcessScroll ? headerSuffixText.length : 0;
+
+      // Reserve space for scroll suffix in the command column
       const cmdWidth = Math.max(
-        20,
+        10,
         innerWidth -
           prefixWidth -
           idWidth -
           nameWidth -
           statusWidth -
           timeWidth -
-          sizeWidth,
+          sizeWidth -
+          headerSuffixLen,
       );
-
-      const hasProcessScroll = processes.length > MAX_VISIBLE_PROCESSES;
-      const headerSuffix = hasProcessScroll
-        ? dim(
-            ` [${this.processScrollOffset + 1}-${Math.min(this.processScrollOffset + MAX_VISIBLE_PROCESSES, processes.length)}/${processes.length}]`,
-          )
-        : "";
 
       lines.push(padLine(""));
       const header =
@@ -250,7 +253,7 @@ export class ProcessesComponent implements Component {
         dim("Status".padEnd(statusWidth)) +
         dim("Time".padEnd(timeWidth)) +
         dim("Size".padStart(sizeWidth)) +
-        headerSuffix;
+        (hasProcessScroll ? dim(headerSuffixText) : "");
       lines.push(padLine(header));
       lines.push(border("─".repeat(width)));
 
@@ -305,13 +308,27 @@ export class ProcessesComponent implements Component {
 
         lines.push(border("─".repeat(width)));
 
-        const logTitle = `Output: ${accent(selected.name)} ${dim(`(${selected.id})`)}`;
-        const sizeInfo = sizes
-          ? dim(
-              ` stdout: ${formatBytes(sizes.stdout)}, stderr: ${formatBytes(sizes.stderr)}`,
-            )
+        const logTitlePlain = `Output: ${selected.name} (${selected.id})`;
+        const sizeInfoPlain = sizes
+          ? ` stdout: ${formatBytes(sizes.stdout)}, stderr: ${formatBytes(sizes.stderr)}`
           : "";
-        lines.push(padLine(logTitle + sizeInfo));
+        const combinedPlain = logTitlePlain + sizeInfoPlain;
+        // Truncate if combined exceeds innerWidth, prioritizing the title
+        if (combinedPlain.length <= innerWidth) {
+          const logTitle = `Output: ${accent(selected.name)} ${dim(`(${selected.id})`)}`;
+          const sizeInfo = sizes ? dim(sizeInfoPlain) : "";
+          lines.push(padLine(logTitle + sizeInfo));
+        } else {
+          const maxNameLen = Math.max(
+            8,
+            innerWidth -
+              (`Output:  (${selected.id})`.length + sizeInfoPlain.length),
+          );
+          const tName = truncate(selected.name, maxNameLen);
+          const logTitle = `Output: ${accent(tName)} ${dim(`(${selected.id})`)}`;
+          const sizeInfo = sizes ? dim(sizeInfoPlain) : "";
+          lines.push(padLine(logTitle + sizeInfo));
+        }
         lines.push(padLine(""));
 
         let renderedLines = 0;
@@ -341,7 +358,10 @@ export class ProcessesComponent implements Component {
               this.logScrollOffset > 0 ? logLines.length - endIdx : 0;
 
             for (const line of visibleLines) {
-              const displayLine = truncate(line.text, innerWidth - 2);
+              const displayLine = truncate(
+                stripAnsi(line.text),
+                innerWidth - 2,
+              );
               if (line.type === "stderr") {
                 lines.push(padLine(warning(displayLine)));
               } else {

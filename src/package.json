@@ -2,7 +2,7 @@
   "name": "@aliou/pi-processes",
   "version": "0.2.2",
   "type": "module",
-  "private": true,
+  "private": false,
   "keywords": [
     "pi-package",
     "pi-extension",

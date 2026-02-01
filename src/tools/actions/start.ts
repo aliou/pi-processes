@@ -5,9 +5,9 @@ import type { ProcessManager } from "../../manager";
 interface StartParams {
   name?: string;
   command?: string;
-  notifyOnSuccess?: boolean;
-  notifyOnFailure?: boolean;
-  notifyOnKill?: boolean;
+  alertOnSuccess?: boolean;
+  alertOnFailure?: boolean;
+  alertOnKill?: boolean;
 }
 
 export function executeStart(
@@ -37,9 +37,9 @@ export function executeStart(
   }
 
   const proc = manager.start(params.name, params.command, ctx.cwd, {
-    notifyOnSuccess: params.notifyOnSuccess,
-    notifyOnFailure: params.notifyOnFailure,
-    notifyOnKill: params.notifyOnKill,
+    alertOnSuccess: params.alertOnSuccess,
+    alertOnFailure: params.alertOnFailure,
+    alertOnKill: params.alertOnKill,
   });
 
   const message = `Started "${proc.name}" (${proc.id}, PID: ${proc.pid})\nLogs: ${proc.stdoutFile}`;

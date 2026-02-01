@@ -27,9 +27,9 @@ export interface ProcessInfo {
   success: boolean | null; // null if running, true if exit code 0, false otherwise
   stdoutFile: string;
   stderrFile: string;
-  notifyOnSuccess: boolean;
-  notifyOnFailure: boolean;
-  notifyOnKill: boolean;
+  alertOnSuccess: boolean;
+  alertOnFailure: boolean;
+  alertOnKill: boolean;
 }
 
 export type ManagerEvent =
@@ -43,9 +43,9 @@ export type KillResult =
   | { ok: false; info: ProcessInfo; reason: "not_found" | "timeout" | "error" };
 
 export interface StartOptions {
-  notifyOnSuccess?: boolean;
-  notifyOnFailure?: boolean;
-  notifyOnKill?: boolean;
+  alertOnSuccess?: boolean;
+  alertOnFailure?: boolean;
+  alertOnKill?: boolean;
 }
 
 export interface ProcessesDetails {

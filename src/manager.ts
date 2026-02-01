@@ -148,9 +148,9 @@ export class ProcessManager {
       success: null,
       stdoutFile,
       stderrFile,
-      notifyOnSuccess: options?.notifyOnSuccess ?? false,
-      notifyOnFailure: options?.notifyOnFailure ?? true,
-      notifyOnKill: options?.notifyOnKill ?? false,
+      alertOnSuccess: options?.alertOnSuccess ?? false,
+      alertOnFailure: options?.alertOnFailure ?? true,
+      alertOnKill: options?.alertOnKill ?? false,
       process: child,
       lastSignalSent: null,
     };
@@ -306,9 +306,9 @@ export class ProcessManager {
           success: false,
           stdoutFile: "",
           stderrFile: "",
-          notifyOnSuccess: false,
-          notifyOnFailure: true,
-          notifyOnKill: false,
+          alertOnSuccess: false,
+          alertOnFailure: true,
+          alertOnKill: false,
         },
         reason: "not_found",
       };
@@ -317,7 +317,7 @@ export class ProcessManager {
     const signal = opts?.signal ?? "SIGTERM";
     const timeoutMs = opts?.timeoutMs ?? 3000;
 
-    managed.notifyOnKill = false;
+    managed.alertOnKill = false;
 
     if (!LIVE_STATUSES.has(managed.status)) {
       return { ok: true, info: this.toProcessInfo(managed) };
@@ -468,9 +468,9 @@ export class ProcessManager {
       success: managed.success,
       stdoutFile: managed.stdoutFile,
       stderrFile: managed.stderrFile,
-      notifyOnSuccess: managed.notifyOnSuccess,
-      notifyOnFailure: managed.notifyOnFailure,
-      notifyOnKill: managed.notifyOnKill,
+      alertOnSuccess: managed.alertOnSuccess,
+      alertOnFailure: managed.alertOnFailure,
+      alertOnKill: managed.alertOnKill,
     };
   }
 }

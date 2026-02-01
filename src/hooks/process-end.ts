@@ -37,11 +37,13 @@ export function setupProcessEndHook(pi: ExtensionAPI, manager: ProcessManager) {
 
     const info: ProcessInfo = event.info;
 
-    // Check notification preferences
-    const shouldNotify =
-      (info.status === "killed" && info.notifyOnKill) ||
-      (info.status === "exited" && info.success && info.notifyOnSuccess) ||
-      (info.status === "exited" && !info.success && info.notifyOnFailure);
+    // Determine if the agent should get a turn to react to this process ending.
+    // When true, the agent receives the message in its context and can respond
+    // (e.g. check results, fix code, restart the process).
+    const triggerAgentTurn =
+      (info.status === "killed" && info.alertOnKill) ||
+      (info.status === "exited" && info.success && info.alertOnSuccess) ||
+      (info.status === "exited" && !info.success && info.alertOnFailure);
 
     const runtime = formatRuntime(info.startTime, info.endTime);
 
@@ -65,27 +67,26 @@ export function setupProcessEndHook(pi: ExtensionAPI, manager: ProcessManager) {
       latestContext.ui.notify(message, level);
     }
 
-    // Only send message to agent if notification preferences allow
-    if (shouldNotify) {
-      const details: ProcessUpdateDetails = {
-        processId: info.id,
-        processName: info.name,
-        command: info.command,
-        status: info.status as "exited" | "killed",
-        exitCode: info.exitCode,
-        success: info.success ?? false,
-        runtime,
-      };
+    // Always send the message so it appears in the conversation history.
+    // Only trigger an agent turn when the notification preferences say so.
+    const details: ProcessUpdateDetails = {
+      processId: info.id,
+      processName: info.name,
+      command: info.command,
+      status: info.status as "exited" | "killed",
+      exitCode: info.exitCode,
+      success: info.success ?? false,
+      runtime,
+    };
 
-      pi.sendMessage(
-        {
-          customType: MESSAGE_TYPE_PROCESS_UPDATE,
-          content: message,
-          display: true,
-          details,
-        },
-        { triggerTurn: false },
-      );
-    }
+    pi.sendMessage(
+      {
+        customType: MESSAGE_TYPE_PROCESS_UPDATE,
+        content: message,
+        display: true,
+        details,
+      },
+      { triggerTurn: triggerAgentTurn },
+    );
   });
 }

@@ -35,22 +35,22 @@ const ProcessesParams = Type.Object({
         "Process ID or name to match (required for output/kill/logs). Can be proc_N or friendly name.",
     }),
   ),
-  notifyOnSuccess: Type.Optional(
+  alertOnSuccess: Type.Optional(
     Type.Boolean({
       description:
-        "Notify when process completes successfully (default: false). Use for builds/tests where you need confirmation.",
+        "Get a turn to react when process completes successfully (default: false). Use for builds/tests where you need confirmation.",
     }),
   ),
-  notifyOnFailure: Type.Optional(
+  alertOnFailure: Type.Optional(
     Type.Boolean({
       description:
-        "Notify when process fails/crashes (default: true). Use to be alerted of unexpected failures.",
+        "Get a turn to react when process fails/crashes (default: true). Use to be alerted of unexpected failures.",
     }),
   ),
-  notifyOnKill: Type.Optional(
+  alertOnKill: Type.Optional(
     Type.Boolean({
       description:
-        "Notify when process is killed by external signal (default: false). Note: killing via tool never notifies.",
+        "Get a turn to react when process is killed by external signal (default: false). Note: killing via tool never triggers a turn.",
     }),
   ),
 });
@@ -63,9 +63,9 @@ export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
     label: "Processes",
     description: `Manage background processes. Actions:
 - start: Run command in background (requires 'name' and 'command')
-  - notifyOnSuccess (default: false): Get notified when process completes successfully
-  - notifyOnFailure (default: true): Get notified when process crashes/fails
-  - notifyOnKill (default: false): Get notified if killed by external signal (killing via tool never notifies)
+  - alertOnSuccess (default: false): Get a turn to react when process completes successfully
+  - alertOnFailure (default: true): Get a turn to react when process crashes/fails
+  - alertOnKill (default: false): Get a turn to react if killed by external signal (killing via tool never triggers a turn)
 - list: Show all managed processes with their IDs and names
 - output: Get recent stdout/stderr (requires 'id' - can be proc_N or name match)
 - logs: Get log file paths to inspect with read tool (requires 'id')
@@ -74,7 +74,7 @@ export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
 
 Important: You DON'T need to poll or wait for processes. Notifications arrive automatically based on your preferences. Start processes and continue with other work - you'll be informed if something requires attention.
 
-Note: User always sees notifications in UI. Notification preferences only control whether YOU (the agent) are informed.`,
+Note: User always sees process updates in the UI. The notify flags control whether YOU (the agent) get a turn to react (e.g. check results, fix code, restart).`,
 
     parameters: ProcessesParams,
 

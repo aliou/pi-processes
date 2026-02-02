@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.3.2
+
+### Patch Changes
+
+- dccbf2d: Add preview video to package.json for the pi package browser.
+
 ## 0.3.1
 
 ### Patch Changes

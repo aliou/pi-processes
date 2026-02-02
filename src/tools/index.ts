@@ -78,7 +78,7 @@ Note: User always sees process updates in the UI. The notify flags control wheth
 
     parameters: ProcessesParams,
 
-    async execute(_toolCallId, params, _onUpdate, ctx) {
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       return executeAction(params, manager, ctx);
     },
 

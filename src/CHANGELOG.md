@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.3.3
+
+### Patch Changes
+
+- b5c4cd1: Update demo video and image URLs for the Pi package browser.
+
 ## 0.3.2
 
 ### Patch Changes

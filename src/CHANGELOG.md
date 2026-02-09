@@ -1,5 +1,13 @@
 # @aliou/pi-processes
 
+## 0.4.1
+
+### Patch Changes
+
+- 1167a3d: Remove auto-stream of logs widget on process start. The log stream widget should only appear when the user explicitly runs /process:stream.
+- Updated dependencies [756552a]
+  - @aliou/pi-utils-settings@0.3.0
+
 ## 0.4.0
 
 ### Minor Changes

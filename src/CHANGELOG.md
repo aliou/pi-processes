@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.4.0
+
+### Minor Changes
+
+- 393b9d7: Rename tool and commands from `processes` to `process`. Add /process:stream, /process:logs, /process:kill, /process:clear commands with autocomplete. Add settings support via /process:settings. Auto-stream logs widget on process start.
+
 ## 0.3.4
 
 ### Patch Changes

@@ -45,7 +45,7 @@ function truncate(str: string, maxLen: number): string {
 export class ProcessesComponent implements Component {
   private tui: { requestRender: () => void };
   private theme: Theme;
-  private onClose: () => void;
+  private onClose: (processId?: string) => void;
   private manager: ProcessManager;
 
   private selectedIndex = 0;
@@ -59,7 +59,7 @@ export class ProcessesComponent implements Component {
   constructor(
     tui: { requestRender: () => void },
     theme: Theme,
-    onClose: () => void,
+    onClose: (processId?: string) => void,
     manager: ProcessManager,
   ) {
     this.tui = tui;
@@ -114,6 +114,19 @@ export class ProcessesComponent implements Component {
       this.logScrollOffset += 5;
       this.invalidate();
       this.tui.requestRender();
+      return true;
+    }
+
+    // Stream logs for selected process
+    if (matchesKey(data, "return")) {
+      if (processes.length > 0 && this.selectedIndex < processes.length) {
+        const proc = processes[this.selectedIndex];
+        if (proc) {
+          this.unsubscribe?.();
+          this.unsubscribe = null;
+          this.onClose(proc.id);
+        }
+      }
       return true;
     }
 
@@ -382,9 +395,10 @@ export class ProcessesComponent implements Component {
     lines.push(border("─".repeat(width)));
 
     const footerLeft =
+      `${dim("enter")} stream  ` +
       `${dim("j/k")} select  ` +
       `${dim("x")} term/kill  ` +
-      `${dim("c")} clear-finished  ` +
+      `${dim("c")} clear  ` +
       `${dim("q")} quit`;
 
     let footerRight = "";

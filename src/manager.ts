@@ -222,9 +222,9 @@ export class ProcessManager {
   }
 
   list(): ProcessInfo[] {
-    return Array.from(this.processes.values()).map((p) =>
-      this.toProcessInfo(p),
-    );
+    return Array.from(this.processes.values())
+      .map((p) => this.toProcessInfo(p))
+      .reverse();
   }
 
   get(id: string): ProcessInfo | null {

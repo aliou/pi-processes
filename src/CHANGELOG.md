@@ -1,5 +1,12 @@
 # @aliou/pi-processes
 
+## 0.3.4
+
+### Patch Changes
+
+- 228d44d: Fix spurious "requires interactive mode" notification on TUI dismiss
+- e9916ca: Strip all CSI sequences in stripAnsi, not just SGR and a few cursor codes
+
 ## 0.3.3
 
 ### Patch Changes

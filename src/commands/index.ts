@@ -48,15 +48,10 @@ function allProcessCompletions(manager: ProcessManager) {
   };
 }
 
-export interface ProcessCommands {
-  /** Start streaming logs for a process via the widget. Needs a UI context. */
-  streamProcess: (processId: string, ui: ExtensionCommandContext["ui"]) => void;
-}
-
 export function setupProcessesCommands(
   pi: ExtensionAPI,
   manager: ProcessManager,
-): ProcessCommands {
+): void {
   let streamingProcessId: string | null = null;
 
   // ── /process:list ──────────────────────────────────────────────────
@@ -304,12 +299,6 @@ export function setupProcessesCommands(
       { placement: "aboveEditor" },
     );
   }
-
-  return {
-    streamProcess: (processId: string, ui: ExtensionCommandContext["ui"]) => {
-      startStreaming(ui, manager, processId);
-    },
-  };
 }
 
 async function pickProcess(

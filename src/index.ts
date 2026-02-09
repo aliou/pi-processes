@@ -19,8 +19,8 @@ export default async function (pi: ExtensionAPI) {
   const manager = new ProcessManager();
 
   const { update: updateWidget } = setupProcessesHooks(pi, manager);
-  const commands = setupProcessesCommands(pi, manager);
-  setupProcessesTools(pi, manager, commands);
+  setupProcessesCommands(pi, manager);
+  setupProcessesTools(pi, manager);
   registerProcessesSettings(pi, () => {
     updateWidget();
   });

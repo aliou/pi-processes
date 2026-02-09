@@ -57,13 +57,7 @@ const ProcessesParams = Type.Object({
 
 type ProcessesParamsType = Static<typeof ProcessesParams>;
 
-import type { ProcessCommands } from "../commands";
-
-export function setupProcessesTools(
-  pi: ExtensionAPI,
-  manager: ProcessManager,
-  commands: ProcessCommands,
-) {
+export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
   pi.registerTool<typeof ProcessesParams, ProcessesDetails>({
     name: "process",
     label: "Process",
@@ -85,17 +79,7 @@ Note: User always sees process updates in the UI. The notify flags control wheth
     parameters: ProcessesParams,
 
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const result = await executeAction(params, manager, ctx);
-      // Auto-stream logs when a process is started successfully.
-      if (
-        params.action === "start" &&
-        result.details?.success &&
-        result.details.process &&
-        ctx.hasUI
-      ) {
-        commands.streamProcess(result.details.process.id, ctx.ui);
-      }
-      return result;
+      return executeAction(params, manager, ctx);
     },
 
     renderCall(args: ProcessesParamsType, theme: Theme): Text {

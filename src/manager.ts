@@ -23,6 +23,7 @@ import { isProcessGroupAlive, killProcessGroup } from "./utils";
 interface ManagedProcess extends ProcessInfo {
   process: ChildProcess;
   lastSignalSent: NodeJS.Signals | null;
+  combinedFile: string;
 }
 
 export class ProcessManager {
@@ -122,9 +123,11 @@ export class ProcessManager {
     const id = `proc_${++this.counter}`;
     const stdoutFile = join(this.logDir, `${id}-stdout.log`);
     const stderrFile = join(this.logDir, `${id}-stderr.log`);
+    const combinedFile = join(this.logDir, `${id}-combined.log`);
 
     appendFileSync(stdoutFile, "");
     appendFileSync(stderrFile, "");
+    appendFileSync(combinedFile, "");
 
     const child = spawn("/bin/bash", ["-lc", command], {
       cwd,
@@ -148,6 +151,7 @@ export class ProcessManager {
       success: null,
       stdoutFile,
       stderrFile,
+      combinedFile,
       alertOnSuccess: options?.alertOnSuccess ?? false,
       alertOnFailure: options?.alertOnFailure ?? true,
       alertOnKill: options?.alertOnKill ?? false,
@@ -173,6 +177,15 @@ export class ProcessManager {
     child.stdout?.on("data", (data: Buffer) => {
       try {
         appendFileSync(stdoutFile, data);
+        const lines = data.toString().split("\n");
+        // The last element after split is either empty (if data ended with \n)
+        // or a partial line. We write all parts with the prefix and newline.
+        const tagged = lines
+          .map((line, i) =>
+            i < lines.length - 1 ? `1:${line}\n` : line ? `1:${line}\n` : "",
+          )
+          .join("");
+        if (tagged) appendFileSync(combinedFile, tagged);
       } catch {
         // Ignore
       }
@@ -181,6 +194,13 @@ export class ProcessManager {
     child.stderr?.on("data", (data: Buffer) => {
       try {
         appendFileSync(stderrFile, data);
+        const lines = data.toString().split("\n");
+        const tagged = lines
+          .map((line, i) =>
+            i < lines.length - 1 ? `2:${line}\n` : line ? `2:${line}\n` : "",
+          )
+          .join("");
+        if (tagged) appendFileSync(combinedFile, tagged);
       } catch {
         // Ignore
       }
@@ -260,6 +280,26 @@ export class ProcessManager {
       stderr: this.readTailLines(managed.stderrFile, tailLines),
       status: managed.status,
     };
+  }
+
+  getCombinedOutput(
+    id: string,
+    tailLines = 100,
+  ): { type: "stdout" | "stderr"; text: string }[] | null {
+    const managed = this.processes.get(id);
+    if (!managed) return null;
+
+    const rawLines = this.readTailLines(managed.combinedFile, tailLines);
+    return rawLines.map((line) => {
+      if (line.startsWith("2:")) {
+        return { type: "stderr", text: line.slice(2) };
+      }
+      // Default to stdout (handles "1:" prefix and any malformed lines).
+      return {
+        type: "stdout",
+        text: line.startsWith("1:") ? line.slice(2) : line,
+      };
+    });
   }
 
   getFullOutput(id: string): { stdout: string; stderr: string } | null {
@@ -374,6 +414,7 @@ export class ProcessManager {
       try {
         rmSync(managed.stdoutFile, { force: true });
         rmSync(managed.stderrFile, { force: true });
+        rmSync(managed.combinedFile, { force: true });
       } catch {
         // Ignore
       }

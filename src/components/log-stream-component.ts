@@ -101,30 +101,19 @@ export class LogStreamComponent implements Component {
         border("─".repeat(rightBorder)),
     );
 
-    // Log lines
-    const output = this.manager.getOutput(this.processId, MAX_LOG_LINES);
-    if (output) {
-      const logLines: { type: "stdout" | "stderr"; text: string }[] = [];
-      for (const line of output.stdout) {
-        logLines.push({ type: "stdout", text: line });
-      }
-      for (const line of output.stderr) {
-        logLines.push({ type: "stderr", text: line });
-      }
-
-      const visible = logLines.slice(-MAX_LOG_LINES);
-
-      if (visible.length === 0) {
-        lines.push(padLine(dim("(no output yet)")));
-      } else {
-        for (const line of visible) {
-          const cleaned = stripAnsi(line.text);
-          const display = truncateToWidth(cleaned, innerWidth - 2);
-          if (line.type === "stderr") {
-            lines.push(padLine(warning(display)));
-          } else {
-            lines.push(padLine(display));
-          }
+    // Log lines (interleaved stdout + stderr in temporal order).
+    const logLines = this.manager.getCombinedOutput(
+      this.processId,
+      MAX_LOG_LINES,
+    );
+    if (logLines && logLines.length > 0) {
+      for (const line of logLines) {
+        const cleaned = stripAnsi(line.text);
+        const display = truncateToWidth(cleaned, innerWidth - 2);
+        if (line.type === "stderr") {
+          lines.push(padLine(warning(display)));
+        } else {
+          lines.push(padLine(display));
         }
       }
     } else {

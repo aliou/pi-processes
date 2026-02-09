@@ -1,8 +1,8 @@
+import { configLoader } from "../../config";
 import type { ExecuteResult } from "../../constants";
 import type { ProcessManager } from "../../manager";
 import { formatStatus, stripAnsi } from "../../utils";
 
-const MAX_LINES = 200;
 const MAX_BYTES = 50 * 1024; // 50KB
 
 interface OutputParams {
@@ -37,7 +37,8 @@ export function executeOutput(
     };
   }
 
-  const output = manager.getOutput(proc.id);
+  const { defaultTailLines } = configLoader.getConfig().output;
+  const output = manager.getOutput(proc.id, defaultTailLines);
   if (!output) {
     const message = `Could not read output for: ${proc.id}`;
     return {
@@ -68,7 +69,8 @@ export function executeOutput(
   }
 
   const fullText = outputParts.join("\n");
-  const contentText = truncateTail(fullText, logFiles);
+  const { maxOutputLines } = configLoader.getConfig().output;
+  const contentText = truncateTail(fullText, logFiles, maxOutputLines);
 
   return {
     content: [{ type: "text", text: contentText }],
@@ -89,12 +91,13 @@ export function executeOutput(
 function truncateTail(
   text: string,
   logFiles: { stdoutFile: string; stderrFile: string } | null,
+  maxLines: number,
 ): string {
   const totalBytes = Buffer.byteLength(text, "utf-8");
   const lines = text.split("\n");
   const totalLines = lines.length;
 
-  if (totalLines <= MAX_LINES && totalBytes <= MAX_BYTES) {
+  if (totalLines <= maxLines && totalBytes <= MAX_BYTES) {
     return text;
   }
 
@@ -103,7 +106,7 @@ function truncateTail(
   let keptBytes = 0;
   let hitBytes = false;
 
-  for (let i = lines.length - 1; i >= 0 && kept.length < MAX_LINES; i--) {
+  for (let i = lines.length - 1; i >= 0 && kept.length < maxLines; i--) {
     const line = lines[i] ?? "";
     const lineBytes =
       Buffer.byteLength(line, "utf-8") + (kept.length > 0 ? 1 : 0);

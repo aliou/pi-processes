@@ -53,7 +53,7 @@ export async function executeKill(
   if (result.reason === "timeout") {
     const message =
       `SIGTERM timed out for "${proc.name}" (${proc.id}). ` +
-      "Run /processes and press x on terminate_timeout to force kill (SIGKILL).";
+      "Run /process:list and press x on terminate_timeout to force kill (SIGKILL).";
     return {
       content: [{ type: "text", text: message }],
       details: {

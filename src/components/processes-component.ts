@@ -1,14 +1,10 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import { type Component, matchesKey, visibleWidth } from "@mariozechner/pi-tui";
+import { configLoader } from "../config";
 import type { ProcessInfo } from "../constants";
 import type { ProcessManager } from "../manager";
 import { stripAnsi } from "../utils";
 import { statusIcon, statusLabel } from "./status-format";
-
-// Max visible processes in the list (scrollable if more)
-const MAX_VISIBLE_PROCESSES = 8;
-// Max log lines shown
-const MAX_LOG_LINES = 12;
 
 function formatRuntime(startTime: number, endTime: number | null): string {
   const end = endTime ?? Date.now();
@@ -176,7 +172,9 @@ export class ProcessesComponent implements Component {
   }
 
   private ensureProcessVisible(totalProcesses: number): void {
-    const visibleCount = Math.min(MAX_VISIBLE_PROCESSES, totalProcesses);
+    const maxVisibleProcesses =
+      configLoader.getConfig().processList.maxVisibleProcesses;
+    const visibleCount = Math.min(maxVisibleProcesses, totalProcesses);
     if (this.selectedIndex < this.processScrollOffset) {
       this.processScrollOffset = this.selectedIndex;
     } else if (this.selectedIndex >= this.processScrollOffset + visibleCount) {
@@ -197,6 +195,10 @@ export class ProcessesComponent implements Component {
     if (width === this.cachedWidth && this.cachedLines.length > 0) {
       return this.cachedLines;
     }
+
+    const cfg = configLoader.getConfig().processList;
+    const maxVisibleProcesses = cfg.maxVisibleProcesses;
+    const maxPreviewLines = cfg.maxPreviewLines;
 
     const theme = this.theme;
     const dim = (s: string) => theme.fg("dim", s);
@@ -238,9 +240,9 @@ export class ProcessesComponent implements Component {
       const timeWidth = 8;
       const sizeWidth = 8;
 
-      const hasProcessScroll = processes.length > MAX_VISIBLE_PROCESSES;
+      const hasProcessScroll = processes.length > maxVisibleProcesses;
       const headerSuffixText = hasProcessScroll
-        ? ` [${this.processScrollOffset + 1}-${Math.min(this.processScrollOffset + MAX_VISIBLE_PROCESSES, processes.length)}/${processes.length}]`
+        ? ` [${this.processScrollOffset + 1}-${Math.min(this.processScrollOffset + maxVisibleProcesses, processes.length)}/${processes.length}]`
         : "";
       const headerSuffixLen = hasProcessScroll ? headerSuffixText.length : 0;
 
@@ -271,7 +273,7 @@ export class ProcessesComponent implements Component {
       lines.push(border("─".repeat(width)));
 
       const visibleProcessCount = Math.min(
-        MAX_VISIBLE_PROCESSES,
+        maxVisibleProcesses,
         processes.length,
       );
       const startIdx = this.processScrollOffset;
@@ -305,7 +307,7 @@ export class ProcessesComponent implements Component {
         }
       }
 
-      for (let i = visibleProcessCount; i < MAX_VISIBLE_PROCESSES; i++) {
+      for (let i = visibleProcessCount; i < maxVisibleProcesses; i++) {
         lines.push(padLine(""));
       }
 
@@ -316,7 +318,7 @@ export class ProcessesComponent implements Component {
           this.cachedWidth = width;
           return this.cachedLines;
         }
-        const output = this.manager.getOutput(selected.id, 200);
+        const output = this.manager.getOutput(selected.id, maxPreviewLines * 2);
         const sizes = this.manager.getFileSize(selected.id);
 
         lines.push(border("─".repeat(width)));
@@ -361,7 +363,7 @@ export class ProcessesComponent implements Component {
           } else {
             const startIdx = Math.max(
               0,
-              logLines.length - MAX_LOG_LINES - this.logScrollOffset,
+              logLines.length - maxPreviewLines - this.logScrollOffset,
             );
             const endIdx = Math.max(0, logLines.length - this.logScrollOffset);
             const visibleLines = logLines.slice(startIdx, endIdx);
@@ -385,7 +387,7 @@ export class ProcessesComponent implements Component {
           }
         }
 
-        while (renderedLines < MAX_LOG_LINES) {
+        while (renderedLines < maxPreviewLines) {
           lines.push(padLine(""));
           renderedLines++;
         }

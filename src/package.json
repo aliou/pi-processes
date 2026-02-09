@@ -25,11 +25,15 @@
   "files": [
     "*.ts",
     "commands",
+    "components",
+    "constants",
     "hooks",
     "tools",
+    "utils",
     "README.md"
   ],
   "dependencies": {
+    "@aliou/pi-utils-settings": "workspace:*",
     "@sinclair/typebox": "^0.34.41"
   },
   "peerDependencies": {

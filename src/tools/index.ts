@@ -57,10 +57,16 @@ const ProcessesParams = Type.Object({
 
 type ProcessesParamsType = Static<typeof ProcessesParams>;
 
-export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
+import type { ProcessCommands } from "../commands";
+
+export function setupProcessesTools(
+  pi: ExtensionAPI,
+  manager: ProcessManager,
+  commands: ProcessCommands,
+) {
   pi.registerTool<typeof ProcessesParams, ProcessesDetails>({
-    name: "processes",
-    label: "Processes",
+    name: "process",
+    label: "Process",
     description: `Manage background processes. Actions:
 - start: Run command in background (requires 'name' and 'command')
   - alertOnSuccess (default: false): Get a turn to react when process completes successfully
@@ -79,22 +85,33 @@ Note: User always sees process updates in the UI. The notify flags control wheth
     parameters: ProcessesParams,
 
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      return executeAction(params, manager, ctx);
+      const result = await executeAction(params, manager, ctx);
+      // Auto-stream logs when a process is started successfully.
+      if (
+        params.action === "start" &&
+        result.details?.success &&
+        result.details.process &&
+        ctx.hasUI
+      ) {
+        commands.streamProcess(result.details.process.id, ctx.ui);
+      }
+      return result;
     },
 
     renderCall(args: ProcessesParamsType, theme: Theme): Text {
-      let text = theme.fg("toolTitle", theme.bold("processes "));
+      let text = theme.fg("toolTitle", theme.bold("Process "));
       text += theme.fg("accent", args.action);
 
       switch (args.action) {
-        case "start":
+        case "start": {
           if (args.name) {
             text += ` ${theme.fg("accent", `"${args.name}"`)}`;
           }
           if (args.command) {
-            text += ` ${theme.fg("muted", args.command.slice(0, 40))}`;
+            text += `\n${theme.fg("muted", `$ ${args.command}`)}`;
           }
-          break;
+          return new Text(text, 0, 0);
+        }
         case "output":
         case "kill":
         case "logs":

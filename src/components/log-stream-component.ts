@@ -128,7 +128,7 @@ export class LogStreamComponent implements Component {
 
     // Footer hint
     lines.push(border("─".repeat(width)));
-    lines.push(padLine(dim("Run /processes to dismiss")));
+    lines.push(padLine(dim("Run /process:stream to dismiss")));
     lines.push(border("─".repeat(width)));
 
     this.cachedLines = lines;

@@ -1,10 +1,12 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { setupProcessesCommands } from "./commands";
+import { registerProcessesSettings } from "./commands/settings-command";
+import { configLoader } from "./config";
 import { setupProcessesHooks } from "./hooks";
 import { ProcessManager } from "./manager";
 import { setupProcessesTools } from "./tools";
 
-export default function (pi: ExtensionAPI) {
+export default async function (pi: ExtensionAPI) {
   if (process.platform === "win32") {
     pi.on("session_start", async (_event, ctx) => {
       if (!ctx.hasUI) return;
@@ -13,9 +15,13 @@ export default function (pi: ExtensionAPI) {
     return;
   }
 
+  await configLoader.load();
   const manager = new ProcessManager();
 
-  setupProcessesHooks(pi, manager);
-  setupProcessesTools(pi, manager);
-  setupProcessesCommands(pi, manager);
+  const { update: updateWidget } = setupProcessesHooks(pi, manager);
+  const commands = setupProcessesCommands(pi, manager);
+  setupProcessesTools(pi, manager, commands);
+  registerProcessesSettings(pi, () => {
+    updateWidget();
+  });
 }

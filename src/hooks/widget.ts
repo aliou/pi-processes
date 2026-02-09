@@ -3,6 +3,7 @@ import type {
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
 import { visibleWidth } from "@mariozechner/pi-tui";
+import { configLoader } from "../config";
 import type { ProcessInfo } from "../constants";
 import type { ProcessManager } from "../manager";
 
@@ -105,6 +106,11 @@ export function setupProcessWidget(pi: ExtensionAPI, manager: ProcessManager) {
 
   function updateWidget() {
     if (!latestContext?.hasUI) return;
+
+    if (!configLoader.getConfig().widget.showStatusWidget) {
+      latestContext.ui.setWidget(WIDGET_ID, undefined);
+      return;
+    }
 
     const processes = manager.list();
     const maxWidth = process.stdout.columns || 120;

@@ -13,14 +13,11 @@ export function setupProcessesCommands(
         ctx.ui.notify("/processes requires interactive mode", "error");
         return;
       }
-      const result = await ctx.ui.custom((tui, theme, _keybindings, done) => {
-        return new ProcessesComponent(
-          tui,
-          theme,
-          () => done(undefined),
-          manager,
-        );
-      });
+      const result = await ctx.ui.custom<null>(
+        (tui, theme, _keybindings, done) => {
+          return new ProcessesComponent(tui, theme, () => done(null), manager);
+        },
+      );
 
       // RPC fallback
       if (result === undefined) {

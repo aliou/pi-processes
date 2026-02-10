@@ -1,3 +1,4 @@
+import { ToolBody, ToolCallHeader, ToolFooter } from "@aliou/pi-utils-ui";
 import { StringEnum } from "@mariozechner/pi-ai";
 import type {
   AgentToolResult,
@@ -82,37 +83,53 @@ Note: User always sees process updates in the UI. The notify flags control wheth
       return executeAction(params, manager, ctx);
     },
 
-    renderCall(args: ProcessesParamsType, theme: Theme): Text {
-      let text = theme.fg("toolTitle", theme.bold("Process "));
-      text += theme.fg("accent", args.action);
+    renderCall(args: ProcessesParamsType, theme: Theme) {
+      const longArgs: Array<{ label?: string; value: string }> = [];
+      const optionArgs: Array<{ label: string; value: string }> = [];
+      let mainArg: string | undefined;
 
-      switch (args.action) {
-        case "start": {
-          if (args.name) {
-            text += ` ${theme.fg("accent", `"${args.name}"`)}`;
-          }
-          if (args.command) {
-            text += `\n${theme.fg("muted", `$ ${args.command}`)}`;
-          }
-          return new Text(text, 0, 0);
+      if (args.action === "start") {
+        if (args.name) {
+          mainArg = `"${args.name}"`;
         }
-        case "output":
-        case "kill":
-        case "logs":
-          if (args.id) {
-            text += ` ${theme.fg("muted", args.id)}`;
+
+        if (args.command) {
+          if (!mainArg && args.command.length <= 60) {
+            mainArg = args.command;
+          } else if (args.command.length <= 60) {
+            optionArgs.push({ label: "command", value: args.command });
+          } else {
+            longArgs.push({ label: "command", value: args.command });
           }
-          break;
+        }
       }
 
-      return new Text(text, 0, 0);
+      if (
+        (args.action === "output" ||
+          args.action === "kill" ||
+          args.action === "logs") &&
+        args.id
+      ) {
+        mainArg = args.id;
+      }
+
+      return new ToolCallHeader(
+        {
+          toolName: "Process",
+          action: args.action,
+          mainArg,
+          optionArgs,
+          longArgs,
+        },
+        theme,
+      );
     },
 
     renderResult(
       result: AgentToolResult<ProcessesDetails>,
-      _options: ToolRenderResultOptions,
+      options: ToolRenderResultOptions,
       theme: Theme,
-    ): Text {
+    ) {
       const { details } = result;
 
       if (!details) {
@@ -124,34 +141,32 @@ Note: User always sees process updates in the UI. The notify flags control wheth
         );
       }
 
+      const fields: Array<
+        { label: string; value: string; showCollapsed?: boolean } | Text
+      > = [];
+
       if (!details.success) {
-        return new Text(theme.fg("error", details.message), 0, 0);
-      }
-
-      // For start action
-      if (details.action === "start" && details.process) {
-        const p = details.process;
-        return new Text(
-          theme.fg("success", "\u2713 Started ") +
-            theme.fg("accent", `"${p.name}"`) +
-            ` (${p.id}, PID: ${p.pid})`,
-          0,
-          0,
-        );
-      }
-
-      // For output action
-      if (details.action === "output" && details.output) {
-        const lines: string[] = [];
-        lines.push(theme.fg("muted", details.message));
-
+        fields.push({
+          label: "Error",
+          value: theme.fg("error", details.message),
+          showCollapsed: true,
+        });
+      } else if (details.action === "start" && details.process) {
+        const process = details.process;
+        fields.push({
+          label: "Status",
+          value:
+            theme.fg("success", "Started") +
+            ` ${theme.fg("accent", `"${process.name}"`)} (${process.id}, PID: ${process.pid})`,
+          showCollapsed: true,
+        });
+      } else if (details.action === "output" && details.output) {
+        const lines: string[] = [theme.fg("muted", details.message)];
         let hadAnsi = false;
 
         if (details.output.stdout.length > 0) {
-          lines.push("");
-          lines.push(theme.fg("accent", "stdout:"));
-          const stdoutLines = details.output.stdout.slice(-20);
-          for (const line of stdoutLines) {
+          lines.push("", theme.fg("accent", "stdout:"));
+          for (const line of details.output.stdout.slice(-20)) {
             if (!hadAnsi && hasAnsi(line)) hadAnsi = true;
             lines.push(stripAnsi(line));
           }
@@ -166,10 +181,8 @@ Note: User always sees process updates in the UI. The notify flags control wheth
         }
 
         if (details.output.stderr.length > 0) {
-          lines.push("");
-          lines.push(theme.fg("warning", "stderr:"));
-          const stderrLines = details.output.stderr.slice(-10);
-          for (const line of stderrLines) {
+          lines.push("", theme.fg("warning", "stderr:"));
+          for (const line of details.output.stderr.slice(-10)) {
             if (!hadAnsi && hasAnsi(line)) hadAnsi = true;
             lines.push(theme.fg("warning", stripAnsi(line)));
           }
@@ -184,28 +197,25 @@ Note: User always sees process updates in the UI. The notify flags control wheth
         }
 
         if (hadAnsi) {
-          lines.push("");
           lines.push(
+            "",
             theme.fg("muted", "ANSI escape codes were stripped from output"),
           );
         }
 
-        return new Text(lines.join("\n"), 0, 0);
-      }
-
-      // For list action
-      if (
+        fields.push(new Text(lines.join("\n"), 0, 0));
+      } else if (
         details.action === "list" &&
         details.processes &&
         details.processes.length > 0
       ) {
-        const lines: string[] = [];
-        lines.push(
+        const lines: string[] = [
           theme.fg("success", `${details.processes.length} process(es):`),
-        );
-        for (const p of details.processes) {
+        ];
+
+        for (const process of details.processes) {
           let status: string;
-          switch (p.status) {
+          switch (process.status) {
             case "running":
               status = theme.fg("accent", "running");
               break;
@@ -219,43 +229,52 @@ Note: User always sees process updates in the UI. The notify flags control wheth
               status = theme.fg("warning", "killed");
               break;
             case "exited":
-              status = p.success
+              status = process.success
                 ? theme.fg("success", "exit(0)")
-                : theme.fg("error", `exit(${p.exitCode ?? "?"})`);
+                : theme.fg("error", `exit(${process.exitCode ?? "?"})`);
               break;
             default:
-              status = theme.fg("muted", p.status);
+              status = theme.fg("muted", process.status);
           }
+
           lines.push(
-            `  ${p.id} ${theme.fg("accent", `"${p.name}"`)}: ${truncateCmd(p.command)} [${status}] ${formatRuntime(p.startTime, p.endTime)}`,
+            `  ${process.id} ${theme.fg("accent", `"${process.name}"`)}: ${truncateCmd(process.command)} [${status}] ${formatRuntime(process.startTime, process.endTime)}`,
           );
         }
-        return new Text(lines.join("\n"), 0, 0);
+
+        fields.push(new Text(lines.join("\n"), 0, 0));
+      } else if (details.action === "logs" && details.logFiles) {
+        fields.push(
+          new Text(
+            [
+              theme.fg("success", "Log files:"),
+              `  stdout: ${theme.fg("accent", details.logFiles.stdoutFile)}`,
+              `  stderr: ${theme.fg("accent", details.logFiles.stderrFile)}`,
+            ].join("\n"),
+            0,
+            0,
+          ),
+        );
+      } else {
+        fields.push({
+          label: "Result",
+          value: details.message,
+          showCollapsed: true,
+        });
       }
 
-      // For logs action
-      if (details.action === "logs" && details.logFiles) {
-        const lines: string[] = [];
-        lines.push(theme.fg("success", "Log files:"));
-        lines.push(
-          `  stdout: ${theme.fg("accent", details.logFiles.stdoutFile)}`,
-        );
-        lines.push(
-          `  stderr: ${theme.fg("accent", details.logFiles.stderrFile)}`,
-        );
-        return new Text(lines.join("\n"), 0, 0);
-      }
+      const footer = new ToolFooter(theme, {
+        items: [
+          { label: "action", value: details.action, tone: "accent" },
+          {
+            label: "status",
+            value: details.success ? "ok" : "error",
+            tone: details.success ? "success" : "error",
+          },
+        ],
+      });
 
-      // For clear action
-      if (details.action === "clear") {
-        return new Text(
-          theme.fg("success", "\u2713 ") + theme.fg("muted", details.message),
-          0,
-          0,
-        );
-      }
-
-      return new Text(details.message, 0, 0);
+      return new ToolBody({ fields, footer }, options, theme);
     },
   });
 }

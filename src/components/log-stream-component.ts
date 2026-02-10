@@ -1,3 +1,8 @@
+import {
+  createPanelPadder,
+  renderPanelRule,
+  renderPanelTitleLine,
+} from "@aliou/pi-utils-ui";
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import {
   type Component,
@@ -62,26 +67,26 @@ export class LogStreamComponent implements Component {
 
     const theme = this.theme;
     const dim = (s: string) => theme.fg("dim", s);
-    const accent = (s: string) => theme.fg("accent", s);
     const warning = (s: string) => theme.fg("warning", s);
-    const border = (s: string) => theme.fg("dim", s);
     const innerWidth = width - 2;
 
+    const basePadLine = createPanelPadder(width);
     const padLine = (content: string): string => {
       const contentWidth = visibleWidth(content);
-      if (contentWidth > innerWidth) {
-        return ` ${truncateToWidth(content, innerWidth)} `;
-      }
-      return ` ${content}${" ".repeat(Math.max(0, innerWidth - contentWidth))} `;
+      return basePadLine(
+        contentWidth > innerWidth
+          ? truncateToWidth(content, innerWidth)
+          : content,
+      );
     };
 
     const lines: string[] = [];
     const proc = this.manager.get(this.processId);
 
     if (!proc) {
-      lines.push(border("─".repeat(width)));
+      lines.push(renderPanelRule(width, theme));
       lines.push(padLine(warning("Process not found")));
-      lines.push(border("─".repeat(width)));
+      lines.push(renderPanelRule(width, theme));
       this.cachedLines = lines;
       this.cachedWidth = width;
       return this.cachedLines;
@@ -90,15 +95,12 @@ export class LogStreamComponent implements Component {
     // Header
     const icon = statusIcon(proc.status, proc.success);
     const label = statusLabel(proc);
-    const headerText = ` ${accent(proc.name)} ${dim(`(${proc.id})`)} ${icon} ${dim(label)} `;
-    const headerLen = visibleWidth(headerText);
-    const borderLen = Math.max(0, width - headerLen);
-    const leftBorder = Math.floor(borderLen / 2);
-    const rightBorder = borderLen - leftBorder;
     lines.push(
-      border("─".repeat(leftBorder)) +
-        headerText +
-        border("─".repeat(rightBorder)),
+      renderPanelTitleLine(
+        `Process: ${proc.name} (${proc.id}) ${icon} ${label}`,
+        width,
+        theme,
+      ),
     );
 
     // Log lines (interleaved stdout + stderr in temporal order).
@@ -127,9 +129,9 @@ export class LogStreamComponent implements Component {
     }
 
     // Footer hint
-    lines.push(border("─".repeat(width)));
+    lines.push(renderPanelRule(width, theme));
     lines.push(padLine(dim("Run /process:stream to dismiss")));
-    lines.push(border("─".repeat(width)));
+    lines.push(renderPanelRule(width, theme));
 
     this.cachedLines = lines;
     this.cachedWidth = width;

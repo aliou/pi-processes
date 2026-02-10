@@ -1,3 +1,8 @@
+import {
+  createPanelPadder,
+  renderPanelRule,
+  renderPanelTitleLine,
+} from "@aliou/pi-utils-ui";
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import { type Component, matchesKey, visibleWidth } from "@mariozechner/pi-tui";
 import { configLoader } from "../config";
@@ -204,28 +209,14 @@ export class ProcessesComponent implements Component {
     const dim = (s: string) => theme.fg("dim", s);
     const accent = (s: string) => theme.fg("accent", s);
     const warning = (s: string) => theme.fg("warning", s);
-    const bold = (s: string) => theme.bold(s);
-    const border = (s: string) => theme.fg("dim", s);
 
     const lines: string[] = [];
     const processes = this.manager.list();
     const innerWidth = width - 2;
 
-    const padLine = (content: string): string => {
-      const len = visibleWidth(content);
-      return ` ${content}${" ".repeat(Math.max(0, innerWidth - len))} `;
-    };
+    const padLine = createPanelPadder(width);
 
-    const title = " Background Processes ";
-    const titleLen = title.length;
-    const borderLen = Math.max(0, width - titleLen);
-    const leftBorder = Math.floor(borderLen / 2);
-    const rightBorder = borderLen - leftBorder;
-    lines.push(
-      border("─".repeat(leftBorder)) +
-        accent(bold(title)) +
-        border("─".repeat(rightBorder)),
-    );
+    lines.push(renderPanelTitleLine("Background Processes", width, theme));
 
     if (processes.length === 0) {
       lines.push(padLine(""));
@@ -270,7 +261,7 @@ export class ProcessesComponent implements Component {
         dim("Size".padStart(sizeWidth)) +
         (hasProcessScroll ? dim(headerSuffixText) : "");
       lines.push(padLine(header));
-      lines.push(border("─".repeat(width)));
+      lines.push(renderPanelRule(width, theme));
 
       const visibleProcessCount = Math.min(
         maxVisibleProcesses,
@@ -321,7 +312,7 @@ export class ProcessesComponent implements Component {
         const output = this.manager.getOutput(selected.id, maxPreviewLines * 2);
         const sizes = this.manager.getFileSize(selected.id);
 
-        lines.push(border("─".repeat(width)));
+        lines.push(renderPanelRule(width, theme));
 
         const logTitlePlain = `Output: ${selected.name} (${selected.id})`;
         const sizeInfoPlain = sizes
@@ -394,7 +385,7 @@ export class ProcessesComponent implements Component {
       }
     }
 
-    lines.push(border("─".repeat(width)));
+    lines.push(renderPanelRule(width, theme));
 
     const footerLeft =
       `${dim("enter")} stream  ` +
@@ -421,7 +412,7 @@ export class ProcessesComponent implements Component {
     const footer = footerLeft + " ".repeat(footerGap) + footerRight;
 
     lines.push(padLine(footer));
-    lines.push(border("─".repeat(width)));
+    lines.push(renderPanelRule(width, theme));
 
     this.cachedLines = lines;
     this.cachedWidth = width;

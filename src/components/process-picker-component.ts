@@ -1,5 +1,10 @@
+import {
+  createPanelPadder,
+  renderPanelRule,
+  renderPanelTitleLine,
+} from "@aliou/pi-utils-ui";
 import type { Theme } from "@mariozechner/pi-coding-agent";
-import { type Component, matchesKey, visibleWidth } from "@mariozechner/pi-tui";
+import { type Component, matchesKey } from "@mariozechner/pi-tui";
 import type { ProcessInfo } from "../constants";
 import type { ProcessManager } from "../manager";
 import { statusIcon, statusLabel } from "./status-format";
@@ -105,29 +110,13 @@ export class ProcessPickerComponent implements Component {
     const theme = this.theme;
     const dim = (s: string) => theme.fg("dim", s);
     const accent = (s: string) => theme.fg("accent", s);
-    const bold = (s: string) => theme.bold(s);
-    const border = (s: string) => theme.fg("dim", s);
-    const innerWidth = width - 2;
 
-    const padLine = (content: string): string => {
-      const len = visibleWidth(content);
-      return ` ${content}${" ".repeat(Math.max(0, innerWidth - len))} `;
-    };
+    const padLine = createPanelPadder(width);
 
     const lines: string[] = [];
     const processes = this.getProcesses();
 
-    // Header
-    const titleText = ` ${this.title} `;
-    const titleLen = titleText.length;
-    const borderLen = Math.max(0, width - titleLen);
-    const leftBorder = Math.floor(borderLen / 2);
-    const rightBorder = borderLen - leftBorder;
-    lines.push(
-      border("─".repeat(leftBorder)) +
-        accent(bold(titleText)) +
-        border("─".repeat(rightBorder)),
-    );
+    lines.push(renderPanelTitleLine(this.title, width, theme));
 
     if (processes.length === 0) {
       lines.push(padLine(""));
@@ -151,13 +140,13 @@ export class ProcessPickerComponent implements Component {
     }
 
     // Footer
-    lines.push(border("─".repeat(width)));
+    lines.push(renderPanelRule(width, theme));
     lines.push(
       padLine(
         `${dim("j/k")} select  ${dim("enter")} confirm  ${dim("q")} cancel`,
       ),
     );
-    lines.push(border("─".repeat(width)));
+    lines.push(renderPanelRule(width, theme));
 
     this.cachedLines = lines;
     this.cachedWidth = width;

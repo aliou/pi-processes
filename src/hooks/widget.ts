@@ -126,8 +126,9 @@ export function setupProcessWidget(pi: ExtensionAPI, manager: ProcessManager) {
   }
 
   pi.on("session_start", async (_event, ctx) => {
+    // Startup defer: capture context only. First render happens on process
+    // manager events or explicit settings updates.
     latestContext = ctx;
-    updateWidget();
   });
 
   pi.on("session_switch", async (_event, ctx) => {

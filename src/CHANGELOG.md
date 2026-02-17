@@ -1,5 +1,12 @@
 # @aliou/pi-processes
 
+## 0.4.3
+
+### Patch Changes
+
+- Updated dependencies [7df01a2]
+  - @aliou/pi-utils-settings@0.4.0
+
 ## 0.4.2
 
 ### Patch Changes

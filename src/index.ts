@@ -16,7 +16,9 @@ export default async function (pi: ExtensionAPI) {
   }
 
   await configLoader.load();
-  const manager = new ProcessManager();
+  const manager = new ProcessManager({
+    getConfiguredShellPath: () => configLoader.getConfig().execution.shellPath,
+  });
 
   const { update: updateWidget } = setupProcessesHooks(pi, manager);
   setupProcessesCommands(pi, manager);

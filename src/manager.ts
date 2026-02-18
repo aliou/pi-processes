@@ -1,4 +1,4 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
 import {
   appendFileSync,
@@ -19,11 +19,16 @@ import {
   type StartOptions,
 } from "./constants";
 import { isProcessGroupAlive, killProcessGroup } from "./utils";
+import { spawnCommand } from "./utils/command-executor";
 
 interface ManagedProcess extends ProcessInfo {
   process: ChildProcess;
   lastSignalSent: NodeJS.Signals | null;
   combinedFile: string;
+}
+
+interface ProcessManagerOptions {
+  getConfiguredShellPath?: () => string | undefined;
 }
 
 export class ProcessManager {
@@ -32,10 +37,13 @@ export class ProcessManager {
   private logDir: string;
   private events = new EventEmitter();
   private watcher: ReturnType<typeof setInterval> | null = null;
+  private getConfiguredShellPath: () => string | undefined;
 
-  constructor() {
+  constructor(options?: ProcessManagerOptions) {
     this.logDir = join(tmpdir(), `pi-processes-${Date.now()}`);
     mkdirSync(this.logDir, { recursive: true });
+    this.getConfiguredShellPath =
+      options?.getConfiguredShellPath ?? (() => undefined);
   }
 
   onEvent(listener: (event: ManagerEvent) => void): () => void {
@@ -129,12 +137,7 @@ export class ProcessManager {
     appendFileSync(stderrFile, "");
     appendFileSync(combinedFile, "");
 
-    const child = spawn("/bin/bash", ["-lc", command], {
-      cwd,
-      env: process.env,
-      stdio: ["ignore", "pipe", "pipe"],
-      detached: true,
-    });
+    const child = spawnCommand(command, cwd, this.getConfiguredShellPath());
 
     child.unref();
 

@@ -20,6 +20,10 @@ export interface ProcessesConfig {
     /** Hard cap on output lines returned to the agent. */
     maxOutputLines?: number;
   };
+  execution?: {
+    /** Absolute shell path override. Leave unset to auto-resolve. */
+    shellPath?: string;
+  };
   widget?: {
     /** Show the status widget below the editor. */
     showStatusWidget?: boolean;
@@ -35,6 +39,9 @@ export interface ResolvedProcessesConfig {
     defaultTailLines: number;
     maxOutputLines: number;
   };
+  execution: {
+    shellPath?: string;
+  };
   widget: {
     showStatusWidget: boolean;
   };
@@ -49,6 +56,7 @@ const DEFAULT_CONFIG: ResolvedProcessesConfig = {
     defaultTailLines: 100,
     maxOutputLines: 200,
   },
+  execution: {},
   widget: {
     showStatusWidget: true,
   },

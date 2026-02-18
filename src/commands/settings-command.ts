@@ -72,6 +72,28 @@ export function registerProcessesSettings(
           ],
         },
         {
+          label: "Execution",
+          items: [
+            {
+              id: "execution.shellPath",
+              label: "Shell path",
+              description:
+                "Absolute shell path override used to execute commands",
+              currentValue:
+                tabConfig?.execution?.shellPath ??
+                resolved.execution.shellPath ??
+                "auto",
+              values: [
+                "auto",
+                "/run/current-system/sw/bin/bash",
+                "/bin/bash",
+                "/usr/bin/bash",
+                "/usr/local/bin/bash",
+              ],
+            },
+          ],
+        },
+        {
           label: "Widget",
           items: [
             {
@@ -97,6 +119,13 @@ export function registerProcessesSettings(
         updated.widget.showStatusWidget = newValue === "on";
         return updated;
       }
+      if (id === "execution.shellPath") {
+        if (!updated.execution) updated.execution = {};
+        updated.execution.shellPath =
+          newValue === "auto" ? undefined : newValue;
+        return updated;
+      }
+
       // Numeric fields.
       const num = Number.parseInt(newValue, 10);
       if (Number.isNaN(num)) return null;

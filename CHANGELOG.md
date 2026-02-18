@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.4.6
+
+### Patch Changes
+
+- be41cbd: Fix: include real source files
+
 ## 0.4.5
 
 ### Patch Changes

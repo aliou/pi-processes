@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.4.5
+
+### Patch Changes
+
+- 328571f: Move to standalone repository
+
 ## 0.4.4
 
 ### Patch Changes

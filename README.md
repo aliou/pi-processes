@@ -8,29 +8,14 @@ Manage background processes from Pi. Start long-running commands (dev servers, b
 
 ## Installation
 
-Install via npm:
-
 ```bash
 pi install npm:@aliou/pi-processes
 ```
 
-Or via the pi-extensions package:
+Or from git:
 
 ```bash
-pi install git:github.com/aliou/pi-extensions
-```
-
-Or selectively in your `settings.json`:
-
-```json
-{
-  "packages": [
-    {
-      "source": "git:github.com/aliou/pi-extensions",
-      "extensions": ["extensions/processes"]
-    }
-  ]
-}
+pi install git:github.com/aliou/pi-processes
 ```
 
 ## Features

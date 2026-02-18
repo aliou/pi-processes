@@ -1,0 +1,66 @@
+{
+  "name": "@aliou/pi-processes",
+  "version": "0.4.4",
+  "license": "MIT",
+  "type": "module",
+  "private": false,
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "processes"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aliou/pi-processes"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "video": "https://assets.aliou.me/pi-extensions/demos/pi-processes.mp4"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "dependencies": {
+    "@aliou/pi-utils-settings": "^0.4.0",
+    "@aliou/pi-utils-ui": "^0.1.0",
+    "@sinclair/typebox": "^0.34.41"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": ">=0.51.0"
+  },
+  "devDependencies": {
+    "@aliou/pi-evals": "^0.3.0",
+    "@biomejs/biome": "^2.3.13",
+    "@changesets/cli": "^2.27.11",
+    "@mariozechner/pi-ai": "0.52.7",
+    "@mariozechner/pi-coding-agent": "0.52.7",
+    "@mariozechner/pi-tui": "0.52.7",
+    "@types/node": "^25.0.10",
+    "husky": "^9.1.7",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  },
+  "pnpm": {
+    "overrides": {
+      "@mariozechner/pi-ai": "$@mariozechner/pi-coding-agent",
+      "@mariozechner/pi-tui": "$@mariozechner/pi-coding-agent"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check",
+    "format": "biome check --write",
+    "prepare": "husky",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "pnpm changeset publish"
+  },
+  "packageManager": "pnpm@10.26.1"
+}

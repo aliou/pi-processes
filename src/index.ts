@@ -1,29 +1,27 @@
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { setupProcessesCommands } from "./commands";
-import { registerProcessesSettings } from "./commands/settings-command";
-import { configLoader } from "./config";
-import { setupProcessesHooks } from "./hooks";
-import { ProcessManager } from "./manager";
-import { setupProcessesTools } from "./tools";
+
+const MARKER_DIR = join(homedir(), ".pi", "agent", "extensions", "migrations");
+const MARKER_FILE = join(MARKER_DIR, "processes-moved");
 
 export default async function (pi: ExtensionAPI) {
-  if (process.platform === "win32") {
-    pi.on("session_start", async (_event, ctx) => {
-      if (!ctx.hasUI) return;
-      ctx.ui.notify("processes extension not available on Windows", "warning");
-    });
-    return;
-  }
+  if (existsSync(MARKER_FILE)) return;
 
-  await configLoader.load();
-  const manager = new ProcessManager({
-    getConfiguredShellPath: () => configLoader.getConfig().execution.shellPath,
-  });
+  pi.on("session_start", async (_event, ctx) => {
+    if (existsSync(MARKER_FILE)) return;
 
-  const { update: updateWidget } = setupProcessesHooks(pi, manager);
-  setupProcessesCommands(pi, manager);
-  setupProcessesTools(pi, manager);
-  registerProcessesSettings(pi, () => {
-    updateWidget();
+    if (ctx.hasUI) {
+      ctx.ui.notify(
+        "@aliou/pi-processes has moved to its own repo. " +
+          "Run: pi install npm:@aliou/pi-processes -- " +
+          "then remove it from the pi-extensions package config.",
+        "warning",
+      );
+    }
+
+    mkdirSync(MARKER_DIR, { recursive: true });
+    writeFileSync(MARKER_FILE, new Date().toISOString());
   });
 }

@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.4.7
+
+### Patch Changes
+
+- abcfd26: mark pi SDK peer deps as optional to prevent koffi OOM in Gondolin VMs
+
 ## 0.4.6
 
 ### Patch Changes

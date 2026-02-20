@@ -34,7 +34,8 @@
     "@sinclair/typebox": "^0.34.41"
   },
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": ">=0.51.0"
+    "@mariozechner/pi-coding-agent": ">=0.51.0",
+    "@mariozechner/pi-tui": ">=0.51.0"
   },
   "devDependencies": {
     "@aliou/pi-evals": "^0.3.0",
@@ -42,7 +43,6 @@
     "@changesets/cli": "^2.27.11",
     "@mariozechner/pi-ai": "0.52.7",
     "@mariozechner/pi-coding-agent": "0.52.7",
-    "@mariozechner/pi-tui": "0.52.7",
     "@types/node": "^25.0.10",
     "husky": "^9.1.7",
     "typescript": "^5.9.3",
@@ -58,7 +58,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check",
     "format": "biome check --write",
-    "prepare": "husky",
+    "prepare": "[ -d .git ] && husky || true",
     "changeset": "changeset",
     "version": "changeset version",
     "release": "pnpm changeset publish"
@@ -66,6 +66,9 @@
   "packageManager": "pnpm@10.26.1",
   "peerDependenciesMeta": {
     "@mariozechner/pi-coding-agent": {
+      "optional": true
+    },
+    "@mariozechner/pi-tui": {
       "optional": true
     }
   }

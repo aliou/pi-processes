@@ -35,3 +35,6 @@ result-*
 
 # Husky
 .husky/_
+
+# Pi
+.pi/

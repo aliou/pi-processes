@@ -21,10 +21,16 @@ importers:
       '@aliou/sh':
         specifier: ^0.1.0
         version: 0.1.0
+      '@mariozechner/pi-tui':
+        specifier: 0.52.7
+        version: 0.52.7
       '@sinclair/typebox':
         specifier: ^0.34.41
         version: 0.34.48
     devDependencies:
+      '@aliou/biome-plugins':
+        specifier: ^0.3.2
+        version: 0.3.2(@biomejs/biome@2.4.2)
       '@aliou/pi-evals':
         specifier: ^0.3.0
         version: 0.3.0(ws@8.19.0)(zod@3.25.76)
@@ -40,9 +46,6 @@ importers:
       '@mariozechner/pi-coding-agent':
         specifier: 0.52.7
         version: 0.52.7(ws@8.19.0)(zod@3.25.76)
-      '@mariozechner/pi-tui':
-        specifier: 0.52.7
-        version: 0.52.7
       '@types/node':
         specifier: ^25.0.10
         version: 25.2.3
@@ -57,6 +60,11 @@ importers:
         version: 4.0.18(@types/node@25.2.3)(yaml@2.8.2)
 
 packages:
+
+  '@aliou/biome-plugins@0.3.2':
+    resolution: {integrity: sha512-FG9imcSkAgqrlI+ptXj2K7RVEFnveK714nrJqtfinkC7p5mxQdlpBRZ5QDA1NCpn/uzp45zv9n7wio4r71uvHQ==}
+    peerDependencies:
+      '@biomejs/biome': '>=2.0.0'
 
   '@aliou/pi-evals@0.3.0':
     resolution: {integrity: sha512-2/wbd1ZWQOiYWxRDRL7PknO9fP3Zi7sNBHDPZKOfkH1K8A8XRV7K4/v8nKMdooCH+n8H+BKj9/Dh7Ql4X924Tg==}
@@ -2079,6 +2087,10 @@ packages:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
 snapshots:
+
+  '@aliou/biome-plugins@0.3.2(@biomejs/biome@2.4.2)':
+    dependencies:
+      '@biomejs/biome': 2.4.2
 
   '@aliou/pi-evals@0.3.0(ws@8.19.0)(zod@3.25.76)':
     dependencies:

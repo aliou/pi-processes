@@ -1,9 +1,10 @@
+import type * as nodeFs from "node:fs";
 import { existsSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { resolveShellExecutable } from "./command-executor";
 
 vi.mock("node:fs", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("node:fs")>();
+  const actual = await importOriginal<typeof nodeFs>();
   return { ...actual, existsSync: vi.fn() };
 });
 

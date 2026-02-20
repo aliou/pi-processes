@@ -4,7 +4,12 @@ import {
   renderPanelTitleLine,
 } from "@aliou/pi-utils-ui";
 import type { Theme } from "@mariozechner/pi-coding-agent";
-import { type Component, matchesKey, visibleWidth } from "@mariozechner/pi-tui";
+import {
+  type Component,
+  matchesKey,
+  truncateToWidth,
+  visibleWidth,
+} from "@mariozechner/pi-tui";
 import { configLoader } from "../config";
 import type { ProcessInfo } from "../constants";
 import type { ProcessManager } from "../manager";
@@ -225,11 +230,18 @@ export class ProcessesComponent implements Component {
       lines.push(padLine(""));
     } else {
       const prefixWidth = 2;
-      const idWidth = 9;
-      const nameWidth = 15;
-      const statusWidth = 18;
-      const timeWidth = 8;
-      const sizeWidth = 8;
+
+      // Responsive column widths based on available space
+      // Minimum widths: id=6, name=8, cmd=4, status=10, time=4, size=4 = ~40 chars minimum
+      const minTotalWidth = 40;
+      const scaleFactor =
+        innerWidth < minTotalWidth ? innerWidth / minTotalWidth : 1;
+
+      const idWidth = Math.max(6, Math.floor(9 * scaleFactor));
+      const nameWidth = Math.max(8, Math.floor(15 * scaleFactor));
+      const statusWidth = Math.max(10, Math.floor(18 * scaleFactor));
+      const timeWidth = Math.max(4, Math.floor(8 * scaleFactor));
+      const sizeWidth = Math.max(4, Math.floor(8 * scaleFactor));
 
       const hasProcessScroll = processes.length > maxVisibleProcesses;
       const headerSuffixText = hasProcessScroll
@@ -237,18 +249,16 @@ export class ProcessesComponent implements Component {
         : "";
       const headerSuffixLen = hasProcessScroll ? headerSuffixText.length : 0;
 
-      // Reserve space for scroll suffix in the command column
-      const cmdWidth = Math.max(
-        10,
-        innerWidth -
-          prefixWidth -
-          idWidth -
-          nameWidth -
-          statusWidth -
-          timeWidth -
-          sizeWidth -
-          headerSuffixLen,
-      );
+      // Calculate command column width based on remaining space
+      const fixedWidth =
+        prefixWidth +
+        idWidth +
+        nameWidth +
+        statusWidth +
+        timeWidth +
+        sizeWidth +
+        headerSuffixLen;
+      const cmdWidth = Math.max(4, innerWidth - fixedWidth);
 
       lines.push(padLine(""));
       const header =
@@ -409,7 +419,12 @@ export class ProcessesComponent implements Component {
     const footerLeftLen = visibleWidth(footerLeft);
     const footerRightLen = visibleWidth(footerRight);
     const footerGap = Math.max(2, innerWidth - footerLeftLen - footerRightLen);
-    const footer = footerLeft + " ".repeat(footerGap) + footerRight;
+    let footer = footerLeft + " ".repeat(footerGap) + footerRight;
+
+    // Truncate footer if it exceeds inner width (e.g., on very narrow terminals)
+    if (footerLeftLen + footerGap + footerRightLen > innerWidth) {
+      footer = truncateToWidth(footer, innerWidth);
+    }
 
     lines.push(padLine(footer));
     lines.push(renderPanelRule(width, theme));

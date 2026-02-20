@@ -28,6 +28,10 @@ export interface ProcessesConfig {
     /** Show the status widget below the editor. */
     showStatusWidget?: boolean;
   };
+  interception?: {
+    /** Block background bash commands (&, nohup, disown, setsid) and guide the model to use the process tool. */
+    blockBackgroundCommands?: boolean;
+  };
 }
 
 export interface ResolvedProcessesConfig {
@@ -45,6 +49,9 @@ export interface ResolvedProcessesConfig {
   widget: {
     showStatusWidget: boolean;
   };
+  interception: {
+    blockBackgroundCommands: boolean;
+  };
 }
 
 const DEFAULT_CONFIG: ResolvedProcessesConfig = {
@@ -59,6 +66,9 @@ const DEFAULT_CONFIG: ResolvedProcessesConfig = {
   execution: {},
   widget: {
     showStatusWidget: true,
+  },
+  interception: {
+    blockBackgroundCommands: false,
   },
 };
 

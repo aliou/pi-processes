@@ -20,7 +20,8 @@ export default async function (pi: ExtensionAPI) {
     getConfiguredShellPath: () => configLoader.getConfig().execution.shellPath,
   });
 
-  const { update: updateWidget } = setupProcessesHooks(pi, manager);
+  const config = configLoader.getConfig();
+  const { update: updateWidget } = setupProcessesHooks(pi, manager, config);
   setupProcessesCommands(pi, manager);
   setupProcessesTools(pi, manager);
   registerProcessesSettings(pi, () => {

@@ -94,6 +94,23 @@ export function registerProcessesSettings(
           ],
         },
         {
+          label: "Interception",
+          items: [
+            {
+              id: "interception.blockBackgroundCommands",
+              label: "Block background commands",
+              description:
+                "Block bash background commands (&, nohup, disown, setsid) and guide the model to use the process tool",
+              currentValue:
+                (tabConfig?.interception?.blockBackgroundCommands ??
+                resolved.interception.blockBackgroundCommands)
+                  ? "on"
+                  : "off",
+              values: ["on", "off"],
+            },
+          ],
+        },
+        {
           label: "Widget",
           items: [
             {
@@ -114,6 +131,11 @@ export function registerProcessesSettings(
     onSettingChange: (id, newValue, config) => {
       const updated = structuredClone(config);
       // Boolean fields.
+      if (id === "interception.blockBackgroundCommands") {
+        if (!updated.interception) updated.interception = {};
+        updated.interception.blockBackgroundCommands = newValue === "on";
+        return updated;
+      }
       if (id === "widget.showStatusWidget") {
         if (!updated.widget) updated.widget = {};
         updated.widget.showStatusWidget = newValue === "on";

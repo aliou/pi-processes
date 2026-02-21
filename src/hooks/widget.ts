@@ -2,7 +2,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
-import { visibleWidth } from "@mariozechner/pi-tui";
+import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import { configLoader } from "../config";
 import type { ProcessInfo } from "../constants";
 import type { ProcessManager } from "../manager";
@@ -75,16 +75,28 @@ function renderWidget(
   for (const proc of allProcs) {
     const formatted = formatProcessStatus(proc, theme);
     const formattedLen = visibleWidth(formatted);
+    const remaining = allProcs.length - includedCount - 1;
 
     // Check if adding this part would exceed the width
     const needed =
       includedCount > 0 ? separatorLen + formattedLen : formattedLen;
 
-    if (currentLen + needed > effectiveMax && includedCount > 0) {
+    // If there are more processes after this one, reserve space for the
+    // overflow suffix (separator + "+N more") so the final line fits.
+    let reservedForSuffix = 0;
+    if (remaining > 0) {
+      const suffixText = `+${remaining} more`;
+      reservedForSuffix = separatorLen + visibleWidth(suffixText);
+    }
+
+    if (
+      currentLen + needed + reservedForSuffix > effectiveMax &&
+      includedCount > 0
+    ) {
       // Show how many are hidden
-      const remaining = allProcs.length - includedCount;
-      if (remaining > 0) {
-        parts.push(theme.fg("dim", `+${remaining} more`));
+      const hiddenCount = allProcs.length - includedCount;
+      if (hiddenCount > 0) {
+        parts.push(theme.fg("dim", `+${hiddenCount} more`));
       }
       break;
     }
@@ -94,11 +106,25 @@ function renderWidget(
     includedCount++;
   }
 
+  // Edge case: the very first element was too wide and the loop's overflow
+  // check was skipped (it only fires when includedCount > 0). The suffix
+  // reservation already shrinks the budget, but a single process that fills
+  // the whole line still slips through. Show it truncated rather than nothing.
+  if (includedCount === 0 && allProcs.length > 0) {
+    const formatted = formatProcessStatus(allProcs[0], theme);
+    parts.push(formatted);
+  }
+
   if (parts.length === 0) {
     return [];
   }
 
-  return [prefix + parts.join(separator)];
+  const line = prefix + parts.join(separator);
+  return [
+    visibleWidth(line) > effectiveMax
+      ? truncateToWidth(line, effectiveMax)
+      : line,
+  ];
 }
 
 export function setupProcessWidget(pi: ExtensionAPI, manager: ProcessManager) {

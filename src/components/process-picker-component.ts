@@ -4,7 +4,12 @@ import {
   renderPanelTitleLine,
 } from "@aliou/pi-utils-ui";
 import type { Theme } from "@mariozechner/pi-coding-agent";
-import { type Component, matchesKey } from "@mariozechner/pi-tui";
+import {
+  type Component,
+  matchesKey,
+  truncateToWidth,
+  visibleWidth,
+} from "@mariozechner/pi-tui";
 import type { ProcessInfo } from "../constants";
 import type { ProcessManager } from "../manager";
 import { statusIcon, statusLabel } from "./status-format";
@@ -111,7 +116,14 @@ export class ProcessPickerComponent implements Component {
     const dim = (s: string) => theme.fg("dim", s);
     const accent = (s: string) => theme.fg("accent", s);
 
-    const padLine = createPanelPadder(width);
+    const innerWidth = width - 2;
+    const basePadLine = createPanelPadder(width);
+    const padLine = (content: string): string =>
+      basePadLine(
+        visibleWidth(content) > innerWidth
+          ? truncateToWidth(content, innerWidth)
+          : content,
+      );
 
     const lines: string[] = [];
     const processes = this.getProcesses();

@@ -219,7 +219,13 @@ export class ProcessesComponent implements Component {
     const processes = this.manager.list();
     const innerWidth = width - 2;
 
-    const padLine = createPanelPadder(width);
+    const basePadLine = createPanelPadder(width);
+    const padLine = (content: string): string =>
+      basePadLine(
+        visibleWidth(content) > innerWidth
+          ? truncateToWidth(content, innerWidth)
+          : content,
+      );
 
     lines.push(renderPanelTitleLine("Background Processes", width, theme));
 

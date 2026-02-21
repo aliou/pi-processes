@@ -1,5 +1,17 @@
 # @aliou/pi-processes
 
+## 0.5.0
+
+### Minor Changes
+
+- da665cd: Add opt-in blocker for background bash commands: when enabled, `bash` tool calls that would spawn a background process (`&`) are held for approval before execution.
+
+  Fix process list column truncation on narrow terminals. Move `@mariozechner/pi-tui` to peer dependencies.
+
+### Patch Changes
+
+- 3ccf461: Fix TUI crash when rendered lines exceed terminal width. Add width guards to widget status line, process list panel, and process picker component.
+
 ## 0.4.7
 
 ### Patch Changes

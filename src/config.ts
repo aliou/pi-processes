@@ -6,6 +6,8 @@
  */
 
 import { ConfigLoader } from "@aliou/pi-utils-settings";
+import type { ProcessesKeybindings } from "./utils/keybindings";
+import { DEFAULT_KEYBINDINGS } from "./utils/keybindings";
 
 export interface ProcessesConfig {
   processList?: {
@@ -27,7 +29,18 @@ export interface ProcessesConfig {
   widget?: {
     /** Show the status widget below the editor. */
     showStatusWidget?: boolean;
+    /** Default dock state when follow mode is enabled. */
+    dockDefaultState?: "hidden" | "collapsed";
+    /** Height of the dock in lines when open. */
+    dockHeight?: number;
   };
+  follow?: {
+    /** Enable follow mode by default when starting processes. */
+    enabledByDefault?: boolean;
+    /** Auto-hide dock when all processes finish. */
+    autoHideOnFinish?: boolean;
+  };
+  keybindings?: Partial<ProcessesKeybindings>;
   interception?: {
     /** Block background bash commands (&, nohup, disown, setsid) and guide the model to use the process tool. */
     blockBackgroundCommands?: boolean;
@@ -48,7 +61,14 @@ export interface ResolvedProcessesConfig {
   };
   widget: {
     showStatusWidget: boolean;
+    dockDefaultState: "hidden" | "collapsed";
+    dockHeight: number;
   };
+  follow: {
+    enabledByDefault: boolean;
+    autoHideOnFinish: boolean;
+  };
+  keybindings: ProcessesKeybindings;
   interception: {
     blockBackgroundCommands: boolean;
   };
@@ -65,8 +85,15 @@ const DEFAULT_CONFIG: ResolvedProcessesConfig = {
   },
   execution: {},
   widget: {
-    showStatusWidget: true,
+    showStatusWidget: false,
+    dockDefaultState: "collapsed",
+    dockHeight: 12,
   },
+  follow: {
+    enabledByDefault: true,
+    autoHideOnFinish: true,
+  },
+  keybindings: DEFAULT_KEYBINDINGS,
   interception: {
     blockBackgroundCommands: false,
   },

@@ -1,13 +1,20 @@
+/**
+ * Process widget hook - manages both status widget and log dock.
+ */
+
 import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
-import { configLoader } from "../config";
-import type { ProcessInfo } from "../constants";
+import { LogDockComponent } from "../components/log-dock-component";
+import { configLoader, type ResolvedProcessesConfig } from "../config";
+import { LIVE_STATUSES, type ProcessInfo } from "../constants";
 import type { ProcessManager } from "../manager";
+import type { DockStateManager } from "../state/dock-state";
 
-const WIDGET_ID = "processes-status";
+const STATUS_WIDGET_ID = "processes-status";
+const LOG_DOCK_WIDGET_ID = "processes-dock";
 
 function formatProcessStatus(
   proc: ProcessInfo,
@@ -35,7 +42,7 @@ function formatProcessStatus(
   }
 }
 
-function renderWidget(
+function renderStatusWidget(
   processes: ProcessInfo[],
   theme: ExtensionContext["ui"]["theme"],
   maxWidth?: number,
@@ -127,29 +134,103 @@ function renderWidget(
   ];
 }
 
-export function setupProcessWidget(pi: ExtensionAPI, manager: ProcessManager) {
+export function setupProcessWidget(
+  pi: ExtensionAPI,
+  manager: ProcessManager,
+  config: ResolvedProcessesConfig,
+  dockState: DockStateManager,
+) {
   let latestContext: ExtensionContext | null = null;
+  let logDockComponent: LogDockComponent | null = null;
 
   function updateWidget() {
     if (!latestContext?.hasUI) return;
 
+    // Update status widget
     if (!configLoader.getConfig().widget.showStatusWidget) {
-      latestContext.ui.setWidget(WIDGET_ID, undefined);
+      latestContext.ui.setWidget(STATUS_WIDGET_ID, undefined);
+    } else {
+      const processes = manager.list();
+      const maxWidth = process.stdout.columns || 120;
+      const lines = renderStatusWidget(
+        processes,
+        latestContext.ui.theme,
+        maxWidth,
+      );
+
+      if (lines.length === 0) {
+        latestContext.ui.setWidget(STATUS_WIDGET_ID, undefined);
+      } else {
+        latestContext.ui.setWidget(STATUS_WIDGET_ID, lines, {
+          placement: "belowEditor",
+        });
+      }
+    }
+
+    // Update log dock widget
+    const state = dockState.getState();
+
+    if (!latestContext?.hasUI) return;
+
+    if (state.visibility === "hidden") {
+      latestContext.ui.setWidget(LOG_DOCK_WIDGET_ID, undefined);
       return;
     }
 
-    const processes = manager.list();
-    const maxWidth = process.stdout.columns || 120;
-    const lines = renderWidget(processes, latestContext.ui.theme, maxWidth);
+    // Create or update the dock component
+    const dockHeight = config.widget.dockHeight;
 
-    if (lines.length === 0) {
-      latestContext.ui.setWidget(WIDGET_ID, undefined);
-    } else {
-      latestContext.ui.setWidget(WIDGET_ID, lines, {
-        placement: "belowEditor",
-      });
-    }
+    // Set widget height based on visibility state
+    const widgetHeight = state.visibility === "collapsed" ? 3 : dockHeight;
+
+    // Capture current context for the closure
+    const ctx = latestContext;
+
+    ctx.ui.setWidget(
+      LOG_DOCK_WIDGET_ID,
+      (tui: { requestRender: () => void }, theme: typeof ctx.ui.theme) => {
+        // Dispose old component if exists
+        logDockComponent?.dispose();
+
+        logDockComponent = new LogDockComponent({
+          manager,
+          dockState,
+          theme,
+          tui,
+          dockHeight: widgetHeight,
+        });
+        return logDockComponent;
+      },
+      { placement: "aboveEditor" },
+    );
   }
+
+  // Listen to process events for auto-show/hide
+  manager.onEvent((event) => {
+    if (event.type === "process_started") {
+      // Auto-show dock when first process starts and follow is enabled
+      dockState.autoShow();
+    }
+
+    if (event.type === "process_ended") {
+      // Handle focus when process exits
+      dockState.handleProcessExit(event.info.id);
+
+      // Auto-hide dock when all processes finish (if follow enabled)
+      const running = manager.list().filter((p) => LIVE_STATUSES.has(p.status));
+      if (running.length === 0 && config.follow.autoHideOnFinish) {
+        dockState.autoHide();
+      }
+    }
+
+    // Update widgets on any event
+    updateWidget();
+  });
+
+  // Subscribe to dock state changes
+  dockState.subscribe(() => {
+    updateWidget();
+  });
 
   pi.on("session_start", async (_event, ctx) => {
     // Startup defer: capture context only. First render happens on process
@@ -159,10 +240,6 @@ export function setupProcessWidget(pi: ExtensionAPI, manager: ProcessManager) {
 
   pi.on("session_switch", async (_event, ctx) => {
     latestContext = ctx;
-    updateWidget();
-  });
-
-  manager.onEvent(() => {
     updateWidget();
   });
 

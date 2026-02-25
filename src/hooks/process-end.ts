@@ -1,7 +1,4 @@
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-} from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { MESSAGE_TYPE_PROCESS_UPDATE, type ProcessInfo } from "../constants";
 import type { ProcessManager } from "../manager";
 import { formatRuntime } from "../utils";
@@ -17,21 +14,6 @@ interface ProcessUpdateDetails {
 }
 
 export function setupProcessEndHook(pi: ExtensionAPI, manager: ProcessManager) {
-  let latestContext: ExtensionContext | null = null;
-
-  // Capture context from session events
-  pi.on("session_start", async (_event, ctx) => {
-    latestContext = ctx;
-  });
-
-  pi.on("turn_start", async (_event, ctx) => {
-    latestContext = ctx;
-  });
-
-  pi.on("turn_end", async (_event, ctx) => {
-    latestContext = ctx;
-  });
-
   manager.onEvent((event) => {
     if (event.type !== "process_ended") return;
 
@@ -47,27 +29,18 @@ export function setupProcessEndHook(pi: ExtensionAPI, manager: ProcessManager) {
 
     const runtime = formatRuntime(info.startTime, info.endTime);
 
-    // Build notification message
+    // Build message
     let message: string;
-    let level: "info" | "error" | "warning";
 
     if (info.status === "killed") {
       message = `Process '${info.name}' was terminated (${runtime})`;
-      level = "warning";
     } else if (info.success) {
       message = `Process '${info.name}' completed successfully (${runtime})`;
-      level = "info";
     } else {
       message = `Process '${info.name}' crashed with exit code ${info.exitCode ?? "?"} (${runtime})`;
-      level = "error";
     }
 
-    // Always notify user via UI
-    if (latestContext?.hasUI) {
-      latestContext.ui.notify(message, level);
-    }
-
-    // Always send the message so it appears in the conversation history.
+    // Send the message to the conversation - displayed via custom renderer in UI
     // Only trigger an agent turn when the notification preferences say so.
     const details: ProcessUpdateDetails = {
       processId: info.id,

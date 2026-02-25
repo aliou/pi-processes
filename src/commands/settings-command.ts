@@ -11,7 +11,7 @@ export function registerProcessesSettings(
   onSave?: () => void,
 ): void {
   registerSettingsCommand<ProcessesConfig, ResolvedProcessesConfig>(pi, {
-    commandName: "process:settings",
+    commandName: "ps:settings",
     title: "Processes Settings",
     configStore: configLoader,
     buildSections: (
@@ -124,6 +124,52 @@ export function registerProcessesSettings(
                   : "off",
               values: ["on", "off"],
             },
+            {
+              id: "widget.dockDefaultState",
+              label: "Dock default state",
+              description:
+                "Default visibility state of the log dock when follow mode is on",
+              currentValue:
+                tabConfig?.widget?.dockDefaultState ??
+                resolved.widget.dockDefaultState,
+              values: ["hidden", "collapsed"],
+            },
+            {
+              id: "widget.dockHeight",
+              label: "Dock height",
+              description: "Height of the log dock in lines when open",
+              currentValue: String(
+                tabConfig?.widget?.dockHeight ?? resolved.widget.dockHeight,
+              ),
+              values: ["8", "10", "12", "16", "20"],
+            },
+          ],
+        },
+        {
+          label: "Follow Mode",
+          items: [
+            {
+              id: "follow.enabledByDefault",
+              label: "Enable by default",
+              description: "Automatically show logs when a process starts",
+              currentValue:
+                (tabConfig?.follow?.enabledByDefault ??
+                resolved.follow.enabledByDefault)
+                  ? "on"
+                  : "off",
+              values: ["on", "off"],
+            },
+            {
+              id: "follow.autoHideOnFinish",
+              label: "Auto-hide on finish",
+              description: "Hide dock when all processes finish",
+              currentValue:
+                (tabConfig?.follow?.autoHideOnFinish ??
+                resolved.follow.autoHideOnFinish)
+                  ? "on"
+                  : "off",
+              values: ["on", "off"],
+            },
           ],
         },
       ];
@@ -139,6 +185,27 @@ export function registerProcessesSettings(
       if (id === "widget.showStatusWidget") {
         if (!updated.widget) updated.widget = {};
         updated.widget.showStatusWidget = newValue === "on";
+        return updated;
+      }
+      if (id === "widget.dockDefaultState") {
+        if (!updated.widget) updated.widget = {};
+        updated.widget.dockDefaultState =
+          newValue === "hidden" ? "hidden" : "collapsed";
+        return updated;
+      }
+      if (id === "widget.dockHeight") {
+        if (!updated.widget) updated.widget = {};
+        updated.widget.dockHeight = Number.parseInt(newValue, 10);
+        return updated;
+      }
+      if (id === "follow.enabledByDefault") {
+        if (!updated.follow) updated.follow = {};
+        updated.follow.enabledByDefault = newValue === "on";
+        return updated;
+      }
+      if (id === "follow.autoHideOnFinish") {
+        if (!updated.follow) updated.follow = {};
+        updated.follow.autoHideOnFinish = newValue === "on";
         return updated;
       }
       if (id === "execution.shellPath") {

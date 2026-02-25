@@ -4,6 +4,7 @@ import { registerProcessesSettings } from "./commands/settings-command";
 import { configLoader } from "./config";
 import { setupProcessesHooks } from "./hooks";
 import { ProcessManager } from "./manager";
+import { DockStateManager } from "./state/dock-state";
 import { setupProcessesTools } from "./tools";
 
 export default async function (pi: ExtensionAPI) {
@@ -21,8 +22,17 @@ export default async function (pi: ExtensionAPI) {
   });
 
   const config = configLoader.getConfig();
-  const { update: updateWidget } = setupProcessesHooks(pi, manager, config);
-  setupProcessesCommands(pi, manager);
+
+  // Create dock state manager with follow enabled by default
+  const dockState = new DockStateManager(config.follow.enabledByDefault);
+
+  const { update: updateWidget } = setupProcessesHooks(
+    pi,
+    manager,
+    config,
+    dockState,
+  );
+  setupProcessesCommands(pi, manager, dockState);
   setupProcessesTools(pi, manager);
   registerProcessesSettings(pi, () => {
     updateWidget();

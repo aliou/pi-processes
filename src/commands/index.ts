@@ -1,15 +1,22 @@
+/**
+ * Process commands with /ps: prefix.
+ *
+ * /ps         - Open full panel to view and manage processes
+ * /ps:focus   - Focus on a specific process (opens dock)
+ * /ps:kill    - Kill a running process
+ * /ps:clear   - Clear finished processes
+ * /ps:logs    - Show log file paths
+ */
+
 import type {
   ExtensionAPI,
   ExtensionCommandContext,
-  Theme,
 } from "@mariozechner/pi-coding-agent";
-import { LogStreamComponent } from "../components/log-stream-component";
 import { ProcessPickerComponent } from "../components/process-picker-component";
 import { ProcessesComponent } from "../components/processes-component";
 import { LIVE_STATUSES, type ProcessInfo } from "../constants";
 import type { ProcessManager } from "../manager";
-
-const LOG_STREAM_WIDGET_ID = "processes-log-stream";
+import type { DockStateManager } from "../state/dock-state";
 
 function runningProcessCompletions(manager: ProcessManager) {
   return (prefix: string) => {
@@ -51,23 +58,15 @@ function allProcessCompletions(manager: ProcessManager) {
 export function setupProcessesCommands(
   pi: ExtensionAPI,
   manager: ProcessManager,
+  dockState: DockStateManager,
 ): void {
-  let streamingProcessId: string | null = null;
-
-  // ── /process:list ──────────────────────────────────────────────────
-  // Registered first so it appears first in autocomplete.
-  pi.registerCommand("process:list", {
+  // ── /ps ─────────────────────────────────────────────────────────────
+  // Open full panel to view and manage processes
+  pi.registerCommand("ps", {
     description: "View and manage background processes",
     handler: async (_args, ctx) => {
       if (!ctx.hasUI) {
-        ctx.ui.notify("/process:list requires interactive mode", "error");
         return;
-      }
-
-      // If currently streaming, dismiss the stream widget and show the list.
-      if (streamingProcessId) {
-        ctx.ui.setWidget(LOG_STREAM_WIDGET_ID, undefined);
-        streamingProcessId = null;
       }
 
       const result = await ctx.ui.custom<string | null>(
@@ -77,93 +76,48 @@ export function setupProcessesCommands(
             theme,
             (processId?: string) => {
               if (processId) {
-                done(processId);
-              } else {
-                done(null);
+                dockState.setFocus(processId);
               }
+              done(processId ?? null);
             },
             manager,
           );
         },
       );
 
-      // RPC fallback.
       if (result === undefined) {
-        ctx.ui.notify("/process:list requires interactive mode", "info");
         return;
       }
-
-      // User dismissed with Escape/q.
-      if (result === null) {
-        return;
-      }
-
-      // User selected a process — start streaming its logs.
-      startStreaming(ctx.ui, manager, result);
     },
   });
 
-  // ── /process:stream [id|name] ──────────────────────────────────────
-  pi.registerCommand("process:stream", {
-    description: "Stream logs from a running process",
-    getArgumentCompletions: runningProcessCompletions(manager),
+  // ── /ps:focus [id|name] ────────────────────────────────────────────
+  pi.registerCommand("ps:focus", {
+    description: "Focus on a process to view its logs in the dock",
+    getArgumentCompletions: allProcessCompletions(manager),
     handler: async (args, ctx) => {
       const arg = args.trim();
 
-      // Explicit argument: stream that process.
+      let processId: string | undefined;
+
       if (arg) {
         const proc = manager.find(arg);
         if (!proc) {
-          ctx.ui.notify(`Process not found: ${arg}`, "error");
           return;
         }
-        if (!LIVE_STATUSES.has(proc.status)) {
-          ctx.ui.notify(
-            `${proc.name} (${proc.id}) is not running (${proc.status})`,
-            "info",
-          );
-          return;
-        }
-        startStreaming(ctx.ui, manager, proc.id);
-        return;
+        processId = proc.id;
+      } else {
+        processId = await pickProcess(ctx, manager, "Select process to focus");
+        if (!processId) return;
       }
 
-      // No argument + currently streaming: dismiss.
-      if (streamingProcessId) {
-        ctx.ui.setWidget(LOG_STREAM_WIDGET_ID, undefined);
-        streamingProcessId = null;
-        return;
-      }
-
-      // No argument + not streaming: pick from running processes.
-      const running = manager.list().filter((p) => LIVE_STATUSES.has(p.status));
-
-      // No running processes.
-      if (running.length === 0) {
-        ctx.ui.notify("No running processes", "info");
-        return;
-      }
-
-      // Single running process: auto-select.
-      if (running.length === 1 && running[0]) {
-        startStreaming(ctx.ui, manager, running[0].id);
-        return;
-      }
-
-      // Multiple running processes: show picker.
-      const processId = await pickProcess(
-        ctx,
-        manager,
-        "Select process to stream",
-        (p) => LIVE_STATUSES.has(p.status),
-      );
-      if (!processId) return;
-      startStreaming(ctx.ui, manager, processId);
+      // Focus on the process (auto-shows dock if hidden)
+      dockState.setFocus(processId);
     },
   });
 
-  // ── /process:logs [id|name] ────────────────────────────────────────
-  pi.registerCommand("process:logs", {
+  // ── /ps:logs [id|name] ─────────────────────────────────────────────
+  pi.registerCommand("ps:logs", {
     description: "Show log file paths for a process",
     getArgumentCompletions: allProcessCompletions(manager),
     handler: async (args, ctx) => {
@@ -174,32 +128,24 @@ export function setupProcessesCommands(
       if (arg) {
         const proc = manager.find(arg);
         if (!proc) {
-          ctx.ui.notify(`Process not found: ${arg}`, "error");
           return;
         }
         processId = proc.id;
       } else {
-        // No argument: show picker.
         processId = await pickProcess(ctx, manager, "Select process for logs");
         if (!processId) return;
       }
 
-      const logFiles = manager.getLogFiles(processId);
-      const proc = manager.get(processId);
-      if (!logFiles || !proc) {
-        ctx.ui.notify(`Process not found: ${processId}`, "error");
-        return;
-      }
-
-      ctx.ui.notify(
-        `${proc.name} (${proc.id})\nstdout: ${logFiles.stdoutFile}\nstderr: ${logFiles.stderrFile}`,
-        "info",
-      );
+      // Focus on the process and expand dock to show logs
+      dockState.setState({
+        focusedProcessId: processId,
+        visibility: "open",
+      });
     },
   });
 
-  // ── /process:kill [id|name] ────────────────────────────────────────
-  pi.registerCommand("process:kill", {
+  // ── /ps:kill [id|name] ─────────────────────────────────────────────
+  pi.registerCommand("ps:kill", {
     description: "Kill a running background process",
     getArgumentCompletions: runningProcessCompletions(manager),
     handler: async (args, ctx) => {
@@ -210,14 +156,9 @@ export function setupProcessesCommands(
       if (arg) {
         const proc = manager.find(arg);
         if (!proc) {
-          ctx.ui.notify(`Process not found: ${arg}`, "error");
           return;
         }
         if (!LIVE_STATUSES.has(proc.status)) {
-          ctx.ui.notify(
-            `${proc.name} (${proc.id}) is not running (${proc.status})`,
-            "info",
-          );
           return;
         }
         processId = proc.id;
@@ -228,7 +169,6 @@ export function setupProcessesCommands(
           .filter((p) => LIVE_STATUSES.has(p.status));
 
         if (running.length === 0) {
-          ctx.ui.notify("No running processes to kill", "info");
           return;
         }
 
@@ -247,7 +187,6 @@ export function setupProcessesCommands(
 
       const proc = manager.get(processId);
       if (!proc) {
-        ctx.ui.notify(`Process not found: ${processId}`, "error");
         return;
       }
 
@@ -257,48 +196,163 @@ export function setupProcessesCommands(
       const result = await manager.kill(processId, { signal, timeoutMs });
 
       if (result.ok) {
-        ctx.ui.notify(`Killed ${proc.name} (${proc.id})`, "info");
-      } else {
-        ctx.ui.notify(
-          `Failed to kill ${proc.name} (${proc.id}): ${result.reason}`,
-          "error",
-        );
+        if (dockState.getState().focusedProcessId === processId) {
+          dockState.setFocus(null);
+        }
       }
     },
   });
 
-  // ── /process:clear ─────────────────────────────────────────────────
-  pi.registerCommand("process:clear", {
+  // ── /ps:clear ─────────────────────────────────────────────────────
+  pi.registerCommand("ps:clear", {
     description: "Clear finished processes",
-    handler: async (_args, ctx) => {
-      const cleared = manager.clearFinished();
-      if (cleared > 0) {
-        ctx.ui.notify(
-          `Cleared ${cleared} finished process${cleared > 1 ? "es" : ""}`,
-          "info",
-        );
+    handler: async (_args, _ctx) => {
+      manager.clearFinished();
+    },
+  });
+
+  // ── /ps:dock [on|off|expanded] ─────────────────────────────────────
+  pi.registerCommand("ps:dock", {
+    description: "Toggle dock visibility (on/off/expanded)",
+    getArgumentCompletions: () => [
+      { value: "on", label: "on" },
+      { value: "off", label: "off" },
+      { value: "expanded", label: "expanded" },
+    ],
+    handler: async (args, _ctx) => {
+      const arg = args.trim().toLowerCase();
+
+      if (arg === "on") {
+        dockState.expand();
+      } else if (arg === "off") {
+        dockState.hide();
+      } else if (arg === "expanded") {
+        dockState.expand();
       } else {
-        ctx.ui.notify("No finished processes to clear", "info");
+        dockState.toggleVisibility();
       }
     },
   });
 
-  // ── Helpers ────────────────────────────────────────────────────────
+  // ── Deprecated commands (backward compatible) ─────────────────────
+  pi.registerCommand("process:list", {
+    description: "[DEPRECATED] Use /ps instead",
+    handler: async (_args, _ctx) => {
+      // Same as /ps - open panel
+    },
+  });
 
-  function startStreaming(
-    ui: ExtensionCommandContext["ui"],
-    mgr: ProcessManager,
-    processId: string,
-  ) {
-    streamingProcessId = processId;
-    ui.setWidget(
-      LOG_STREAM_WIDGET_ID,
-      (tui: { requestRender: () => void }, theme: Theme) => {
-        return new LogStreamComponent(tui, theme, mgr, processId);
-      },
-      { placement: "aboveEditor" },
-    );
-  }
+  pi.registerCommand("process:stream", {
+    description: "[DEPRECATED] Use /ps:focus instead",
+    handler: async (args, ctx) => {
+      // Same as /ps:focus
+      const arg = args.trim();
+      let processId: string | undefined;
+
+      if (arg) {
+        const proc = manager.find(arg);
+        if (!proc) {
+          return;
+        }
+        processId = proc.id;
+      } else {
+        processId = await pickProcess(ctx, manager, "Select process to stream");
+        if (!processId) return;
+      }
+
+      dockState.setFocus(processId);
+    },
+  });
+
+  pi.registerCommand("process:logs", {
+    description: "[DEPRECATED] Use /ps:logs instead",
+    handler: async (args, ctx) => {
+      // Same as /ps:logs
+      const arg = args.trim();
+      let processId: string | undefined;
+
+      if (arg) {
+        const proc = manager.find(arg);
+        if (!proc) {
+          return;
+        }
+        processId = proc.id;
+      } else {
+        processId = await pickProcess(ctx, manager, "Select process for logs");
+        if (!processId) return;
+      }
+
+      dockState.setState({
+        focusedProcessId: processId,
+        visibility: "open",
+      });
+    },
+  });
+
+  pi.registerCommand("process:kill", {
+    description: "[DEPRECATED] Use /ps:kill instead",
+    handler: async (args, ctx) => {
+      // Same as /ps:kill
+      const arg = args.trim();
+
+      let processId: string | undefined;
+
+      if (arg) {
+        const proc = manager.find(arg);
+        if (!proc) {
+          return;
+        }
+        if (!LIVE_STATUSES.has(proc.status)) {
+          return;
+        }
+        processId = proc.id;
+      } else {
+        const running = manager
+          .list()
+          .filter((p) => LIVE_STATUSES.has(p.status));
+
+        if (running.length === 0) {
+          return;
+        }
+
+        if (running.length === 1 && running[0]) {
+          processId = running[0].id;
+        } else {
+          processId = await pickProcess(
+            ctx,
+            manager,
+            "Select process to kill",
+            (p) => LIVE_STATUSES.has(p.status),
+          );
+          if (!processId) return;
+        }
+      }
+
+      const proc = manager.get(processId);
+      if (!proc) {
+        return;
+      }
+
+      const signal =
+        proc.status === "terminate_timeout" ? "SIGKILL" : "SIGTERM";
+      const timeoutMs = signal === "SIGKILL" ? 200 : 3000;
+      const result = await manager.kill(processId, { signal, timeoutMs });
+
+      if (result.ok) {
+        if (dockState.getState().focusedProcessId === processId) {
+          dockState.setFocus(null);
+        }
+      }
+    },
+  });
+
+  pi.registerCommand("process:clear", {
+    description: "[DEPRECATED] Use /ps:clear instead",
+    handler: async (_args, _ctx) => {
+      // Same as /ps:clear
+      manager.clearFinished();
+    },
+  });
 }
 
 async function pickProcess(
@@ -308,7 +362,6 @@ async function pickProcess(
   filter?: (proc: ProcessInfo) => boolean,
 ): Promise<string | undefined> {
   if (!ctx.hasUI) {
-    ctx.ui.notify("Interactive mode required", "error");
     return undefined;
   }
 
@@ -325,7 +378,6 @@ async function pickProcess(
     );
   });
 
-  // RPC fallback or user cancelled.
   if (result === undefined || result === null) {
     return undefined;
   }

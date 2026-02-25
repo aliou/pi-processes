@@ -42,6 +42,13 @@ export type KillResult =
   | { ok: true; info: ProcessInfo }
   | { ok: false; info: ProcessInfo; reason: "not_found" | "timeout" | "error" };
 
+export type WriteResult =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: "not_found" | "process_exited" | "stdin_closed" | "write_error";
+    };
+
 export interface StartOptions {
   alertOnSuccess?: boolean;
   alertOnFailure?: boolean;

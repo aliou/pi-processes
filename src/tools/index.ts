@@ -15,10 +15,10 @@ import { executeAction } from "./actions";
 
 const ProcessesParams = Type.Object({
   action: StringEnum(
-    ["start", "list", "output", "logs", "kill", "clear"] as const,
+    ["start", "list", "output", "logs", "kill", "clear", "write"] as const,
     {
       description:
-        "Action: start (run command), list (show all), output (get recent output), logs (get log file paths), kill (terminate), clear (remove finished)",
+        "Action: start (run command), list (show all), output (get recent output), logs (get log file paths), kill (terminate), clear (remove finished), write (write to stdin)",
     },
   ),
   command: Type.Optional(
@@ -33,7 +33,18 @@ const ProcessesParams = Type.Object({
   id: Type.Optional(
     Type.String({
       description:
-        "Process ID or name to match (required for output/kill/logs). Can be proc_N or friendly name.",
+        "Process ID or name to match (required for output/kill/logs/write). Can be proc_N or friendly name.",
+    }),
+  ),
+  input: Type.Optional(
+    Type.String({
+      description: "Data to write to process stdin (required for write action)",
+    }),
+  ),
+  end: Type.Optional(
+    Type.Boolean({
+      description:
+        "Close stdin after writing (optional for write action, use for programs reading until EOF)",
     }),
   ),
   alertOnSuccess: Type.Optional(
@@ -72,6 +83,7 @@ export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
 - logs: Get log file paths to inspect with read tool (requires 'id')
 - kill: Terminate a process (requires 'id' - can be proc_N or name match like "backend")
 - clear: Remove all finished processes from the list
+- write: Write to process stdin (requires 'id' and 'input', optional 'end' to close stdin)
 
 Important: You DON'T need to poll or wait for processes. Notifications arrive automatically based on your preferences. Start processes and continue with other work - you'll be informed if something requires attention.
 
@@ -107,10 +119,18 @@ Note: User always sees process updates in the UI. The notify flags control wheth
       if (
         (args.action === "output" ||
           args.action === "kill" ||
-          args.action === "logs") &&
+          args.action === "logs" ||
+          args.action === "write") &&
         args.id
       ) {
         mainArg = args.id;
+      }
+
+      if (args.action === "write" && args.input) {
+        optionArgs.push({ label: "input", value: args.input });
+        if (args.end) {
+          optionArgs.push({ label: "end", value: "true" });
+        }
       }
 
       return new ToolCallHeader(

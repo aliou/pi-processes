@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Writable } from "node:stream";
 
 import {
   type KillResult,
@@ -17,12 +18,15 @@ import {
   type ProcessInfo,
   type ProcessStatus,
   type StartOptions,
+  type WriteResult,
 } from "./constants";
 import { isProcessGroupAlive, killProcessGroup } from "./utils";
 import { spawnCommand } from "./utils/command-executor";
 
 interface ManagedProcess extends ProcessInfo {
   process: ChildProcess;
+  stdin: Writable | null;
+  stdinClosed: boolean;
   lastSignalSent: NodeJS.Signals | null;
   combinedFile: string;
 }
@@ -159,6 +163,8 @@ export class ProcessManager {
       alertOnFailure: options?.alertOnFailure ?? true,
       alertOnKill: options?.alertOnKill ?? false,
       process: child,
+      stdin: child.stdin,
+      stdinClosed: false,
       lastSignalSent: null,
     };
 
@@ -407,6 +413,50 @@ export class ProcessManager {
     return { ok: true, info: this.toProcessInfo(managed) };
   }
 
+  writeToStdin(
+    id: string,
+    data: string,
+    opts?: { end?: boolean },
+  ): WriteResult {
+    const managed = this.processes.get(id);
+    if (!managed) {
+      return {
+        ok: false,
+        reason: "not_found",
+      };
+    }
+
+    if (!LIVE_STATUSES.has(managed.status)) {
+      return {
+        ok: false,
+        reason: "process_exited",
+      };
+    }
+
+    if (managed.stdinClosed || !managed.stdin) {
+      return {
+        ok: false,
+        reason: "stdin_closed",
+      };
+    }
+
+    try {
+      managed.stdin.write(data);
+
+      if (opts?.end) {
+        managed.stdin.end();
+        managed.stdinClosed = true;
+      }
+
+      return { ok: true };
+    } catch {
+      return {
+        ok: false,
+        reason: "write_error",
+      };
+    }
+  }
+
   clearFinished(): number {
     let cleared = 0;
     for (const [id, managed] of this.processes) {
@@ -519,4 +569,10 @@ export class ProcessManager {
   }
 }
 
-export type { ProcessInfo, ProcessStatus, ManagerEvent, KillResult };
+export type {
+  ProcessInfo,
+  ProcessStatus,
+  ManagerEvent,
+  KillResult,
+  WriteResult,
+};

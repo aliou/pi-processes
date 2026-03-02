@@ -433,7 +433,6 @@ export class ProcessesComponent implements Component {
     }
 
     lines.push(padLine(footer));
-    lines.push(renderPanelRule(width, theme));
 
     this.cachedLines = lines;
     this.cachedWidth = width;

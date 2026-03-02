@@ -35,13 +35,17 @@ export class LogFileViewer {
   private theme: Theme;
 
   private follow: boolean;
-  /** Lines from bottom; 0 = tail, higher = older. */
-  private scrollOffset = 0;
+  /** Absolute index of the last visible line (1-based).
+   *  null = follow mode; always shows latest lines. */
+  private anchorEnd: number | null = null;
   private streamFilter: StreamFilter = "combined";
 
   private searchQuery = "";
   private searchMatches: number[] = [];
   private searchCurrentMatch = -1;
+
+  /** Line index (0-based) to center in the viewport. null = not centering. */
+  private centerTarget: number | null = null;
 
   constructor(opts: LogFileViewerOptions) {
     this.filePath = opts.filePath;
@@ -105,22 +109,34 @@ export class LogFileViewer {
   // ---------------------------------------------------------------------------
 
   scrollToTop(): void {
+    this.anchorEnd = 0;
     this.follow = false;
-    this.scrollOffset = Number.MAX_SAFE_INTEGER; // clamped in renderLines
   }
 
   scrollToBottom(): void {
-    this.scrollOffset = 0;
+    const lines = this.applyFilter(this.readAllLines());
+    this.anchorEnd = lines.length;
+    this.follow = false;
   }
 
-  /** delta > 0 = scroll up (older content), delta < 0 = scroll down (newer). */
+  /** delta > 0 = scroll toward older content, delta < 0 = toward newer. */
   scrollBy(delta: number): void {
-    this.scrollOffset = Math.max(0, this.scrollOffset + delta);
+    if (this.anchorEnd === null) {
+      const lines = this.applyFilter(this.readAllLines());
+      this.anchorEnd = lines.length;
+    }
+    this.anchorEnd = Math.max(0, this.anchorEnd + delta);
+    this.follow = false;
   }
 
   toggleFollow(): boolean {
     this.follow = !this.follow;
-    if (this.follow) this.scrollOffset = 0;
+    if (this.follow) {
+      this.anchorEnd = null;
+    } else {
+      const lines = this.applyFilter(this.readAllLines());
+      this.anchorEnd = lines.length;
+    }
     return this.follow;
   }
 
@@ -153,10 +169,7 @@ export class LogFileViewer {
     if (this.searchMatches.length > 0) {
       // Start at the last match so the user lands near the tail.
       this.searchCurrentMatch = this.searchMatches.length - 1;
-      this.jumpToMatchLine(
-        lines.length,
-        this.searchMatches[this.searchCurrentMatch],
-      );
+      this.jumpToMatchLine(this.searchMatches[this.searchCurrentMatch]);
     } else {
       this.searchCurrentMatch = -1;
     }
@@ -168,8 +181,8 @@ export class LogFileViewer {
     this.searchCurrentMatch = -1;
   }
 
-  private jumpToMatchLine(total: number, lineIdx: number): void {
-    this.scrollOffset = Math.max(0, total - lineIdx - 1);
+  private jumpToMatchLine(lineIdx: number): void {
+    this.centerTarget = lineIdx;
     this.follow = false;
   }
 
@@ -177,11 +190,7 @@ export class LogFileViewer {
     if (this.searchMatches.length === 0) return;
     this.searchCurrentMatch =
       (this.searchCurrentMatch + 1) % this.searchMatches.length;
-    const lines = this.applyFilter(this.readAllLines());
-    this.jumpToMatchLine(
-      lines.length,
-      this.searchMatches[this.searchCurrentMatch],
-    );
+    this.jumpToMatchLine(this.searchMatches[this.searchCurrentMatch]);
   }
 
   prevMatch(): void {
@@ -189,11 +198,7 @@ export class LogFileViewer {
     this.searchCurrentMatch =
       (this.searchCurrentMatch - 1 + this.searchMatches.length) %
       this.searchMatches.length;
-    const lines = this.applyFilter(this.readAllLines());
-    this.jumpToMatchLine(
-      lines.length,
-      this.searchMatches[this.searchCurrentMatch],
-    );
+    this.jumpToMatchLine(this.searchMatches[this.searchCurrentMatch]);
   }
 
   getSearchInfo(): { query: string; current: number; total: number } | null {
@@ -214,7 +219,6 @@ export class LogFileViewer {
     const theme = this.theme;
     const dim = (s: string) => theme.fg("dim", s);
     const warning = (s: string) => theme.fg("warning", s);
-    const accent = (s: string) => theme.fg("accent", s);
 
     const allLines = this.readAllLines();
     const lines = this.applyFilter(allLines);
@@ -230,10 +234,18 @@ export class LogFileViewer {
     const total = lines.length;
     if (total === 0) return [dim("(no output yet)")];
 
-    // Clamp offset to valid range.
-    this.scrollOffset = Math.min(this.scrollOffset, Math.max(0, total - 1));
+    // Resolve centerTarget into anchorEnd now that we know maxLines.
+    if (this.centerTarget !== null) {
+      const half = Math.floor(maxLines / 2);
+      this.anchorEnd = Math.min(total, this.centerTarget + half + 1);
+      this.centerTarget = null;
+    }
 
-    const endIdx = this.follow ? total : Math.max(0, total - this.scrollOffset);
+    // Resolve anchor: null = follow (tail), number = absolute frozen end.
+    const rawEnd = this.anchorEnd ?? total;
+    // Clamp to valid range. Math.max with min(maxLines, total) ensures anchorEnd = 0
+    // (scrollToTop sentinel) still shows a full window from the top.
+    const endIdx = Math.min(total, Math.max(rawEnd, Math.min(maxLines, total)));
     const startIdx = Math.max(0, endIdx - maxLines);
 
     const currentMatchIdx =
@@ -247,7 +259,7 @@ export class LogFileViewer {
       const absIdx = startIdx + i;
       const text = truncateToWidth(stripAnsi(line.text), width);
 
-      if (absIdx === currentMatchIdx) return accent(text);
+      if (absIdx === currentMatchIdx) return theme.bold(theme.inverse(text));
       if (matchSet.has(absIdx)) return warning(text);
       if (line.type === "stderr") return warning(text);
       return text;
@@ -273,7 +285,8 @@ export class LogFileViewer {
     } else if (total === 0) {
       rightParts.push(dim("empty"));
     } else {
-      const endIdx = Math.max(0, total - this.scrollOffset);
+      const rawEnd = this.anchorEnd ?? total;
+      const endIdx = Math.min(total, Math.max(0, rawEnd));
       const pct = Math.round((endIdx / total) * 100);
       rightParts.push(dim(`${pct}%  L${Math.min(endIdx, total)}/${total}`));
     }

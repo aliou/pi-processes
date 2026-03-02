@@ -2,7 +2,6 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { LogOverlayComponent } from "../components/log-overlay-component";
 import type { ProcessManager } from "../manager";
 import { allProcessCompletions } from "./completions";
-import { pickProcess } from "./pick-process";
 
 export function registerPsLogsCommand(
   pi: ExtensionAPI,
@@ -21,13 +20,6 @@ export function registerPsLogsCommand(
         const proc = manager.find(arg);
         if (!proc) return;
         processId = proc.id;
-      } else {
-        processId = await pickProcess(
-          ctx,
-          manager,
-          "Select process to view logs",
-        );
-        if (!processId) return;
       }
 
       await ctx.ui.custom<null>(

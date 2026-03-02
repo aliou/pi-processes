@@ -130,11 +130,7 @@ export class LogDockComponent implements Component {
     };
 
     if (processes.length === 0) {
-      return [
-        renderPanelRule(width, theme),
-        padLine(dim("No processes")),
-        renderPanelRule(width, theme),
-      ];
+      return [renderPanelRule(width, theme), padLine(dim("No processes"))];
     }
 
     const running = processes.filter((p) => LIVE_STATUSES.has(p.status));
@@ -171,7 +167,6 @@ export class LogDockComponent implements Component {
       }
     }
 
-    lines.push(renderPanelRule(width, theme));
     return lines;
   }
 
@@ -206,7 +201,6 @@ export class LogDockComponent implements Component {
         renderPanelTitleLine("Process Logs", width, theme),
         padLine(dim("No processes")),
         padLine(dim("Run a command to start")),
-        renderPanelRule(width, theme),
       ];
     }
 
@@ -215,7 +209,6 @@ export class LogDockComponent implements Component {
       return [
         renderPanelTitleLine("Process Logs", width, theme),
         padLine(dim("Log files unavailable")),
-        renderPanelRule(width, theme),
       ];
     }
 
@@ -232,8 +225,6 @@ export class LogDockComponent implements Component {
     for (let i = 0; i < logRows; i++) {
       lines.push(padLine(contentLines[i] ?? ""));
     }
-
-    lines.push(renderPanelRule(width, theme));
 
     // Slice to dockHeight in case of overflow.
     return lines.slice(0, this.dockHeight);

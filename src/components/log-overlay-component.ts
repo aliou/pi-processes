@@ -17,6 +17,7 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import {
   type Component,
+  Input,
   matchesKey,
   type TUI,
   truncateToWidth,
@@ -28,12 +29,12 @@ import { LogFileViewer } from "./log-file-viewer";
 import { statusIcon } from "./status-format";
 
 // Lines that aren't log content: top border + tabs + divider + divider + status + footer + bottom border
-const CHROME_LINES = 7;
+const CHROME_LINES = 6;
 const MIN_LOG_ROWS = 5;
 const OVERLAY_FRACTION = 0.8;
 const MAX_TAB_NAME = 12;
 
-type OverlayMode = "normal" | "search";
+type OverlayMode = "normal" | "search-typing" | "search-active";
 
 interface LogOverlayOptions {
   tui: TUI;
@@ -58,7 +59,7 @@ export class LogOverlayComponent implements Component {
   private viewers: Map<string, LogFileViewer> = new Map();
 
   private mode: OverlayMode = "normal";
-  private searchBuffer = "";
+  private searchInput: Input = new Input();
 
   private timer: ReturnType<typeof setInterval> | null = null;
   private unsubscribeManager: (() => void) | null = null;
@@ -69,7 +70,7 @@ export class LogOverlayComponent implements Component {
     this.manager = opts.manager;
     this.done = opts.done;
 
-    this.processes = this.manager.list();
+    this.processes = this.sortProcesses(this.manager.list());
 
     if (opts.initialProcessId) {
       const idx = this.processes.findIndex(
@@ -85,7 +86,7 @@ export class LogOverlayComponent implements Component {
         this.close();
         return;
       }
-      this.processes = next;
+      this.processes = this.sortProcesses(next);
       this.tabIndex = Math.min(this.tabIndex, this.processes.length - 1);
       this.tui.requestRender();
     });
@@ -93,6 +94,38 @@ export class LogOverlayComponent implements Component {
     this.timer = setInterval(() => {
       this.tui.requestRender();
     }, 300);
+
+    this.searchInput.onSubmit = (query) => {
+      const trimmed = query.trim();
+      if (trimmed) {
+        this.currentViewer()?.setSearch(trimmed);
+        this.mode = "search-active";
+      } else {
+        this.currentViewer()?.clearSearch();
+        this.mode = "normal";
+      }
+      this.tui.requestRender();
+    };
+
+    this.searchInput.onEscape = () => {
+      this.mode = "normal";
+      this.searchInput.setValue("");
+      this.tui.requestRender();
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sorting
+  // ---------------------------------------------------------------------------
+
+  private sortProcesses(list: ProcessInfo[]): ProcessInfo[] {
+    const isLive = (p: ProcessInfo) => LIVE_STATUSES.has(p.status);
+    return [...list].sort((a, b) => {
+      const aLive = isLive(a) ? 1 : 0;
+      const bLive = isLive(b) ? 1 : 0;
+      if (bLive !== aLive) return bLive - aLive; // live first
+      return b.startTime - a.startTime; // most recent first within each group
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -108,7 +141,7 @@ export class LogOverlayComponent implements Component {
         filePath: logFiles.combinedFile,
         format: "combined",
         theme: this.theme,
-        follow: LIVE_STATUSES.has(proc.status),
+        follow: false,
       });
       this.viewers.set(proc.id, viewer);
     }
@@ -144,7 +177,10 @@ export class LogOverlayComponent implements Component {
   // ---------------------------------------------------------------------------
 
   handleInput(data: string): boolean {
-    if (this.mode === "search") return this.handleSearchInput(data);
+    if (this.mode === "search-typing")
+      return this.handleSearchTypingInput(data);
+    if (this.mode === "search-active")
+      return this.handleSearchActiveInput(data);
     return this.handleNormalInput(data);
   }
 
@@ -156,12 +192,12 @@ export class LogOverlayComponent implements Component {
       return true;
     }
 
-    if (matchesKey(data, "left") || data === "h") {
-      this.prevTab();
+    if (data === "\t") {
+      this.nextTab();
       return true;
     }
-    if (matchesKey(data, "right") || data === "l") {
-      this.nextTab();
+    if (matchesKey(data, "shift+tab")) {
+      this.prevTab();
       return true;
     }
 
@@ -178,22 +214,12 @@ export class LogOverlayComponent implements Component {
       return true;
     }
     if (matchesKey(data, "down") || data === "j") {
-      viewer.scrollBy(-1);
-      this.tui.requestRender();
-      return true;
-    }
-    if (matchesKey(data, "up") || data === "k") {
       viewer.scrollBy(1);
       this.tui.requestRender();
       return true;
     }
-    if (data === "d") {
-      viewer.scrollBy(-10);
-      this.tui.requestRender();
-      return true;
-    }
-    if (data === "u") {
-      viewer.scrollBy(10);
+    if (matchesKey(data, "up") || data === "k") {
+      viewer.scrollBy(-1);
       this.tui.requestRender();
       return true;
     }
@@ -209,54 +235,50 @@ export class LogOverlayComponent implements Component {
     }
 
     if (data === "/") {
-      this.mode = "search";
-      this.searchBuffer = "";
+      this.searchInput.setValue("");
+      this.mode = "search-typing";
+      this.tui.requestRender();
+      return true;
+    }
+    return true;
+  }
+
+  private handleSearchTypingInput(data: string): boolean {
+    // Delegate all editing to the Input component.
+    // onSubmit / onEscape are wired in the constructor and fire synchronously.
+    this.searchInput.handleInput(data);
+    this.tui.requestRender();
+    return true;
+  }
+
+  private handleSearchActiveInput(data: string): boolean {
+    if (matchesKey(data, "escape")) {
+      this.currentViewer()?.clearSearch();
+      this.mode = "normal";
+      this.searchInput.setValue("");
       this.tui.requestRender();
       return true;
     }
     if (data === "n") {
-      viewer.nextMatch();
+      this.currentViewer()?.nextMatch();
       this.tui.requestRender();
       return true;
     }
     if (data === "N") {
-      viewer.prevMatch();
+      this.currentViewer()?.prevMatch();
       this.tui.requestRender();
       return true;
     }
-
-    return true;
-  }
-
-  private handleSearchInput(data: string): boolean {
-    if (matchesKey(data, "return")) {
-      this.currentViewer()?.setSearch(this.searchBuffer);
-      this.mode = "normal";
+    if (data === "/") {
+      // Re-open typing with current query pre-filled.
+      const current = this.currentViewer()?.getSearchInfo()?.query ?? "";
+      this.searchInput.setValue(current);
+      this.mode = "search-typing";
       this.tui.requestRender();
       return true;
     }
-    if (matchesKey(data, "escape")) {
-      this.mode = "normal";
-      this.searchBuffer = "";
-      this.tui.requestRender();
-      return true;
-    }
-    if (data === "\x7f" || data === "\b") {
-      this.searchBuffer = this.searchBuffer.slice(0, -1);
-      this.tui.requestRender();
-      return true;
-    }
-    if (data === "\x15") {
-      this.searchBuffer = "";
-      this.tui.requestRender();
-      return true;
-    }
-    if (data.length === 1 && data >= " ") {
-      this.searchBuffer += data;
-      this.tui.requestRender();
-      return true;
-    }
-    return true;
+    // All other keys: normal navigation (j/k, g/G, f, s, Tab, q, etc.)
+    return this.handleNormalInput(data);
   }
 
   private prevTab(): void {
@@ -342,6 +364,19 @@ export class LogOverlayComponent implements Component {
       }
     } else {
       const contentLines = viewer.renderLines(innerWidth, logRows);
+      // Overlay "following" indicator at bottom-right of the content area.
+      if (viewer.isFollowing()) {
+        const indicator = theme.fg("accent", "following");
+        const indicatorW = visibleWidth(indicator);
+        const targetIdx = logRows - 1;
+        const line = contentLines[targetIdx] ?? "";
+        const truncated = truncateToWidth(line, innerWidth - indicatorW);
+        const truncW = visibleWidth(truncated);
+        contentLines[targetIdx] =
+          truncated +
+          " ".repeat(Math.max(0, innerWidth - truncW - indicatorW)) +
+          indicator;
+      }
       for (let i = 0; i < logRows; i++) {
         lines.push(row(contentLines[i] ?? ""));
       }
@@ -356,9 +391,6 @@ export class LogOverlayComponent implements Component {
 
     // ── Footer / keybindings ────────────────────────────────────────────────
     lines.push(row(this.renderFooterContent(innerWidth)));
-
-    // ── Bottom border ────────────────────────────────────────────────────────
-    lines.push(border(`╰${"─".repeat(width - 2)}╯`));
 
     return lines;
   }
@@ -442,13 +474,18 @@ export class LogOverlayComponent implements Component {
   ): string {
     const theme = this.theme;
     const dim = (s: string) => theme.fg("dim", s);
-    const accent = (s: string) => theme.fg("accent", s);
 
-    if (this.mode === "search") {
-      const prompt = `${dim("/")}${this.searchBuffer}${accent("█")}`;
-      const w = visibleWidth(prompt);
-      if (w >= innerWidth) return truncateToWidth(prompt, innerWidth);
-      return prompt + " ".repeat(innerWidth - w);
+    if (this.mode === "search-typing") {
+      // Input renders as "> <text>" — replace "> " with "/" for search prompt.
+      // Reserve innerWidth - 1 chars for Input so the "/" prefix fits.
+      const inputWidth = Math.max(1, innerWidth - 1);
+      const rendered = this.searchInput.render(inputWidth);
+      const inputLine = rendered[0] ?? "";
+      // Input always prefixes with "> " (2 plain chars, no ANSI before them).
+      const withSlash = dim("/") + inputLine.slice(2);
+      const w = visibleWidth(withSlash);
+      if (w >= innerWidth) return truncateToWidth(withSlash, innerWidth);
+      return withSlash + " ".repeat(Math.max(0, innerWidth - w));
     }
 
     if (!viewer) return "";
@@ -461,25 +498,47 @@ export class LogOverlayComponent implements Component {
     const dim = (s: string) => theme.fg("dim", s);
     const accent = (s: string) => theme.fg("accent", s);
 
-    if (this.mode === "search") {
-      const hint = `${dim("enter")} search  ${dim("esc")} cancel  ${dim("ctrl+u")} clear`;
+    if (this.mode === "search-typing") {
+      const hint = `${dim("enter")} apply  ${dim("esc")} cancel  ${dim("ctrl+u")} clear`;
+      const w = visibleWidth(hint);
+      if (w >= innerWidth) return truncateToWidth(hint, innerWidth);
+      return hint + " ".repeat(innerWidth - w);
+    }
+
+    if (this.mode === "search-active") {
+      const hint =
+        `${dim("n")} next  ` +
+        `${dim("N")} prev  ` +
+        `${dim("/")} edit search  ` +
+        `${dim("esc")} clear  ` +
+        `${dim("j/k")} scroll  ` +
+        `${dim("f")} follow  ` +
+        `${dim("q")} quit`;
       const w = visibleWidth(hint);
       if (w >= innerWidth) return truncateToWidth(hint, innerWidth);
       return hint + " ".repeat(innerWidth - w);
     }
 
     const viewer = this.currentViewer();
-    const filter = viewer ? accent(viewer.getStreamFilter()) : dim("combined");
-    const follow = viewer?.isFollowing() ? accent("on") : dim("off");
+    const streamFilter = viewer?.getStreamFilter() ?? "combined";
+    // Show stdout+stderr with only the active stream(s) highlighted.
+    const stdoutPart =
+      streamFilter === "combined" || streamFilter === "stdout"
+        ? accent("stdout")
+        : dim("stdout");
+    const stderrPart =
+      streamFilter === "combined" || streamFilter === "stderr"
+        ? accent("stderr")
+        : dim("stderr");
+    const streamIndicator = `${dim("s:")}${stdoutPart}${dim("+")}${stderrPart}`;
 
     const footer =
-      `${dim("←/→")} tab  ` +
+      `${dim("tab/shift+tab")} switch  ` +
       `${dim("g/G")} top/bot  ` +
       `${dim("j/k")} scroll  ` +
       `${dim("/")} search  ` +
-      `${dim("n/N")} match  ` +
-      `${dim("s:")}${filter}  ` +
-      `${dim("f:")}${follow}  ` +
+      streamIndicator +
+      `  ${dim("f")} follow  ` +
       `${dim("q")} quit`;
 
     const w = visibleWidth(footer);

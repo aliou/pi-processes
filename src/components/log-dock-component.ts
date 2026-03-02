@@ -1,10 +1,8 @@
 /**
- * Log Dock Component - Shows interleaved process logs in the dock.
+ * Log Dock Component - shows process logs in the bottom dock.
  *
- * Features:
- * - Collapsed view (1-2 lines: summary + last log line)
- * - Open view (full interleaved logs with panel framing)
- * - Proper panel styling using pi-utils-ui
+ * Collapsed view: one-line summary (running procs + follow status) + last log line.
+ * Open view: LogFileViewer for the focused process (or first running), follow mode on.
  */
 
 import {
@@ -18,11 +16,10 @@ import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import { LIVE_STATUSES } from "../constants";
 import type { ProcessManager } from "../manager";
 import type { DockStateManager } from "../state/dock-state";
+import { LogFileViewer } from "./log-file-viewer";
 
-const MAX_LOG_LINES = 10;
 const POLL_INTERVAL_MS = 500;
 
-// Color names for process prefixes (theme supports these via fg())
 const PROCESS_COLORS: ThemeColor[] = [
   "accent",
   "warning",
@@ -53,14 +50,11 @@ export class LogDockComponent implements Component {
   private unsubscribeDock: (() => void) | null = null;
   private unsubscribeManager: (() => void) | null = null;
 
-  private cachedLines: string[] = [];
-  private cachedWidth = 0;
-  private cachedState: string = "";
+  /** One viewer per process, lazily created, follow:true. */
+  private viewers: Map<string, LogFileViewer> = new Map();
 
-  // Color management
   private processColors: Map<string, ThemeColor> = new Map();
   private colorCounter = 0;
-  private themeColors: ThemeColor[] = PROCESS_COLORS;
 
   constructor(options: LogDockOptions) {
     this.manager = options.manager;
@@ -69,79 +63,56 @@ export class LogDockComponent implements Component {
     this.tui = options.tui;
     this.dockHeight = options.dockHeight ?? 12;
 
-    // Initialize theme colors
-    this.themeColors = [...PROCESS_COLORS];
-
-    // Poll log file for new output
     this.timer = setInterval(() => {
-      this.invalidate();
       this.tui.requestRender();
     }, POLL_INTERVAL_MS);
 
-    // Subscribe to dock state changes
     this.unsubscribeDock = this.dockState.subscribe(() => {
-      this.invalidate();
       this.tui.requestRender();
     });
 
-    // Subscribe to process events
     this.unsubscribeManager = this.manager.onEvent(() => {
-      this.invalidate();
       this.tui.requestRender();
     });
   }
 
   handleInput(_data: string): boolean {
-    // Widget doesn't handle input - user is always in the editor
     return false;
+  }
+
+  invalidate(): void {
+    // No local cache; always renders fresh.
   }
 
   private getProcessColor(processId: string): ThemeColor {
     const existing = this.processColors.get(processId);
-    if (existing) {
-      return existing;
-    }
-
-    const color = this.themeColors[this.colorCounter % this.themeColors.length];
+    if (existing) return existing;
+    const color = PROCESS_COLORS[this.colorCounter % PROCESS_COLORS.length];
     this.colorCounter++;
     this.processColors.set(processId, color);
     return color;
   }
 
-  invalidate(): void {
-    this.cachedWidth = 0;
-    this.cachedLines = [];
+  private getViewer(processId: string, combinedFile: string): LogFileViewer {
+    let viewer = this.viewers.get(processId);
+    if (!viewer) {
+      viewer = new LogFileViewer({
+        filePath: combinedFile,
+        format: "combined",
+        theme: this.theme,
+        follow: true,
+      });
+      this.viewers.set(processId, viewer);
+    }
+    return viewer;
   }
 
   render(width: number): string[] {
     const state = this.dockState.getState();
-    const stateKey = `${state.visibility}-${state.followEnabled}`;
 
-    // Check if we can use cached result
-    if (
-      width === this.cachedWidth &&
-      this.cachedLines.length > 0 &&
-      this.cachedState === stateKey
-    ) {
-      return this.cachedLines;
-    }
-
-    this.cachedState = stateKey;
-
-    if (state.visibility === "hidden") {
-      this.cachedLines = [];
-      this.cachedWidth = width;
-      return this.cachedLines;
-    }
-
-    if (state.visibility === "collapsed") {
-      this.cachedLines = this.renderCollapsed(width);
-    } else {
-      this.cachedLines = this.renderOpen(width);
-    }
-
-    this.cachedWidth = width;
-    return this.cachedLines;
+    if (state.visibility === "hidden") return [];
+    if (state.visibility === "collapsed") return this.renderCollapsed(width);
+    return this.renderOpen(width);
   }
 
   private renderCollapsed(width: number): string[] {
@@ -150,44 +121,43 @@ export class LogDockComponent implements Component {
     const fg = (color: ThemeColor, s: string) => theme.fg(color, s);
 
     const processes = this.manager.list();
+    const innerWidth = width - 2;
+    const padLine = (content: string) => {
+      const w = visibleWidth(content);
+      const line =
+        w > innerWidth ? truncateToWidth(content, innerWidth) : content;
+      return ` ${line}${" ".repeat(Math.max(0, width - 1 - visibleWidth(line)))}`;
+    };
 
     if (processes.length === 0) {
       return [
         renderPanelRule(width, theme),
-        this.padLine(dim("No processes"), width),
+        padLine(dim("No processes")),
         renderPanelRule(width, theme),
       ];
     }
 
-    // Build process summary
     const running = processes.filter((p) => LIVE_STATUSES.has(p.status));
     const finished = processes.filter((p) => !LIVE_STATUSES.has(p.status));
 
     const parts: string[] = [];
-
-    // Show running processes as colored dots
     for (const proc of running) {
       const color = this.getProcessColor(proc.id);
       parts.push(`${fg(color, "●")} ${proc.name}`);
     }
-
-    // Show finished count
     if (finished.length > 0) {
       parts.push(dim(`+${finished.length} finished`));
     }
 
-    // First line: summary
     const dockState = this.dockState.getState();
     const followStatus = dockState.followEnabled
       ? fg("success", "follow:on")
       : dim("follow:off");
 
     const firstLine = `${parts.join(" | ")} | ${followStatus}`;
-
-    // Second line: last log entry (from any running process)
     const lines = [
       renderPanelRule(width, theme),
-      this.padLine(truncateToWidth(firstLine, width - 2), width),
+      padLine(truncateToWidth(firstLine, innerWidth)),
     ];
 
     if (running.length > 0) {
@@ -195,105 +165,78 @@ export class LogDockComponent implements Component {
       if (lastLogs && lastLogs.length > 0) {
         const lastLog = truncateToWidth(
           lastLogs[lastLogs.length - 1].text,
-          width - 2,
+          innerWidth,
         );
-        lines.push(this.padLine(dim(lastLog), width));
+        lines.push(padLine(dim(lastLog)));
       }
     }
 
     lines.push(renderPanelRule(width, theme));
-
     return lines;
   }
 
   private renderOpen(width: number): string[] {
     const theme = this.theme;
     const dim = (s: string) => theme.fg("dim", s);
-    const fg = (color: ThemeColor, s: string) => theme.fg(color, s);
 
-    const processes = this.manager.list();
+    const innerWidth = width - 2;
     const basePadLine = createPanelPadder(width);
     const padLine = (content: string): string => {
-      const contentWidth = visibleWidth(content);
-      const innerWidth = width - 2;
+      const w = visibleWidth(content);
       return basePadLine(
-        contentWidth > innerWidth
-          ? truncateToWidth(content, innerWidth)
-          : content,
+        w > innerWidth ? truncateToWidth(content, innerWidth) : content,
       );
     };
 
-    if (processes.length === 0) {
+    // Resolve which process to show: focused > first running > first overall.
+    const state = this.dockState.getState();
+    const processes = this.manager.list();
+    const running = processes.filter((p) => LIVE_STATUSES.has(p.status));
+
+    const targetProc =
+      (state.focusedProcessId
+        ? processes.find((p) => p.id === state.focusedProcessId)
+        : null) ??
+      running[0] ??
+      processes[0] ??
+      null;
+
+    if (!targetProc) {
       return [
         renderPanelTitleLine("Process Logs", width, theme),
         padLine(dim("No processes")),
-        padLine(dim("Run /ps <command> to start")),
+        padLine(dim("Run a command to start")),
         renderPanelRule(width, theme),
       ];
     }
 
+    const logFiles = this.manager.getLogFiles(targetProc.id);
+    if (!logFiles) {
+      return [
+        renderPanelTitleLine("Process Logs", width, theme),
+        padLine(dim("Log files unavailable")),
+        renderPanelRule(width, theme),
+      ];
+    }
+
+    const viewer = this.getViewer(targetProc.id, logFiles.combinedFile);
+
+    // Available rows for log lines: dockHeight minus chrome (title + bottom rule).
+    const logRows = Math.max(1, this.dockHeight - 2);
+
+    const title = `${targetProc.name} ${dim(`(${targetProc.id})`)}`;
     const lines: string[] = [];
+    lines.push(renderPanelTitleLine(title, width, theme));
 
-    // Header
-    lines.push(renderPanelTitleLine("Process Logs", width, theme));
-
-    // Running processes logs
-    const running = processes.filter((p) => LIVE_STATUSES.has(p.status));
-    const finished = processes
-      .filter((p) => !LIVE_STATUSES.has(p.status))
-      .sort((a, b) => (b.endTime ?? 0) - (a.endTime ?? 0));
-
-    // Show logs from running processes
-    for (const proc of running) {
-      const color = this.getProcessColor(proc.id);
-      const prefix = fg(color, `[${proc.name.slice(0, 8)}]`);
-
-      const logLines = this.manager.getCombinedOutput(proc.id, MAX_LOG_LINES);
-      if (logLines && logLines.length > 0) {
-        for (const log of logLines) {
-          const text = truncateToWidth(log.text, width - prefix.length - 4);
-          if (log.type === "stderr") {
-            lines.push(padLine(`${prefix} ${fg("warning", text)}`));
-          } else {
-            lines.push(padLine(`${prefix} ${text}`));
-          }
-        }
-      }
+    const contentLines = viewer.renderLines(innerWidth, logRows);
+    for (let i = 0; i < logRows; i++) {
+      lines.push(padLine(contentLines[i] ?? ""));
     }
 
-    // Finished processes header
-    if (finished.length > 0) {
-      lines.push(padLine(""));
-      lines.push(renderPanelRule(width, theme));
-      lines.push(padLine(dim("Finished:")));
-
-      // Show last line from finished processes
-      for (const proc of finished.slice(0, 5)) {
-        const color = this.getProcessColor(proc.id);
-        const prefix = fg(color, `[${proc.name.slice(0, 8)}]`);
-        const logLines = this.manager.getCombinedOutput(proc.id, 1);
-        if (logLines && logLines.length > 0) {
-          const text = truncateToWidth(
-            logLines[0].text,
-            width - prefix.length - 4,
-          );
-          lines.push(padLine(`${prefix} ${text}`));
-        }
-      }
-    }
-
-    // Footer
     lines.push(renderPanelRule(width, theme));
 
+    // Slice to dockHeight in case of overflow.
     return lines.slice(0, this.dockHeight);
-  }
-
-  private padLine(content: string, width: number): string {
-    const contentWidth = visibleWidth(content);
-    if (contentWidth >= width) {
-      return truncateToWidth(content, width);
-    }
-    return content + " ".repeat(width - contentWidth);
   }
 
   dispose(): void {
@@ -303,6 +246,7 @@ export class LogDockComponent implements Component {
     }
     this.unsubscribeDock?.();
     this.unsubscribeManager?.();
+    this.viewers.clear();
     this.processColors.clear();
   }
 }

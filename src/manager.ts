@@ -325,12 +325,15 @@ export class ProcessManager {
     }
   }
 
-  getLogFiles(id: string): { stdoutFile: string; stderrFile: string } | null {
+  getLogFiles(
+    id: string,
+  ): { stdoutFile: string; stderrFile: string; combinedFile: string } | null {
     const managed = this.processes.get(id);
     if (!managed) return null;
     return {
       stdoutFile: managed.stdoutFile,
       stderrFile: managed.stderrFile,
+      combinedFile: managed.combinedFile,
     };
   }
 

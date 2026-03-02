@@ -11,10 +11,30 @@ import { LogDockComponent } from "../components/log-dock-component";
 import { configLoader, type ResolvedProcessesConfig } from "../config";
 import { LIVE_STATUSES, type ProcessInfo } from "../constants";
 import type { ProcessManager } from "../manager";
-import type { DockStateManager } from "../state/dock-state";
 
 const STATUS_WIDGET_ID = "processes-status";
 const LOG_DOCK_WIDGET_ID = "processes-dock";
+
+// Internal types — not exported
+type DockVisibility = "hidden" | "collapsed" | "open";
+
+interface DockState {
+  visibility: DockVisibility;
+  followEnabled: boolean;
+  focusedProcessId: string | null;
+}
+
+// Exported — the interface that commands receive
+export interface DockActions {
+  getFocusedProcessId(): string | null;
+  isFollowEnabled(): boolean;
+  setFocus(id: string | null): void;
+  expand(): void;
+  collapse(): void;
+  hide(): void;
+  toggle(): void;
+  toggleFollow(): void;
+}
 
 function formatProcessStatus(
   proc: ProcessInfo,
@@ -84,12 +104,9 @@ function renderStatusWidget(
     const formattedLen = visibleWidth(formatted);
     const remaining = allProcs.length - includedCount - 1;
 
-    // Check if adding this part would exceed the width
     const needed =
       includedCount > 0 ? separatorLen + formattedLen : formattedLen;
 
-    // If there are more processes after this one, reserve space for the
-    // overflow suffix (separator + "+N more") so the final line fits.
     let reservedForSuffix = 0;
     if (remaining > 0) {
       const suffixText = `+${remaining} more`;
@@ -100,7 +117,6 @@ function renderStatusWidget(
       currentLen + needed + reservedForSuffix > effectiveMax &&
       includedCount > 0
     ) {
-      // Show how many are hidden
       const hiddenCount = allProcs.length - includedCount;
       if (hiddenCount > 0) {
         parts.push(theme.fg("dim", `+${hiddenCount} more`));
@@ -113,10 +129,6 @@ function renderStatusWidget(
     includedCount++;
   }
 
-  // Edge case: the very first element was too wide and the loop's overflow
-  // check was skipped (it only fires when includedCount > 0). The suffix
-  // reservation already shrinks the budget, but a single process that fills
-  // the whole line still slips through. Show it truncated rather than nothing.
   if (includedCount === 0 && allProcs.length > 0) {
     const formatted = formatProcessStatus(allProcs[0], theme);
     parts.push(formatted);
@@ -138,10 +150,17 @@ export function setupProcessWidget(
   pi: ExtensionAPI,
   manager: ProcessManager,
   config: ResolvedProcessesConfig,
-  dockState: DockStateManager,
 ) {
   let latestContext: ExtensionContext | null = null;
   let logDockComponent: LogDockComponent | null = null;
+  let logDockComponentTui: { requestRender(): void } | null = null;
+
+  // Internal state — plain mutable object
+  const dockState: DockState = {
+    visibility: "hidden",
+    followEnabled: config.follow.enabledByDefault,
+    focusedProcessId: null,
+  };
 
   function updateWidget() {
     if (!latestContext?.hasUI) return;
@@ -168,82 +187,134 @@ export function setupProcessWidget(
     }
 
     // Update log dock widget
-    const state = dockState.getState();
-
     if (!latestContext?.hasUI) return;
 
-    if (state.visibility === "hidden") {
+    if (dockState.visibility === "hidden") {
       latestContext.ui.setWidget(LOG_DOCK_WIDGET_ID, undefined);
+      if (logDockComponent) {
+        logDockComponent.dispose();
+        logDockComponent = null;
+        logDockComponentTui = null;
+      }
       return;
     }
 
-    // Create or update the dock component
-    const dockHeight = config.widget.dockHeight;
+    const mode = dockState.visibility as "collapsed" | "open";
+    const height = mode === "collapsed" ? 3 : config.widget.dockHeight;
 
-    // Set widget height based on visibility state
-    const widgetHeight = state.visibility === "collapsed" ? 3 : dockHeight;
-
-    // Capture current context for the closure
-    const ctx = latestContext;
-
-    ctx.ui.setWidget(
-      LOG_DOCK_WIDGET_ID,
-      (tui: { requestRender: () => void }, theme: typeof ctx.ui.theme) => {
-        // Dispose old component if exists
-        logDockComponent?.dispose();
-
-        logDockComponent = new LogDockComponent({
-          manager,
-          dockState,
-          theme,
-          tui,
-          dockHeight: widgetHeight,
-        });
-        return logDockComponent;
-      },
-      { placement: "aboveEditor" },
-    );
+    if (logDockComponent && logDockComponentTui) {
+      // Component already exists — just update its state.
+      logDockComponent.update({
+        mode,
+        focusedProcessId: dockState.focusedProcessId,
+        followEnabled: dockState.followEnabled,
+        dockHeight: height,
+      });
+    } else {
+      // First time showing (or after a session switch destroyed it).
+      const ctx = latestContext;
+      ctx.ui.setWidget(
+        LOG_DOCK_WIDGET_ID,
+        (tui: { requestRender(): void }, theme: typeof ctx.ui.theme) => {
+          logDockComponent = new LogDockComponent({
+            manager,
+            tui,
+            theme,
+            mode,
+            focusedProcessId: dockState.focusedProcessId,
+            followEnabled: dockState.followEnabled,
+            dockHeight: height,
+          });
+          logDockComponentTui = tui;
+          return logDockComponent;
+        },
+        { placement: "aboveEditor" },
+      );
+    }
   }
+
+  const dockActions: DockActions = {
+    getFocusedProcessId: () => dockState.focusedProcessId,
+    isFollowEnabled: () => dockState.followEnabled,
+
+    setFocus(id) {
+      dockState.focusedProcessId = id;
+      if (id && dockState.visibility === "hidden")
+        dockState.visibility = "open";
+      updateWidget();
+    },
+
+    expand() {
+      dockState.visibility = "open";
+      updateWidget();
+    },
+
+    collapse() {
+      dockState.visibility = "collapsed";
+      updateWidget();
+    },
+
+    hide() {
+      dockState.visibility = "hidden";
+      updateWidget();
+    },
+
+    toggle() {
+      if (dockState.visibility === "hidden") dockState.visibility = "collapsed";
+      else if (dockState.visibility === "collapsed")
+        dockState.visibility = "open";
+      else dockState.visibility = "collapsed";
+      updateWidget();
+    },
+
+    toggleFollow() {
+      dockState.followEnabled = !dockState.followEnabled;
+      updateWidget();
+    },
+  };
 
   // Listen to process events for auto-show/hide
   manager.onEvent((event) => {
     if (event.type === "process_started") {
-      // Auto-show dock when first process starts and follow is enabled
-      dockState.autoShow();
-    }
-
-    if (event.type === "process_ended") {
-      // Handle focus when process exits
-      dockState.handleProcessExit(event.info.id);
-
-      // Auto-hide dock when all processes finish (if follow enabled)
-      const running = manager.list().filter((p) => LIVE_STATUSES.has(p.status));
-      if (running.length === 0 && config.follow.autoHideOnFinish) {
-        dockState.autoHide();
+      // Auto-show dock when first process starts and follow is enabled.
+      if (dockState.followEnabled && dockState.visibility === "hidden") {
+        dockState.visibility = "collapsed";
       }
     }
 
-    // Update widgets on any event
-    updateWidget();
-  });
+    if (event.type === "process_ended") {
+      // Unfocus if the focused process ended.
+      if (dockState.focusedProcessId === event.info.id) {
+        dockState.focusedProcessId = null;
+      }
+      // Auto-hide when last running process ends and follow is enabled.
+      const running = manager.list().filter((p) => LIVE_STATUSES.has(p.status));
+      if (
+        running.length === 0 &&
+        config.follow.autoHideOnFinish &&
+        dockState.followEnabled
+      ) {
+        dockState.visibility = "hidden";
+      }
+    }
 
-  // Subscribe to dock state changes
-  dockState.subscribe(() => {
     updateWidget();
   });
 
   pi.on("session_start", async (_event, ctx) => {
-    // Startup defer: capture context only. First render happens on process
-    // manager events or explicit settings updates.
     latestContext = ctx;
   });
 
   pi.on("session_switch", async (_event, ctx) => {
+    // Destroy old component — new TUI context means we must recreate it.
+    if (logDockComponent) {
+      logDockComponent.dispose();
+      logDockComponent = null;
+      logDockComponentTui = null;
+    }
     latestContext = ctx;
     updateWidget();
   });
 
-  return {
-    update: updateWidget,
-  };
+  return { update: updateWidget, dockActions };
 }

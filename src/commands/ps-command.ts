@@ -1,12 +1,12 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { ProcessesComponent } from "../components/processes-component";
+import type { DockActions } from "../hooks/widget";
 import type { ProcessManager } from "../manager";
-import type { DockStateManager } from "../state/dock-state";
 
 export function registerPsCommand(
   pi: ExtensionAPI,
   manager: ProcessManager,
-  dockState: DockStateManager,
+  dockActions: DockActions,
 ): void {
   pi.registerCommand("ps", {
     description: "View and manage background processes",
@@ -22,7 +22,7 @@ export function registerPsCommand(
             theme,
             (processId?: string) => {
               if (processId) {
-                dockState.setFocus(processId);
+                dockActions.setFocus(processId);
               }
               done(processId ?? null);
             },

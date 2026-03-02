@@ -1,13 +1,13 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { DockActions } from "../hooks/widget";
 import type { ProcessManager } from "../manager";
-import type { DockStateManager } from "../state/dock-state";
 import { allProcessCompletions } from "./completions";
 import { pickProcess } from "./pick-process";
 
 export function registerPsFocusCommand(
   pi: ExtensionAPI,
   manager: ProcessManager,
-  dockState: DockStateManager,
+  dockActions: DockActions,
 ): void {
   pi.registerCommand("ps:focus", {
     description: "Focus on a process to view its logs in the dock",
@@ -28,8 +28,7 @@ export function registerPsFocusCommand(
         if (!processId) return;
       }
 
-      // Focus on the process (auto-shows dock if hidden)
-      dockState.setFocus(processId);
+      dockActions.setFocus(processId);
     },
   });
 }

@@ -11,8 +11,8 @@
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { DockActions } from "../hooks/widget";
 import type { ProcessManager } from "../manager";
-import type { DockStateManager } from "../state/dock-state";
 import { registerPsClearCommand } from "./ps-clear-command";
 import { registerPsCommand } from "./ps-command";
 import { registerPsDockCommand } from "./ps-dock-command";
@@ -24,13 +24,13 @@ import { registerPsLogsCommand } from "./ps-logs-command";
 export function setupProcessesCommands(
   pi: ExtensionAPI,
   manager: ProcessManager,
-  dockState: DockStateManager,
+  dockActions: DockActions,
 ): void {
-  registerPsCommand(pi, manager, dockState);
-  registerPsListCommand(pi, manager, dockState);
-  registerPsFocusCommand(pi, manager, dockState);
+  registerPsCommand(pi, manager, dockActions);
+  registerPsListCommand(pi, manager, dockActions);
+  registerPsFocusCommand(pi, manager, dockActions);
   registerPsLogsCommand(pi, manager);
-  registerPsKillCommand(pi, manager, dockState);
+  registerPsKillCommand(pi, manager, dockActions);
   registerPsClearCommand(pi, manager);
-  registerPsDockCommand(pi, dockState);
+  registerPsDockCommand(pi, dockActions);
 }

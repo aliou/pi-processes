@@ -61,14 +61,7 @@ export class ProcessManager {
 
   private transition(managed: ManagedProcess, next: ProcessStatus): void {
     if (managed.status === next) return;
-    const prev = managed.status;
     managed.status = next;
-
-    this.emit({
-      type: "process_status_changed",
-      info: this.toProcessInfo(managed),
-      prev,
-    });
 
     if (next === "exited" || next === "killed") {
       this.emit({ type: "process_ended", info: this.toProcessInfo(managed) });

@@ -1,9 +1,9 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import type { DockStateManager } from "../state/dock-state";
+import type { DockActions } from "../hooks/widget";
 
 export function registerPsDockCommand(
   pi: ExtensionAPI,
-  dockState: DockStateManager,
+  dockActions: DockActions,
 ): void {
   pi.registerCommand("ps:dock", {
     description: "Toggle dock visibility (on/off/expanded)",
@@ -16,13 +16,13 @@ export function registerPsDockCommand(
       const arg = args.trim().toLowerCase();
 
       if (arg === "on") {
-        dockState.expand();
+        dockActions.expand();
       } else if (arg === "off") {
-        dockState.hide();
+        dockActions.hide();
       } else if (arg === "expanded") {
-        dockState.expand();
+        dockActions.expand();
       } else {
-        dockState.toggleVisibility();
+        dockActions.toggle();
       }
     },
   });

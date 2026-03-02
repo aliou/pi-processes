@@ -1,14 +1,14 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { LIVE_STATUSES } from "../constants";
+import type { DockActions } from "../hooks/widget";
 import type { ProcessManager } from "../manager";
-import type { DockStateManager } from "../state/dock-state";
 import { runningProcessCompletions } from "./completions";
 import { pickProcess } from "./pick-process";
 
 export function registerPsKillCommand(
   pi: ExtensionAPI,
   manager: ProcessManager,
-  dockState: DockStateManager,
+  dockActions: DockActions,
 ): void {
   pi.registerCommand("ps:kill", {
     description: "Kill a running background process",
@@ -28,7 +28,6 @@ export function registerPsKillCommand(
         }
         processId = proc.id;
       } else {
-        // No argument: show picker (only running processes).
         const running = manager
           .list()
           .filter((p) => LIVE_STATUSES.has(p.status));
@@ -61,8 +60,8 @@ export function registerPsKillCommand(
       const result = await manager.kill(processId, { signal, timeoutMs });
 
       if (result.ok) {
-        if (dockState.getState().focusedProcessId === processId) {
-          dockState.setFocus(null);
+        if (dockActions.getFocusedProcessId() === processId) {
+          dockActions.setFocus(null);
         }
       }
     },

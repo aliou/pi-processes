@@ -15,7 +15,6 @@ import type { Component } from "@mariozechner/pi-tui";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import { LIVE_STATUSES } from "../constants";
 import type { ProcessManager } from "../manager";
-import type { DockStateManager } from "../state/dock-state";
 import { LogFileViewer } from "./log-file-viewer";
 
 const POLL_INTERVAL_MS = 500;
@@ -33,21 +32,24 @@ const PROCESS_COLORS: ThemeColor[] = [
 
 interface LogDockOptions {
   manager: ProcessManager;
-  dockState: DockStateManager;
   theme: Theme;
   tui: { requestRender: () => void };
+  mode: "collapsed" | "open";
+  focusedProcessId: string | null;
+  followEnabled: boolean;
   dockHeight?: number;
 }
 
 export class LogDockComponent implements Component {
   private manager: ProcessManager;
-  private dockState: DockStateManager;
   private theme: Theme;
   private tui: { requestRender: () => void };
   private dockHeight: number;
+  private mode: "collapsed" | "open";
+  private focusedProcessId: string | null;
+  private followEnabled: boolean;
 
   private timer: ReturnType<typeof setInterval> | null = null;
-  private unsubscribeDock: (() => void) | null = null;
   private unsubscribeManager: (() => void) | null = null;
 
   /** One viewer per process, lazily created, follow:true. */
@@ -58,22 +60,33 @@ export class LogDockComponent implements Component {
 
   constructor(options: LogDockOptions) {
     this.manager = options.manager;
-    this.dockState = options.dockState;
     this.theme = options.theme;
     this.tui = options.tui;
     this.dockHeight = options.dockHeight ?? 12;
+    this.mode = options.mode;
+    this.focusedProcessId = options.focusedProcessId;
+    this.followEnabled = options.followEnabled;
 
     this.timer = setInterval(() => {
       this.tui.requestRender();
     }, POLL_INTERVAL_MS);
 
-    this.unsubscribeDock = this.dockState.subscribe(() => {
-      this.tui.requestRender();
-    });
-
     this.unsubscribeManager = this.manager.onEvent(() => {
       this.tui.requestRender();
     });
+  }
+
+  update(opts: {
+    mode: "collapsed" | "open";
+    focusedProcessId: string | null;
+    followEnabled: boolean;
+    dockHeight: number;
+  }): void {
+    this.mode = opts.mode;
+    this.focusedProcessId = opts.focusedProcessId;
+    this.followEnabled = opts.followEnabled;
+    this.dockHeight = opts.dockHeight;
+    this.tui.requestRender();
   }
 
   handleInput(_data: string): boolean {
@@ -108,10 +121,7 @@ export class LogDockComponent implements Component {
   }
 
   render(width: number): string[] {
-    const state = this.dockState.getState();
-
-    if (state.visibility === "hidden") return [];
-    if (state.visibility === "collapsed") return this.renderCollapsed(width);
+    if (this.mode === "collapsed") return this.renderCollapsed(width);
     return this.renderOpen(width);
   }
 
@@ -145,8 +155,7 @@ export class LogDockComponent implements Component {
       parts.push(dim(`+${finished.length} finished`));
     }
 
-    const dockState = this.dockState.getState();
-    const followStatus = dockState.followEnabled
+    const followStatus = this.followEnabled
       ? fg("success", "follow:on")
       : dim("follow:off");
 
@@ -183,14 +192,12 @@ export class LogDockComponent implements Component {
       );
     };
 
-    // Resolve which process to show: focused > first running > first overall.
-    const state = this.dockState.getState();
     const processes = this.manager.list();
     const running = processes.filter((p) => LIVE_STATUSES.has(p.status));
 
     const targetProc =
-      (state.focusedProcessId
-        ? processes.find((p) => p.id === state.focusedProcessId)
+      (this.focusedProcessId
+        ? processes.find((p) => p.id === this.focusedProcessId)
         : null) ??
       running[0] ??
       processes[0] ??
@@ -214,7 +221,6 @@ export class LogDockComponent implements Component {
 
     const viewer = this.getViewer(targetProc.id, logFiles.combinedFile);
 
-    // Available rows for log lines: dockHeight minus chrome (title + bottom rule).
     const logRows = Math.max(1, this.dockHeight - 2);
 
     const title = `${targetProc.name} ${dim(`(${targetProc.id})`)}`;
@@ -226,7 +232,6 @@ export class LogDockComponent implements Component {
       lines.push(padLine(contentLines[i] ?? ""));
     }
 
-    // Slice to dockHeight in case of overflow.
     return lines.slice(0, this.dockHeight);
   }
 
@@ -235,7 +240,6 @@ export class LogDockComponent implements Component {
       clearInterval(this.timer);
       this.timer = null;
     }
-    this.unsubscribeDock?.();
     this.unsubscribeManager?.();
     this.viewers.clear();
     this.processColors.clear();

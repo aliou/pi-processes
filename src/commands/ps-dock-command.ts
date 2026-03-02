@@ -6,21 +6,21 @@ export function registerPsDockCommand(
   dockActions: DockActions,
 ): void {
   pi.registerCommand("ps:dock", {
-    description: "Toggle dock visibility (on/off/expanded)",
+    description: "Control dock visibility",
     getArgumentCompletions: () => [
-      { value: "on", label: "on" },
-      { value: "off", label: "off" },
-      { value: "expanded", label: "expanded" },
+      { value: "show", label: "show — make the dock visible" },
+      { value: "hide", label: "hide — hide the dock" },
+      { value: "toggle", label: "toggle — cycle visibility" },
     ],
     handler: async (args, _ctx) => {
       const arg = args.trim().toLowerCase();
 
-      if (arg === "on") {
+      if (arg === "show") {
         dockActions.expand();
-      } else if (arg === "off") {
+      } else if (arg === "hide") {
         dockActions.hide();
-      } else if (arg === "expanded") {
-        dockActions.expand();
+      } else if (arg === "toggle" || arg === "") {
+        dockActions.toggle();
       } else {
         dockActions.toggle();
       }

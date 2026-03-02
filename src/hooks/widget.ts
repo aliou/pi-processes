@@ -207,7 +207,6 @@ export function setupProcessWidget(
       logDockComponent.update({
         mode,
         focusedProcessId: dockState.focusedProcessId,
-        followEnabled: dockState.followEnabled,
         dockHeight: height,
       });
     } else {
@@ -222,7 +221,6 @@ export function setupProcessWidget(
             theme,
             mode,
             focusedProcessId: dockState.focusedProcessId,
-            followEnabled: dockState.followEnabled,
             dockHeight: height,
           });
           logDockComponentTui = tui;

@@ -1,7 +1,7 @@
 /**
  * Log Dock Component - shows process logs in the bottom dock.
  *
- * Collapsed view: one-line summary (running procs + follow status) + last log line.
+ * Collapsed view: one-line summary (running procs) + last log line.
  * Open view: LogFileViewer for the focused process (or first running), follow mode on.
  */
 
@@ -36,7 +36,6 @@ interface LogDockOptions {
   tui: { requestRender: () => void };
   mode: "collapsed" | "open";
   focusedProcessId: string | null;
-  followEnabled: boolean;
   dockHeight?: number;
 }
 
@@ -47,7 +46,6 @@ export class LogDockComponent implements Component {
   private dockHeight: number;
   private mode: "collapsed" | "open";
   private focusedProcessId: string | null;
-  private followEnabled: boolean;
 
   private timer: ReturnType<typeof setInterval> | null = null;
   private unsubscribeManager: (() => void) | null = null;
@@ -65,7 +63,6 @@ export class LogDockComponent implements Component {
     this.dockHeight = options.dockHeight ?? 12;
     this.mode = options.mode;
     this.focusedProcessId = options.focusedProcessId;
-    this.followEnabled = options.followEnabled;
 
     this.timer = setInterval(() => {
       this.tui.requestRender();
@@ -79,12 +76,10 @@ export class LogDockComponent implements Component {
   update(opts: {
     mode: "collapsed" | "open";
     focusedProcessId: string | null;
-    followEnabled: boolean;
     dockHeight: number;
   }): void {
     this.mode = opts.mode;
     this.focusedProcessId = opts.focusedProcessId;
-    this.followEnabled = opts.followEnabled;
     this.dockHeight = opts.dockHeight;
     this.tui.requestRender();
   }
@@ -155,11 +150,7 @@ export class LogDockComponent implements Component {
       parts.push(dim(`+${finished.length} finished`));
     }
 
-    const followStatus = this.followEnabled
-      ? fg("success", "follow:on")
-      : dim("follow:off");
-
-    const firstLine = `${parts.join(" | ")} | ${followStatus}`;
+    const firstLine = parts.join(" | ");
     const lines = [
       renderPanelRule(width, theme),
       padLine(truncateToWidth(firstLine, innerWidth)),

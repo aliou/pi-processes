@@ -4,17 +4,16 @@ import type { ProcessManager } from "../manager";
 import { allProcessCompletions } from "./completions";
 import { pickProcess } from "./pick-process";
 
-export function registerPsFocusCommand(
+export function registerPsPinCommand(
   pi: ExtensionAPI,
   manager: ProcessManager,
   dockActions: DockActions,
 ): void {
-  pi.registerCommand("ps:focus", {
-    description: "Focus on a process to view its logs in the dock",
+  pi.registerCommand("ps:pin", {
+    description: "Pin the dock to a specific process",
     getArgumentCompletions: allProcessCompletions(manager),
     handler: async (args, ctx) => {
       const arg = args.trim();
-
       let processId: string | undefined;
 
       if (arg) {
@@ -24,7 +23,7 @@ export function registerPsFocusCommand(
         }
         processId = proc.id;
       } else {
-        processId = await pickProcess(ctx, manager, "Select process to focus");
+        processId = await pickProcess(ctx, manager, "Select process to pin");
         if (!processId) return;
       }
 

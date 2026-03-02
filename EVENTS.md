@@ -93,7 +93,7 @@ LLM calls process(action: "write", id, input)
 ## User command flows
 
 ```
-/ps  or  /ps:list
+/ps
   → opens ProcessesComponent (full-screen takeover, blocks input)
       keyboard: j/k scroll, Enter/Space select, q/Esc close
       on close with selection: dockState.setFocus(processId)  [expands dock]
@@ -105,7 +105,7 @@ LLM calls process(action: "write", id, input)
       keyboard: see "Overlay keyboard" section below
       on close: overlay is destroyed, dock resumes
 
-/ps:focus  [id or picker]
+/ps:pin  [id or picker]
   → dockState.setFocus(processId)
       → visibility: hidden|collapsed → "open"
       → focusedProcessId = id
@@ -120,7 +120,7 @@ LLM calls process(action: "write", id, input)
   → manager.clear()
   → (same downstream as LLM clear above)
 
-/ps:dock  [on | off | expanded | (no arg)]
+/ps:dock  [show | hide | toggle | (no arg)]
   → dockState.expand() / hide() / toggleVisibility()
       → DockStateManager notifies subscribers
           → widget.ts: updateWidget()
@@ -263,8 +263,8 @@ Search mode (bottom line replaced):
 |---|---|
 | `/ps` | Get a full overview: see all processes, statuses, and select one to focus |
 | `/ps:logs [name]` | Deep-dive into a process's logs in a floating pane with search |
-| `/ps:focus [name]` | Pin the dock to a specific process |
-| `/ps:dock [on\|off\|expanded]` | Control dock visibility without a picker |
+| `/ps:pin [name]` | Pin the dock to a specific process |
+| `/ps:dock [show\|hide\|toggle]` | Control dock visibility without a picker |
 | `/ps:kill [name]` | Terminate a running process |
 | `/ps:clear` | Remove finished processes from the list |
 
@@ -298,7 +298,7 @@ index.ts
   │     └─ setupMessageRenderer()   renders LLM tool call results
   │
   ├─ setupProcessesCommands(pi, manager, dockState)
-  │     registers: /ps /ps:list /ps:logs /ps:focus /ps:kill /ps:clear /ps:dock
+  │     registers: /ps /ps:logs /ps:pin /ps:kill /ps:clear /ps:dock
   │
   └─ setupProcessesTools(pi, manager)
         registers: process tool (start/list/output/logs/kill/clear/write)

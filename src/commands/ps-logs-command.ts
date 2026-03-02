@@ -8,7 +8,8 @@ export function registerPsLogsCommand(
   manager: ProcessManager,
 ): void {
   pi.registerCommand("ps:logs", {
-    description: "Open log viewer overlay for a process",
+    description:
+      "Open log viewer for a process (search, scroll, stream filter)",
     getArgumentCompletions: allProcessCompletions(manager),
     handler: async (args, ctx) => {
       if (!ctx.hasUI) return;

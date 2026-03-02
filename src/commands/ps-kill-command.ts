@@ -11,7 +11,7 @@ export function registerPsKillCommand(
   dockActions: DockActions,
 ): void {
   pi.registerCommand("ps:kill", {
-    description: "Kill a running background process",
+    description: "Kill a running process",
     getArgumentCompletions: runningProcessCompletions(manager),
     handler: async (args, ctx) => {
       const arg = args.trim();

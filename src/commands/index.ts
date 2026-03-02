@@ -1,13 +1,12 @@
 /**
  * Process commands with /ps: prefix.
  *
- * /ps          - Open full panel to view and manage processes
- * /ps:list     - Alias for /ps
- * /ps:logs     - Open tabbed log viewer overlay for a process
- * /ps:focus    - Focus a process in the dock (opens dock, shows its logs)
- * /ps:kill     - Kill a running process
- * /ps:clear    - Clear finished processes
- * /ps:dock     - Toggle dock visibility (on/off/expanded)
+ * /ps                         - View and manage all background processes
+ * /ps:logs [id]               - Open log viewer overlay (search, scroll, stream filter)
+ * /ps:pin [id]                - Pin the dock to a specific process
+ * /ps:kill [id]               - Kill a running process
+ * /ps:clear                   - Remove all finished processes from the list
+ * /ps:dock [show|hide|toggle] - Control dock visibility
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
@@ -16,10 +15,9 @@ import type { ProcessManager } from "../manager";
 import { registerPsClearCommand } from "./ps-clear-command";
 import { registerPsCommand } from "./ps-command";
 import { registerPsDockCommand } from "./ps-dock-command";
-import { registerPsFocusCommand } from "./ps-focus-command";
 import { registerPsKillCommand } from "./ps-kill-command";
-import { registerPsListCommand } from "./ps-list-command";
 import { registerPsLogsCommand } from "./ps-logs-command";
+import { registerPsPinCommand } from "./ps-pin-command";
 
 export function setupProcessesCommands(
   pi: ExtensionAPI,
@@ -27,8 +25,7 @@ export function setupProcessesCommands(
   dockActions: DockActions,
 ): void {
   registerPsCommand(pi, manager, dockActions);
-  registerPsListCommand(pi, manager, dockActions);
-  registerPsFocusCommand(pi, manager, dockActions);
+  registerPsPinCommand(pi, manager, dockActions);
   registerPsLogsCommand(pi, manager);
   registerPsKillCommand(pi, manager, dockActions);
   registerPsClearCommand(pi, manager);

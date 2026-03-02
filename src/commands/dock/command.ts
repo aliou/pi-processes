@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import type { DockActions } from "../hooks/widget";
+import type { DockActions } from "../../hooks/widget";
 
 export function registerPsDockCommand(
   pi: ExtensionAPI,

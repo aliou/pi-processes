@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import type { ProcessManager } from "../manager";
+import type { ProcessManager } from "../../manager";
 
 export function registerPsClearCommand(
   pi: ExtensionAPI,

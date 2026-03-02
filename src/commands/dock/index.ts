@@ -1,0 +1,1 @@
+export { registerPsDockCommand } from "./command";

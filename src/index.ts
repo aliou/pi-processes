@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { setupProcessesCommands } from "./commands";
-import { registerProcessesSettings } from "./commands/settings-command";
+import { registerProcessesSettings } from "./commands/settings";
 import { configLoader } from "./config";
 import { setupProcessesHooks } from "./hooks";
 import { ProcessManager } from "./manager";

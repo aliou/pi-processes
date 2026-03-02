@@ -1,0 +1,1 @@
+export { registerPsLogsCommand } from "./command";

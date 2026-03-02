@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { ProcessesComponent } from "../components/processes-component";
-import type { DockActions } from "../hooks/widget";
-import type { ProcessManager } from "../manager";
+import { ProcessesComponent } from "../../components/processes-component";
+import type { DockActions } from "../../hooks/widget";
+import type { ProcessManager } from "../../manager";
 
 export function registerPsCommand(
   pi: ExtensionAPI,

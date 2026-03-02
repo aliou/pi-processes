@@ -1,0 +1,1 @@
+export { registerPsClearCommand } from "./command";

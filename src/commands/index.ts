@@ -12,12 +12,12 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import type { DockActions } from "../hooks/widget";
 import type { ProcessManager } from "../manager";
-import { registerPsClearCommand } from "./ps-clear-command";
-import { registerPsCommand } from "./ps-command";
-import { registerPsDockCommand } from "./ps-dock-command";
-import { registerPsKillCommand } from "./ps-kill-command";
-import { registerPsLogsCommand } from "./ps-logs-command";
-import { registerPsPinCommand } from "./ps-pin-command";
+import { registerPsClearCommand } from "./clear";
+import { registerPsDockCommand } from "./dock";
+import { registerPsKillCommand } from "./kill";
+import { registerPsLogsCommand } from "./logs";
+import { registerPsPinCommand } from "./pin";
+import { registerPsCommand } from "./processes";
 
 export function setupProcessesCommands(
   pi: ExtensionAPI,

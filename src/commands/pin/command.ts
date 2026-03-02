@@ -1,8 +1,8 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import type { DockActions } from "../hooks/widget";
-import type { ProcessManager } from "../manager";
-import { allProcessCompletions } from "./completions";
-import { pickProcess } from "./pick-process";
+import type { DockActions } from "../../hooks/widget";
+import type { ProcessManager } from "../../manager";
+import { allProcessCompletions } from "../completions";
+import { pickProcess } from "../pick-process";
 
 export function registerPsPinCommand(
   pi: ExtensionAPI,

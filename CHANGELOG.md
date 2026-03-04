@@ -1,5 +1,29 @@
 # @aliou/pi-processes
 
+## 0.6.0
+
+### Minor Changes
+
+- 67da7e3: Add `/ps:dock`, `/ps:focus`, `/ps:logs` commands. Add deprecated `/process:*` commands. Replace status widget with log dock. Preserve ANSI colors. Fix duplicate notifications. Use proper ThemeColor type.
+- 8cd4247: Exclude local implementation plan documents from version control.
+- 47bd895: Split widget hook into focused modules for types, status rendering, and setup.
+- 905a499: Add `write` action to write to process stdin
+
+  The process tool now supports writing to a running process's stdin:
+
+  - `process action=write id=proc_1 input="hello\n"` - write data to stdin
+  - `process action=write id=proc_1 input="quit\n" end=true` - write and close stdin
+
+  Useful for interactive programs, testing RPC mode, and any scenario requiring input to be sent to a background process.
+
+- 265d8ff: Reorganize process commands into per-command directories and split settings command internals.
+
+### Patch Changes
+
+- 9fa2188: Restore bottom border line on log overlay
+- dbcd3d1: Split commands into separate files for better organization
+- d0814e6: Improve tool result display when collapsed: show last 2 output lines, first 3 processes with status. Remove redundant action/status footer on success.
+
 ## 0.5.0
 
 ### Minor Changes

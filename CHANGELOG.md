@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.6.2
+
+### Patch Changes
+
+- 705b650: bump @aliou/pi-utils-settings to ^0.10.0 (local scope fix)
+
 ## 0.6.1
 
 ### Patch Changes

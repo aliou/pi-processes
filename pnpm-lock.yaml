@@ -13,8 +13,8 @@ importers:
   .:
     dependencies:
       '@aliou/pi-utils-settings':
-        specifier: ^0.6.0
-        version: 0.6.0(@mariozechner/pi-coding-agent@0.52.7(ws@8.19.0)(zod@3.25.76))
+        specifier: ^0.10.0
+        version: 0.10.0(@mariozechner/pi-coding-agent@0.52.7(ws@8.19.0)(zod@3.25.76))
       '@aliou/pi-utils-ui':
         specifier: ^0.1.0
         version: 0.1.0(@mariozechner/pi-coding-agent@0.52.7(ws@8.19.0)(zod@3.25.76))(@mariozechner/pi-tui@0.52.7)
@@ -71,8 +71,8 @@ packages:
     engines: {node: '>=20'}
     hasBin: true
 
-  '@aliou/pi-utils-settings@0.6.0':
-    resolution: {integrity: sha512-raFMvVlqwWIzCIEIQCZFTYTRUukrC3xa/uHb/Af3WcWwrKk6+qYDAqymXvm7HTWub1H0uDt76XcAOIy/Qt1lXg==}
+  '@aliou/pi-utils-settings@0.10.0':
+    resolution: {integrity: sha512-sYCITYiv6H7LV6MJW+F5sGEqSavMFL+jLVZB/Z9H+UCsBzfb/2VAzef/GOBrbAD7zDC3jtQk123fILaPCD5tCA==}
     peerDependencies:
       '@mariozechner/pi-coding-agent': '>=0.51.0'
     peerDependenciesMeta:
@@ -2109,7 +2109,7 @@ snapshots:
       - ws
       - zod
 
-  '@aliou/pi-utils-settings@0.6.0(@mariozechner/pi-coding-agent@0.52.7(ws@8.19.0)(zod@3.25.76))':
+  '@aliou/pi-utils-settings@0.10.0(@mariozechner/pi-coding-agent@0.52.7(ws@8.19.0)(zod@3.25.76))':
     optionalDependencies:
       '@mariozechner/pi-coding-agent': 0.52.7(ws@8.19.0)(zod@3.25.76)
 

@@ -1,5 +1,5 @@
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
-import type { ExecuteResult } from "../../constants";
+import type { ExecuteResult, ProcessLogWatch } from "../../constants";
 import type { ProcessManager } from "../../manager";
 
 interface StartParams {
@@ -8,6 +8,7 @@ interface StartParams {
   alertOnSuccess?: boolean;
   alertOnFailure?: boolean;
   alertOnKill?: boolean;
+  logWatches?: ProcessLogWatch[];
 }
 
 export function executeStart(
@@ -36,20 +37,40 @@ export function executeStart(
     };
   }
 
-  const proc = manager.start(params.name, params.command, ctx.cwd, {
-    alertOnSuccess: params.alertOnSuccess,
-    alertOnFailure: params.alertOnFailure,
-    alertOnKill: params.alertOnKill,
-  });
+  try {
+    const proc = manager.start(params.name, params.command, ctx.cwd, {
+      alertOnSuccess: params.alertOnSuccess,
+      alertOnFailure: params.alertOnFailure,
+      alertOnKill: params.alertOnKill,
+      logWatches: params.logWatches,
+    });
 
-  const message = `Started "${proc.name}" (${proc.id}, PID: ${proc.pid})\nLogs: ${proc.stdoutFile}`;
-  return {
-    content: [{ type: "text", text: message }],
-    details: {
-      action: "start",
-      success: true,
-      message,
-      process: proc,
-    },
-  };
+    const watchSummary = params.logWatches?.length
+      ? `\nLog watches: ${params.logWatches.length}`
+      : "";
+    const message = `Started "${proc.name}" (${proc.id}, PID: ${proc.pid})\nLogs: ${proc.stdoutFile}${watchSummary}`;
+    return {
+      content: [{ type: "text", text: message }],
+      details: {
+        action: "start",
+        success: true,
+        message,
+        process: proc,
+      },
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? `Invalid log watch: ${error.message}`
+        : "Invalid log watch";
+
+    return {
+      content: [{ type: "text", text: message }],
+      details: {
+        action: "start",
+        success: false,
+        message,
+      },
+    };
+  }
 }

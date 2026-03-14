@@ -4,7 +4,10 @@ import type {
   Theme,
 } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
-import { MESSAGE_TYPE_PROCESS_UPDATE } from "../constants";
+import {
+  MESSAGE_TYPE_PROCESS_LOG_MATCH,
+  MESSAGE_TYPE_PROCESS_UPDATE,
+} from "../constants";
 
 interface ProcessUpdateDetails {
   processId: string;
@@ -16,10 +19,22 @@ interface ProcessUpdateDetails {
   runtime: string;
 }
 
-interface ProcessUpdateMessage {
+interface ProcessLogMatchDetails {
+  processId: string;
+  processName: string;
+  command: string;
+  stream: "stdout" | "stderr";
+  line: string;
+  pattern: string;
+  flags: string;
+  matchCount: number;
+  runtime: string;
+}
+
+interface ProcessMessage<TDetails> {
   customType: string;
   content: string | Array<{ type: string; text?: string }>;
-  details?: ProcessUpdateDetails;
+  details?: TDetails;
 }
 
 function getContentText(
@@ -38,7 +53,7 @@ export function setupMessageRenderer(pi: ExtensionAPI) {
   pi.registerMessageRenderer<ProcessUpdateDetails>(
     MESSAGE_TYPE_PROCESS_UPDATE,
     (
-      message: ProcessUpdateMessage,
+      message: ProcessMessage<ProcessUpdateDetails>,
       _options: MessageRenderOptions,
       theme: Theme,
     ) => {
@@ -76,6 +91,34 @@ export function setupMessageRenderer(pi: ExtensionAPI) {
         " " +
         theme.fg(color, statusText) +
         theme.fg("muted", ` ${details.runtime}`);
+
+      return new Text(text, 0, 0);
+    },
+  );
+
+  pi.registerMessageRenderer<ProcessLogMatchDetails>(
+    MESSAGE_TYPE_PROCESS_LOG_MATCH,
+    (
+      message: ProcessMessage<ProcessLogMatchDetails>,
+      _options: MessageRenderOptions,
+      theme: Theme,
+    ) => {
+      const details = message.details;
+
+      if (!details) {
+        return new Text(getContentText(message.content), 0, 0);
+      }
+
+      const pattern = `/${details.pattern}/${details.flags}`;
+      const text =
+        theme.fg("warning", "! ") +
+        theme.fg("accent", `"${details.processName}"`) +
+        theme.fg("muted", ` (${details.processId})`) +
+        " " +
+        theme.fg("warning", `matched ${pattern}`) +
+        theme.fg("muted", ` ${details.stream} ${details.runtime}`) +
+        " " +
+        details.line;
 
       return new Text(text, 0, 0);
     },

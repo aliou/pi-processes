@@ -37,6 +37,7 @@ pi install git:github.com/aliou/pi-processes
 process start "pnpm dev" name="backend-dev"
 process start "pnpm build" name="build" alertOnSuccess=true
 process start "pnpm test" alertOnFailure=true
+process start "pnpm dev" name="web" logWatches=[{ pattern: "ready on port \\d+", flags: "i", stream: "stdout" }]
 process list
 process output id="backend"
 process logs id="proc_1"
@@ -48,6 +49,11 @@ process clear
 - `alertOnSuccess` (default: false) - Get a turn to react when process completes successfully. Use for builds/tests where you need confirmation.
 - `alertOnFailure` (default: true) - Get a turn to react when process fails/crashes. Use to be alerted of unexpected failures.
 - `alertOnKill` (default: false) - Get a turn to react if killed by external signal. Note: killing via tool never triggers a turn.
+- `logWatches` - Watch complete stdout/stderr lines for regex matches. Matching lines are shown in the UI and trigger an agent turn.
+  - `pattern` - Regex pattern string
+  - `flags` (optional) - Regex flags, e.g. `i`
+  - `stream` (optional, default: `both`) - `stdout`, `stderr`, or `both`
+  - `once` (optional, default: true) - Stop alerting after the first match for that watch
 
 **Important:** You don't need to poll or wait for processes. Notifications arrive automatically based on your preferences. Start processes and continue with other work - you'll be informed if something requires attention.
 

@@ -16,12 +16,23 @@ import {
   LIVE_STATUSES,
   type ManagerEvent,
   type ProcessInfo,
+  type ProcessLogWatch,
+  type ProcessLogWatchStream,
   type ProcessStatus,
   type StartOptions,
   type WriteResult,
 } from "./constants";
-import { isProcessGroupAlive, killProcessGroup } from "./utils";
+import { isProcessGroupAlive, killProcessGroup, stripAnsi } from "./utils";
 import { spawnCommand } from "./utils/command-executor";
+
+interface ManagedLogWatch {
+  pattern: string;
+  flags: string;
+  stream: ProcessLogWatchStream;
+  once: boolean;
+  regex: RegExp;
+  matchCount: number;
+}
 
 interface ManagedProcess extends ProcessInfo {
   process: ChildProcess;
@@ -29,6 +40,9 @@ interface ManagedProcess extends ProcessInfo {
   stdinClosed: boolean;
   lastSignalSent: NodeJS.Signals | null;
   combinedFile: string;
+  stdoutRemainder: string;
+  stderrRemainder: string;
+  logWatches: ManagedLogWatch[];
 }
 
 interface ProcessManagerOptions {
@@ -110,12 +124,95 @@ export class ProcessManager {
       if (managed.lastSignalSent) {
         managed.success = false;
         managed.exitCode = null;
+        this.flushPendingLines(managed);
         this.transition(managed, "killed");
       } else {
         managed.success = false;
         managed.exitCode = null;
+        this.flushPendingLines(managed);
         this.transition(managed, "exited");
       }
+    }
+  }
+
+  private createLogWatches(logWatches?: ProcessLogWatch[]): ManagedLogWatch[] {
+    return (logWatches ?? []).map((watch) => ({
+      pattern: watch.pattern,
+      flags: watch.flags ?? "",
+      stream: watch.stream ?? "both",
+      once: watch.once ?? true,
+      regex: new RegExp(watch.pattern, watch.flags ?? ""),
+      matchCount: 0,
+    }));
+  }
+
+  private handleChunk(
+    managed: ManagedProcess,
+    stream: "stdout" | "stderr",
+    chunk: string,
+  ): void {
+    const previous =
+      stream === "stdout" ? managed.stdoutRemainder : managed.stderrRemainder;
+    const combined = previous + chunk;
+    const parts = combined.split("\n");
+    const remainder = parts.pop() ?? "";
+
+    if (stream === "stdout") {
+      managed.stdoutRemainder = remainder;
+    } else {
+      managed.stderrRemainder = remainder;
+    }
+
+    for (const line of parts) {
+      this.handleLine(managed, stream, line);
+    }
+  }
+
+  private flushPendingLines(managed: ManagedProcess): void {
+    if (managed.stdoutRemainder) {
+      this.handleLine(managed, "stdout", managed.stdoutRemainder);
+      managed.stdoutRemainder = "";
+    }
+
+    if (managed.stderrRemainder) {
+      this.handleLine(managed, "stderr", managed.stderrRemainder);
+      managed.stderrRemainder = "";
+    }
+  }
+
+  private handleLine(
+    managed: ManagedProcess,
+    stream: "stdout" | "stderr",
+    line: string,
+  ): void {
+    const cleanLine = stripAnsi(line.replace(/\r$/, ""));
+
+    for (const watch of managed.logWatches) {
+      if (watch.stream !== "both" && watch.stream !== stream) {
+        continue;
+      }
+      if (watch.once && watch.matchCount > 0) {
+        continue;
+      }
+
+      watch.regex.lastIndex = 0;
+      if (!watch.regex.test(cleanLine)) {
+        continue;
+      }
+
+      watch.matchCount += 1;
+      watch.regex.lastIndex = 0;
+      this.emit({
+        type: "process_log_matched",
+        info: this.toProcessInfo(managed),
+        match: {
+          stream,
+          line: cleanLine,
+          pattern: watch.pattern,
+          flags: watch.flags,
+          matchCount: watch.matchCount,
+        },
+      });
     }
   }
 
@@ -134,6 +231,7 @@ export class ProcessManager {
     appendFileSync(stderrFile, "");
     appendFileSync(combinedFile, "");
 
+    const managedLogWatches = this.createLogWatches(options?.logWatches);
     const child = spawnCommand(command, cwd, this.getConfiguredShellPath());
 
     child.unref();
@@ -159,6 +257,9 @@ export class ProcessManager {
       stdin: child.stdin,
       stdinClosed: false,
       lastSignalSent: null,
+      stdoutRemainder: "",
+      stderrRemainder: "",
+      logWatches: managedLogWatches,
     };
 
     this.processes.set(id, managed);
@@ -179,7 +280,8 @@ export class ProcessManager {
     child.stdout?.on("data", (data: Buffer) => {
       try {
         appendFileSync(stdoutFile, data);
-        const lines = data.toString().split("\n");
+        const text = data.toString();
+        const lines = text.split("\n");
         // The last element after split is either empty (if data ended with \n)
         // or a partial line. We write all parts with the prefix and newline.
         const tagged = lines
@@ -188,6 +290,7 @@ export class ProcessManager {
           )
           .join("");
         if (tagged) appendFileSync(combinedFile, tagged);
+        this.handleChunk(managed, "stdout", text);
       } catch {
         // Ignore
       }
@@ -196,13 +299,15 @@ export class ProcessManager {
     child.stderr?.on("data", (data: Buffer) => {
       try {
         appendFileSync(stderrFile, data);
-        const lines = data.toString().split("\n");
+        const text = data.toString();
+        const lines = text.split("\n");
         const tagged = lines
           .map((line, i) =>
             i < lines.length - 1 ? `2:${line}\n` : line ? `2:${line}\n` : "",
           )
           .join("");
         if (tagged) appendFileSync(combinedFile, tagged);
+        this.handleChunk(managed, "stderr", text);
       } catch {
         // Ignore
       }
@@ -214,6 +319,7 @@ export class ProcessManager {
       managed.exitCode = code;
       managed.endTime = Date.now();
       managed.success = code === 0;
+      this.flushPendingLines(managed);
 
       if (signal) {
         this.transition(managed, "killed");
@@ -233,6 +339,7 @@ export class ProcessManager {
         managed.exitCode = -1;
         managed.success = false;
         managed.endTime = Date.now();
+        this.flushPendingLines(managed);
         this.transition(managed, "exited");
       }
     });

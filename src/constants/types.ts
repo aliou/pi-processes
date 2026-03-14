@@ -1,5 +1,23 @@
 // Custom message type for process update notifications
 export const MESSAGE_TYPE_PROCESS_UPDATE = "ad-process:update";
+export const MESSAGE_TYPE_PROCESS_LOG_MATCH = "ad-process:log-match";
+
+export type ProcessLogWatchStream = "stdout" | "stderr" | "both";
+
+export interface ProcessLogWatch {
+  pattern: string;
+  flags?: string;
+  stream?: ProcessLogWatchStream;
+  once?: boolean;
+}
+
+export interface ProcessLogMatch {
+  stream: "stdout" | "stderr";
+  line: string;
+  pattern: string;
+  flags: string;
+  matchCount: number;
+}
 
 export type ProcessStatus =
   | "running"
@@ -35,6 +53,7 @@ export interface ProcessInfo {
 export type ManagerEvent =
   | { type: "process_started"; info: ProcessInfo }
   | { type: "process_ended"; info: ProcessInfo }
+  | { type: "process_log_matched"; info: ProcessInfo; match: ProcessLogMatch }
   | { type: "processes_changed" };
 
 export type KillResult =
@@ -52,6 +71,7 @@ export interface StartOptions {
   alertOnSuccess?: boolean;
   alertOnFailure?: boolean;
   alertOnKill?: boolean;
+  logWatches?: ProcessLogWatch[];
 }
 
 export interface ProcessesDetails {

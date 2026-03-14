@@ -13,6 +13,28 @@ import type { ProcessManager } from "../manager";
 import { formatRuntime, hasAnsi, stripAnsi, truncateCmd } from "../utils";
 import { executeAction } from "./actions";
 
+const LogWatchParams = Type.Object({
+  pattern: Type.String({
+    description: "Regex pattern to match against complete log lines",
+  }),
+  flags: Type.Optional(
+    Type.String({
+      description: "Regex flags passed to RegExp (optional, e.g. 'i' or 'gm')",
+    }),
+  ),
+  stream: Type.Optional(
+    StringEnum(["stdout", "stderr", "both"] as const, {
+      description: "Which stream to watch (default: both)",
+    }),
+  ),
+  once: Type.Optional(
+    Type.Boolean({
+      description:
+        "Stop alerting after the first match for this watch (default: true)",
+    }),
+  ),
+});
+
 const ProcessesParams = Type.Object({
   action: StringEnum(
     ["start", "list", "output", "logs", "kill", "clear", "write"] as const,
@@ -65,6 +87,12 @@ const ProcessesParams = Type.Object({
         "Get a turn to react when process is killed by external signal (default: false). Note: killing via tool never triggers a turn.",
     }),
   ),
+  logWatches: Type.Optional(
+    Type.Array(LogWatchParams, {
+      description:
+        "Watch complete stdout/stderr lines for regex matches. Matching lines are shown in the UI and trigger an agent turn.",
+    }),
+  ),
 });
 
 type ProcessesParamsType = Static<typeof ProcessesParams>;
@@ -78,6 +106,7 @@ export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
   - alertOnSuccess (default: false): Get a turn to react when process completes successfully
   - alertOnFailure (default: true): Get a turn to react when process crashes/fails
   - alertOnKill (default: false): Get a turn to react if killed by external signal (killing via tool never triggers a turn)
+  - logWatches: Watch complete stdout/stderr lines for regex matches and trigger an agent turn on match
 - list: Show all managed processes with their IDs and names
 - output: Get recent stdout/stderr (requires 'id' - can be proc_N or name match)
 - logs: Get log file paths to inspect with read tool (requires 'id')
@@ -87,7 +116,7 @@ export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
 
 Important: You DON'T need to poll or wait for processes. Notifications arrive automatically based on your preferences. Start processes and continue with other work - you'll be informed if something requires attention.
 
-Note: User always sees process updates in the UI. The notify flags control whether YOU (the agent) get a turn to react (e.g. check results, fix code, restart).`,
+Note: User always sees process updates in the UI. The alert flags and log watches control whether YOU (the agent) get a turn to react (e.g. check results, fix code, restart).`,
 
     parameters: ProcessesParams,
 
@@ -113,6 +142,13 @@ Note: User always sees process updates in the UI. The notify flags control wheth
           } else {
             longArgs.push({ label: "command", value: args.command });
           }
+        }
+
+        if (args.logWatches?.length) {
+          optionArgs.push({
+            label: "logWatches",
+            value: String(args.logWatches.length),
+          });
         }
       }
 

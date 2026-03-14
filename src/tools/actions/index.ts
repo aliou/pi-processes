@@ -1,5 +1,5 @@
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
-import type { ExecuteResult } from "../../constants";
+import type { ExecuteResult, ProcessLogWatch } from "../../constants";
 import type { ProcessManager } from "../../manager";
 import { executeClear } from "./clear";
 import { executeKill } from "./kill";
@@ -19,6 +19,7 @@ interface ActionParams {
   alertOnSuccess?: boolean;
   alertOnFailure?: boolean;
   alertOnKill?: boolean;
+  logWatches?: ProcessLogWatch[];
 }
 
 export async function executeAction(

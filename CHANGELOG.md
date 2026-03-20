@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.6.3
+
+### Patch Changes
+
+- e1aa8cb: update Pi deps to 0.61.0
+
 ## 0.6.2
 
 ### Patch Changes

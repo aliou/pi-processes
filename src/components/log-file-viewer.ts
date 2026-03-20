@@ -10,7 +10,7 @@
 import { readFileSync } from "node:fs";
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
-import { stripAnsi } from "../utils";
+import { normalizeDisplayText } from "../utils";
 
 export type StreamFilter = "combined" | "stdout" | "stderr";
 export type LineFormat = "plain" | "combined";
@@ -21,17 +21,19 @@ interface ParsedLine {
 }
 
 export interface LogFileViewerOptions {
-  filePath: string;
+  filePath?: string;
   /** "plain" = raw lines (stdout/stderr files), "combined" = manager's 1:/2: tagged format */
-  format: LineFormat;
+  format?: LineFormat;
+  getLines?: () => ParsedLine[];
   theme: Theme;
   /** Start in follow mode (auto-scroll to tail). Default: false */
   follow?: boolean;
 }
 
 export class LogFileViewer {
-  private filePath: string;
+  private filePath: string | null;
   private format: LineFormat;
+  private getLines: (() => ParsedLine[]) | null;
   private theme: Theme;
 
   private follow: boolean;
@@ -48,8 +50,9 @@ export class LogFileViewer {
   private centerTarget: number | null = null;
 
   constructor(opts: LogFileViewerOptions) {
-    this.filePath = opts.filePath;
-    this.format = opts.format;
+    this.filePath = opts.filePath ?? null;
+    this.format = opts.format ?? "combined";
+    this.getLines = opts.getLines ?? null;
     this.theme = opts.theme;
     this.follow = opts.follow ?? false;
   }
@@ -58,7 +61,35 @@ export class LogFileViewer {
   // File reading
   // ---------------------------------------------------------------------------
 
+  private parseRawLines(rawLines: string[]): ParsedLine[] {
+    if (this.format === "plain") {
+      return rawLines.map((line) => ({
+        type: "stdout" as const,
+        text: line,
+      }));
+    }
+
+    // Combined format: "1:text" = stdout, "2:text" = stderr
+    return rawLines.map((line) => {
+      if (line.startsWith("2:")) {
+        return { type: "stderr" as const, text: line.slice(2) };
+      }
+      return {
+        type: "stdout" as const,
+        text: line.startsWith("1:") ? line.slice(2) : line,
+      };
+    });
+  }
+
   private readAllLines(): ParsedLine[] {
+    if (this.getLines) {
+      return this.getLines();
+    }
+
+    if (!this.filePath) {
+      return [];
+    }
+
     try {
       const content = readFileSync(this.filePath, "utf-8");
       const rawLines = content.split("\n");
@@ -67,23 +98,7 @@ export class LogFileViewer {
         rawLines.pop();
       }
 
-      if (this.format === "plain") {
-        return rawLines.map((line) => ({
-          type: "stdout" as const,
-          text: line,
-        }));
-      }
-
-      // Combined format: "1:text" = stdout, "2:text" = stderr
-      return rawLines.map((line) => {
-        if (line.startsWith("2:")) {
-          return { type: "stderr" as const, text: line.slice(2) };
-        }
-        return {
-          type: "stdout" as const,
-          text: line.startsWith("1:") ? line.slice(2) : line,
-        };
-      });
+      return this.parseRawLines(rawLines);
     } catch {
       return [];
     }
@@ -99,7 +114,8 @@ export class LogFileViewer {
     if (!this.searchQuery) return [];
     const q = this.searchQuery.toLowerCase();
     return lines.reduce<number[]>((acc, line, i) => {
-      if (stripAnsi(line.text).toLowerCase().includes(q)) acc.push(i);
+      if (normalizeDisplayText(line.text).toLowerCase().includes(q))
+        acc.push(i);
       return acc;
     }, []);
   }
@@ -257,7 +273,7 @@ export class LogFileViewer {
 
     return lines.slice(startIdx, endIdx).map((line, i) => {
       const absIdx = startIdx + i;
-      const text = truncateToWidth(stripAnsi(line.text), width);
+      const text = truncateToWidth(normalizeDisplayText(line.text), width);
 
       if (absIdx === currentMatchIdx) return theme.bold(theme.inverse(text));
       if (matchSet.has(absIdx)) return warning(text);

@@ -13,7 +13,7 @@ import {
 import { configLoader } from "../config";
 import type { ProcessInfo } from "../constants";
 import type { ProcessManager } from "../manager";
-import { stripAnsi } from "../utils";
+import { normalizeDisplayText } from "../utils";
 import { statusIcon, statusLabel } from "./status-format";
 
 function formatRuntime(startTime: number, endTime: number | null): string {
@@ -381,7 +381,7 @@ export class ProcessesComponent implements Component {
 
             for (const line of visibleLines) {
               const displayLine = truncate(
-                stripAnsi(line.text),
+                normalizeDisplayText(line.text),
                 innerWidth - 2,
               );
               if (line.type === "stderr") {

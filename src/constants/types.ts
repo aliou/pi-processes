@@ -53,6 +53,7 @@ export interface ProcessInfo {
 export type ManagerEvent =
   | { type: "process_started"; info: ProcessInfo }
   | { type: "process_ended"; info: ProcessInfo }
+  | { type: "process_output_changed"; info: ProcessInfo }
   | { type: "process_log_matched"; info: ProcessInfo; match: ProcessLogMatch }
   | { type: "processes_changed" };
 

@@ -34,6 +34,11 @@ interface ManagedLogWatch {
   matchCount: number;
 }
 
+interface BufferedOutputLine {
+  type: "stdout" | "stderr";
+  text: string;
+}
+
 interface ManagedProcess extends ProcessInfo {
   process: ChildProcess;
   stdin: Writable | null;
@@ -42,12 +47,17 @@ interface ManagedProcess extends ProcessInfo {
   combinedFile: string;
   stdoutRemainder: string;
   stderrRemainder: string;
+  bufferedStdout: string[];
+  bufferedStderr: string[];
+  bufferedCombined: BufferedOutputLine[];
   logWatches: ManagedLogWatch[];
 }
 
 interface ProcessManagerOptions {
   getConfiguredShellPath?: () => string | undefined;
 }
+
+const MAX_BUFFERED_OUTPUT_LINES = 5000;
 
 export class ProcessManager {
   private processes: Map<string, ManagedProcess> = new Map();
@@ -146,16 +156,57 @@ export class ProcessManager {
     }));
   }
 
-  private handleChunk(
+  private pushBufferedLine<T>(buffer: T[], line: T): void {
+    buffer.push(line);
+    const overflow = buffer.length - MAX_BUFFERED_OUTPUT_LINES;
+    if (overflow > 0) {
+      buffer.splice(0, overflow);
+    }
+  }
+
+  private commitBufferedLine(
+    managed: ManagedProcess,
+    stream: "stdout" | "stderr",
+    line: string,
+  ): void {
+    if (stream === "stdout") {
+      this.pushBufferedLine(managed.bufferedStdout, line);
+    } else {
+      this.pushBufferedLine(managed.bufferedStderr, line);
+    }
+    this.pushBufferedLine(managed.bufferedCombined, {
+      type: stream,
+      text: line,
+    });
+    this.handleLine(managed, stream, line);
+  }
+
+  private appendBufferedChunk(
     managed: ManagedProcess,
     stream: "stdout" | "stderr",
     chunk: string,
   ): void {
-    const previous =
+    if (!chunk) return;
+
+    let remainder =
       stream === "stdout" ? managed.stdoutRemainder : managed.stderrRemainder;
-    const combined = previous + chunk;
-    const parts = combined.split("\n");
-    const remainder = parts.pop() ?? "";
+    let committed = false;
+
+    for (const char of chunk) {
+      if (char === "\r") {
+        remainder = "";
+        continue;
+      }
+
+      if (char === "\n") {
+        this.commitBufferedLine(managed, stream, remainder);
+        remainder = "";
+        committed = true;
+        continue;
+      }
+
+      remainder += char;
+    }
 
     if (stream === "stdout") {
       managed.stdoutRemainder = remainder;
@@ -163,20 +214,55 @@ export class ProcessManager {
       managed.stderrRemainder = remainder;
     }
 
-    for (const line of parts) {
-      this.handleLine(managed, stream, line);
+    if (committed) {
+      this.emit({
+        type: "process_output_changed",
+        info: this.toProcessInfo(managed),
+      });
     }
   }
 
+  getBufferedOutput(
+    id: string,
+  ): { stdout: string[]; stderr: string[]; status: string } | null {
+    const managed = this.processes.get(id);
+    if (!managed) return null;
+
+    return {
+      stdout: [...managed.bufferedStdout],
+      stderr: [...managed.bufferedStderr],
+      status: managed.status,
+    };
+  }
+
+  getBufferedCombinedOutput(
+    id: string,
+  ): { type: "stdout" | "stderr"; text: string }[] | null {
+    const managed = this.processes.get(id);
+    if (!managed) return null;
+    return managed.bufferedCombined.map((line) => ({ ...line }));
+  }
+
   private flushPendingLines(managed: ManagedProcess): void {
+    let flushed = false;
+
     if (managed.stdoutRemainder) {
-      this.handleLine(managed, "stdout", managed.stdoutRemainder);
+      this.commitBufferedLine(managed, "stdout", managed.stdoutRemainder);
       managed.stdoutRemainder = "";
+      flushed = true;
     }
 
     if (managed.stderrRemainder) {
-      this.handleLine(managed, "stderr", managed.stderrRemainder);
+      this.commitBufferedLine(managed, "stderr", managed.stderrRemainder);
       managed.stderrRemainder = "";
+      flushed = true;
+    }
+
+    if (flushed) {
+      this.emit({
+        type: "process_output_changed",
+        info: this.toProcessInfo(managed),
+      });
     }
   }
 
@@ -259,17 +345,22 @@ export class ProcessManager {
       lastSignalSent: null,
       stdoutRemainder: "",
       stderrRemainder: "",
+      bufferedStdout: [],
+      bufferedStderr: [],
+      bufferedCombined: [],
       logWatches: managedLogWatches,
     };
 
     this.processes.set(id, managed);
 
     if (!child.pid) {
+      const spawnError = "Spawn error: missing pid\n";
       try {
-        appendFileSync(stderrFile, "Spawn error: missing pid\n");
+        appendFileSync(stderrFile, spawnError);
       } catch {
         // Ignore
       }
+      this.appendBufferedChunk(managed, "stderr", spawnError);
       managed.exitCode = -1;
       managed.success = false;
       managed.endTime = Date.now();
@@ -290,7 +381,7 @@ export class ProcessManager {
           )
           .join("");
         if (tagged) appendFileSync(combinedFile, tagged);
-        this.handleChunk(managed, "stdout", text);
+        this.appendBufferedChunk(managed, "stdout", text);
       } catch {
         // Ignore
       }
@@ -307,7 +398,7 @@ export class ProcessManager {
           )
           .join("");
         if (tagged) appendFileSync(combinedFile, tagged);
-        this.handleChunk(managed, "stderr", text);
+        this.appendBufferedChunk(managed, "stderr", text);
       } catch {
         // Ignore
       }
@@ -329,11 +420,13 @@ export class ProcessManager {
     });
 
     child.on("error", (err) => {
+      const errorLine = `Process error: ${err.message}\n`;
       try {
-        appendFileSync(stderrFile, `Process error: ${err.message}\n`);
+        appendFileSync(stderrFile, errorLine);
       } catch {
         // Ignore
       }
+      this.appendBufferedChunk(managed, "stderr", errorLine);
 
       if (!managed.endTime) {
         managed.exitCode = -1;
@@ -366,15 +459,32 @@ export class ProcessManager {
     if (byId) return this.toProcessInfo(byId);
 
     const queryLower = query.toLowerCase();
-    for (const managed of this.processes.values()) {
-      if (managed.name.toLowerCase().includes(queryLower)) {
-        return this.toProcessInfo(managed);
-      }
-      if (managed.command.toLowerCase().includes(queryLower)) {
-        return this.toProcessInfo(managed);
-      }
-    }
-    return null;
+    const processes = Array.from(this.processes.values()).reverse();
+    const isLive = (managed: ManagedProcess) =>
+      LIVE_STATUSES.has(managed.status);
+
+    const match =
+      processes.find(
+        (managed) =>
+          isLive(managed) && managed.name.toLowerCase() === queryLower,
+      ) ??
+      processes.find((managed) => managed.name.toLowerCase() === queryLower) ??
+      processes.find(
+        (managed) =>
+          isLive(managed) && managed.name.toLowerCase().includes(queryLower),
+      ) ??
+      processes.find((managed) =>
+        managed.name.toLowerCase().includes(queryLower),
+      ) ??
+      processes.find(
+        (managed) =>
+          isLive(managed) && managed.command.toLowerCase().includes(queryLower),
+      ) ??
+      processes.find((managed) =>
+        managed.command.toLowerCase().includes(queryLower),
+      );
+
+    return match ? this.toProcessInfo(match) : null;
   }
 
   getOutput(
@@ -385,8 +495,8 @@ export class ProcessManager {
     if (!managed) return null;
 
     return {
-      stdout: this.readTailLines(managed.stdoutFile, tailLines),
-      stderr: this.readTailLines(managed.stderrFile, tailLines),
+      stdout: managed.bufferedStdout.slice(-tailLines),
+      stderr: managed.bufferedStderr.slice(-tailLines),
       status: managed.status,
     };
   }
@@ -398,17 +508,9 @@ export class ProcessManager {
     const managed = this.processes.get(id);
     if (!managed) return null;
 
-    const rawLines = this.readTailLines(managed.combinedFile, tailLines);
-    return rawLines.map((line) => {
-      if (line.startsWith("2:")) {
-        return { type: "stderr", text: line.slice(2) };
-      }
-      // Default to stdout (handles "1:" prefix and any malformed lines).
-      return {
-        type: "stdout",
-        text: line.startsWith("1:") ? line.slice(2) : line,
-      };
-    });
+    return managed.bufferedCombined
+      .slice(-tailLines)
+      .map((line) => ({ ...line }));
   }
 
   getFullOutput(id: string): { stdout: string; stderr: string } | null {
@@ -635,19 +737,6 @@ export class ProcessManager {
       };
     } catch {
       return { stdout: 0, stderr: 0 };
-    }
-  }
-
-  private readTailLines(filePath: string, lines: number): string[] {
-    try {
-      const content = readFileSync(filePath, "utf-8");
-      const allLines = content.split("\n");
-      if (allLines.length > 0 && allLines[allLines.length - 1] === "") {
-        allLines.pop();
-      }
-      return allLines.slice(-lines);
-    } catch {
-      return [];
     }
   }
 

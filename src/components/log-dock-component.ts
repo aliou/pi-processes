@@ -15,9 +15,8 @@ import type { Component } from "@mariozechner/pi-tui";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import { LIVE_STATUSES } from "../constants";
 import type { ProcessManager } from "../manager";
+import { normalizeDisplayText } from "../utils";
 import { LogFileViewer } from "./log-file-viewer";
-
-const POLL_INTERVAL_MS = 500;
 
 const PROCESS_COLORS: ThemeColor[] = [
   "accent",
@@ -47,7 +46,6 @@ export class LogDockComponent implements Component {
   private mode: "collapsed" | "open";
   private focusedProcessId: string | null;
 
-  private timer: ReturnType<typeof setInterval> | null = null;
   private unsubscribeManager: (() => void) | null = null;
 
   /** One viewer per process, lazily created, follow:true. */
@@ -63,10 +61,6 @@ export class LogDockComponent implements Component {
     this.dockHeight = options.dockHeight ?? 12;
     this.mode = options.mode;
     this.focusedProcessId = options.focusedProcessId;
-
-    this.timer = setInterval(() => {
-      this.tui.requestRender();
-    }, POLL_INTERVAL_MS);
 
     this.unsubscribeManager = this.manager.onEvent(() => {
       this.tui.requestRender();
@@ -101,14 +95,13 @@ export class LogDockComponent implements Component {
     return color;
   }
 
-  private getViewer(processId: string, combinedFile: string): LogFileViewer {
+  private getViewer(processId: string): LogFileViewer {
     let viewer = this.viewers.get(processId);
     if (!viewer) {
       viewer = new LogFileViewer({
-        filePath: combinedFile,
-        format: "combined",
         theme: this.theme,
         follow: true,
+        getLines: () => this.manager.getBufferedCombinedOutput(processId) ?? [],
       });
       this.viewers.set(processId, viewer);
     }
@@ -160,7 +153,7 @@ export class LogDockComponent implements Component {
       const lastLogs = this.manager.getCombinedOutput(running[0].id, 1);
       if (lastLogs && lastLogs.length > 0) {
         const lastLog = truncateToWidth(
-          lastLogs[lastLogs.length - 1].text,
+          normalizeDisplayText(lastLogs[lastLogs.length - 1].text),
           innerWidth,
         );
         lines.push(padLine(dim(lastLog)));
@@ -202,15 +195,7 @@ export class LogDockComponent implements Component {
       ];
     }
 
-    const logFiles = this.manager.getLogFiles(targetProc.id);
-    if (!logFiles) {
-      return [
-        renderPanelTitleLine("Process Logs", width, theme),
-        padLine(dim("Log files unavailable")),
-      ];
-    }
-
-    const viewer = this.getViewer(targetProc.id, logFiles.combinedFile);
+    const viewer = this.getViewer(targetProc.id);
 
     const logRows = Math.max(1, this.dockHeight - 2);
 
@@ -227,10 +212,6 @@ export class LogDockComponent implements Component {
   }
 
   dispose(): void {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
-    }
     this.unsubscribeManager?.();
     this.viewers.clear();
     this.processColors.clear();

@@ -34,3 +34,24 @@ export function stripAnsi(str: string): string {
 
   return clean;
 }
+
+function isInvisibleControlChar(char: string): boolean {
+  const code = char.charCodeAt(0);
+  return (
+    (code >= 0x00 && code <= 0x08) ||
+    (code >= 0x0b && code <= 0x1f) ||
+    code === 0x7f
+  );
+}
+
+export function normalizeDisplayText(str: string): string {
+  const clean = stripAnsi(str).replace(/\t/g, "    ");
+  let normalized = "";
+
+  for (const char of clean) {
+    if (isInvisibleControlChar(char)) continue;
+    normalized += char;
+  }
+
+  return normalized;
+}

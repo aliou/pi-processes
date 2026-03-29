@@ -1,0 +1,260 @@
+{
+  "title": "pi-processes",
+  "description": "Manage background processes from Pi without blocking the conversation.",
+  "repoUrl": "https://github.com/aliou/pi-processes",
+  "sections": [
+    {
+      "id": "let-pi-keep-working-while-processes-run",
+      "title": "Let Pi keep working while processes run",
+      "level": 2,
+      "blocks": [
+        {
+          "type": "markdown",
+          "markdown": "When a task needs a long-running command, Pi can start it in the background by itself and keep helping with the rest of the work."
+        },
+        {
+          "type": "markdown",
+          "markdown": "That means Pi can, for example:"
+        },
+        {
+          "type": "markdown",
+          "markdown": "* start a dev server and keep coding\n* keep a test watcher running while it fixes failures\n* run a local API while it inspects logs\n* watch build output without blocking the conversation"
+        },
+        {
+          "type": "markdown",
+          "markdown": "You can then inspect, pin, or stop those processes from the UI."
+        },
+        {
+          "type": "video",
+          "id": "agent-starts-processes",
+          "title": "Pi starts a long-running process and keeps working"
+        }
+      ]
+    },
+    {
+      "id": "installation",
+      "title": "Installation",
+      "level": 2,
+      "blocks": [
+        {
+          "type": "markdown",
+          "markdown": "From npm:"
+        },
+        {
+          "type": "code",
+          "lang": "bash",
+          "html": "<pre class=\"shiki github-dark\" style=\"background-color:#24292e;color:#e1e4e8\" tabindex=\"0\"><code><span class=\"line\"><span style=\"color:#B392F0\">pi</span><span style=\"color:#9ECBFF\"> install</span><span style=\"color:#9ECBFF\"> npm:@aliou/pi-processes</span></span></code></pre>"
+        },
+        {
+          "type": "markdown",
+          "markdown": "From git:"
+        },
+        {
+          "type": "code",
+          "lang": "bash",
+          "html": "<pre class=\"shiki github-dark\" style=\"background-color:#24292e;color:#e1e4e8\" tabindex=\"0\"><code><span class=\"line\"><span style=\"color:#B392F0\">pi</span><span style=\"color:#9ECBFF\"> install</span><span style=\"color:#9ECBFF\"> git:github.com/aliou/pi-processes</span></span></code></pre>"
+        }
+      ]
+    },
+    {
+      "id": "open-the-process-panel",
+      "title": "Open the process panel",
+      "level": 2,
+      "blocks": [
+        {
+          "type": "markdown",
+          "markdown": "Use `/ps` to open the main process panel."
+        },
+        {
+          "type": "markdown",
+          "markdown": "From there you can:"
+        },
+        {
+          "type": "markdown",
+          "markdown": "* see running and finished processes\n* inspect recent output\n* pin a process to the dock\n* kill a running process\n* clear finished entries"
+        },
+        {
+          "type": "markdown",
+          "markdown": "Keys:"
+        },
+        {
+          "type": "markdown",
+          "markdown": "* `j/k` or arrow keys: move selection\n* `J/K`: scroll preview\n* `enter`: pin selected process to the dock\n* `x`: kill selected process\n* `c`: clear finished processes\n* `q` or `esc`: close"
+        },
+        {
+          "type": "video",
+          "id": "process-panel",
+          "title": "Browse and manage processes from the panel"
+        }
+      ]
+    },
+    {
+      "id": "inspect-logs",
+      "title": "Inspect logs",
+      "level": 2,
+      "blocks": [
+        {
+          "type": "markdown",
+          "markdown": "Use `/ps:logs [id|name]` to open the log overlay for one process."
+        },
+        {
+          "type": "markdown",
+          "markdown": "This is useful when Pi started a server, watcher, or local API and you want to follow what it is doing in more detail."
+        },
+        {
+          "type": "markdown",
+          "markdown": "Keys:"
+        },
+        {
+          "type": "markdown",
+          "markdown": "* `tab` / `shift+tab`: switch process tabs\n* `g/G`: jump to top or bottom\n* `j/k` or arrow keys: scroll\n* `s`: switch between combined, stdout, and stderr\n* `f`: toggle follow mode\n* `/`: search\n* `n/N`: move between search matches\n* `q` or `esc`: close"
+        },
+        {
+          "type": "video",
+          "id": "inspect-logs",
+          "title": "Open the log overlay and inspect output"
+        }
+      ]
+    },
+    {
+      "id": "pin-one-process",
+      "title": "Pin one process",
+      "level": 2,
+      "blocks": [
+        {
+          "type": "markdown",
+          "markdown": "Use `/ps:pin [id|name]` to keep the dock focused on one process."
+        },
+        {
+          "type": "markdown",
+          "markdown": "This is useful when one process matters more than the others, such as a dev server or a test watcher."
+        },
+        {
+          "type": "markdown",
+          "markdown": "Without arguments, Pi shows a picker."
+        },
+        {
+          "type": "video",
+          "id": "pin-process",
+          "title": "Pin the dock to one process"
+        }
+      ]
+    },
+    {
+      "id": "control-the-dock",
+      "title": "Control the dock",
+      "level": 2,
+      "blocks": [
+        {
+          "type": "markdown",
+          "markdown": "Use `/ps:dock [show|hide|toggle]` to control dock visibility."
+        },
+        {
+          "type": "markdown",
+          "markdown": "The dock gives you a compact live view without leaving the conversation."
+        },
+        {
+          "type": "video",
+          "id": "dock-control",
+          "title": "Show, hide, and use the dock"
+        }
+      ]
+    },
+    {
+      "id": "adjust-settings",
+      "title": "Adjust settings",
+      "level": 2,
+      "blocks": [
+        {
+          "type": "markdown",
+          "markdown": "Use `/ps:settings` to configure the extension."
+        },
+        {
+          "type": "markdown",
+          "markdown": "Available settings include:"
+        },
+        {
+          "type": "markdown",
+          "markdown": "* process list size\n* output limits\n* shell path override\n* dock defaults\n* follow mode behavior\n* optional background command interception"
+        },
+        {
+          "type": "video",
+          "id": "settings",
+          "title": "Adjust process extension settings"
+        }
+      ]
+    },
+    {
+      "id": "platform-support",
+      "title": "Platform support",
+      "level": 2,
+      "blocks": [
+        {
+          "type": "markdown",
+          "markdown": "* macOS: supported\n* Linux: supported\n* Windows: not supported"
+        }
+      ]
+    },
+    {
+      "id": "troubleshooting",
+      "title": "Troubleshooting",
+      "level": 2,
+      "blocks": []
+    },
+    {
+      "id": "pi-started-something-and-i-want-to-see-more-output",
+      "title": "Pi started something and I want to see more output",
+      "level": 3,
+      "blocks": [
+        {
+          "type": "markdown",
+          "markdown": "Open `/ps` for a quick overview, or use `/ps:logs` for full logs."
+        }
+      ]
+    },
+    {
+      "id": "i-want-one-process-to-stay-visible",
+      "title": "I want one process to stay visible",
+      "level": 3,
+      "blocks": [
+        {
+          "type": "markdown",
+          "markdown": "Use `/ps:pin` to focus the dock on that process."
+        }
+      ]
+    },
+    {
+      "id": "i-want-pi-to-avoid-shell-background-tricks",
+      "title": "I want Pi to avoid shell background tricks",
+      "level": 3,
+      "blocks": [
+        {
+          "type": "markdown",
+          "markdown": "Enable background command interception in `/ps:settings`. When enabled, Pi avoids normal shell background patterns and uses the process workflow instead."
+        }
+      ]
+    },
+    {
+      "id": "contributing",
+      "title": "Contributing",
+      "level": 2,
+      "blocks": [
+        {
+          "type": "markdown",
+          "markdown": "For development, testing, docs generation, and extension internals, see [CONTRIBUTING.md](./CONTRIBUTING.md)."
+        }
+      ]
+    },
+    {
+      "id": "license",
+      "title": "License",
+      "level": 2,
+      "blocks": [
+        {
+          "type": "markdown",
+          "markdown": "MIT"
+        }
+      ]
+    }
+  ]
+}

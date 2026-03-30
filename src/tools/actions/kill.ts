@@ -20,7 +20,7 @@ export async function executeKill(
     };
   }
 
-  const proc = manager.find(params.id);
+  const proc = manager.get(params.id);
   if (!proc) {
     const message = `Process not found: ${params.id}`;
     return {

@@ -17,7 +17,7 @@ export function registerPsPinCommand(
       let processId: string | undefined;
 
       if (arg) {
-        const proc = manager.find(arg);
+        const proc = manager.get(arg);
         if (!proc) {
           return;
         }
@@ -27,6 +27,7 @@ export function registerPsPinCommand(
         if (!processId) return;
       }
 
+      if (!processId) return;
       dockActions.setFocus(processId);
     },
   });

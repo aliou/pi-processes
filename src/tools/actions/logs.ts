@@ -20,7 +20,7 @@ export function executeLogs(
     };
   }
 
-  const proc = manager.find(params.id);
+  const proc = manager.get(params.id);
   if (!proc) {
     const message = `Process not found: ${params.id}`;
     return {
@@ -35,7 +35,7 @@ export function executeLogs(
 
   const logFiles = manager.getLogFiles(proc.id);
   if (!logFiles) {
-    const message = `Could not get log files for: ${proc.id}`;
+    const message = `Could not get log files for "${proc.name}" (${proc.id})`;
     return {
       content: [{ type: "text", text: message }],
       details: {

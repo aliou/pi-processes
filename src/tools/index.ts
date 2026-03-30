@@ -33,7 +33,7 @@ const ProcessesParams = Type.Object({
   id: Type.Optional(
     Type.String({
       description:
-        "Process ID or name to match (required for output/kill/logs/write). Can be proc_N or friendly name.",
+        "Process ID, returned by start and list actions (required for output/kill/logs/write)",
     }),
   ),
   input: Type.Optional(
@@ -79,9 +79,9 @@ export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
   - alertOnFailure (default: true): Get a turn to react when process crashes/fails
   - alertOnKill (default: false): Get a turn to react if killed by external signal (killing via tool never triggers a turn)
 - list: Show all managed processes with their IDs and names
-- output: Get recent stdout/stderr (requires 'id' - can be proc_N or name match)
+- output: Get recent stdout/stderr (requires 'id')
 - logs: Get log file paths to inspect with read tool (requires 'id')
-- kill: Terminate a process (requires 'id' - can be proc_N or name match like "backend")
+- kill: Terminate a process (requires 'id')
 - clear: Remove all finished processes from the list
 - write: Write to process stdin (requires 'id' and 'input', optional 'end' to close stdin)
 
@@ -283,7 +283,7 @@ Note: User always sees process updates in the UI. The notify flags control wheth
           }
 
           lines.push(
-            `  ${process.id} ${theme.fg("accent", `"${process.name}"`)}: ${truncateCmd(process.command)} [${status}] ${formatRuntime(process.startTime, process.endTime)}`,
+            `  ${theme.fg("accent", `"${process.name}"`)} ${theme.fg("muted", `(${process.id})`)}: ${truncateCmd(process.command)} [${status}] ${formatRuntime(process.startTime, process.endTime)}`,
           );
         }
 

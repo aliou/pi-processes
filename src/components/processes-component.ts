@@ -243,8 +243,7 @@ export class ProcessesComponent implements Component {
       const scaleFactor =
         innerWidth < minTotalWidth ? innerWidth / minTotalWidth : 1;
 
-      const idWidth = Math.max(6, Math.floor(9 * scaleFactor));
-      const nameWidth = Math.max(8, Math.floor(15 * scaleFactor));
+      const processWidth = Math.max(14, Math.floor(24 * scaleFactor));
       const statusWidth = Math.max(10, Math.floor(18 * scaleFactor));
       const timeWidth = Math.max(4, Math.floor(8 * scaleFactor));
       const sizeWidth = Math.max(4, Math.floor(8 * scaleFactor));
@@ -258,8 +257,7 @@ export class ProcessesComponent implements Component {
       // Calculate command column width based on remaining space
       const fixedWidth =
         prefixWidth +
-        idWidth +
-        nameWidth +
+        processWidth +
         statusWidth +
         timeWidth +
         sizeWidth +
@@ -269,8 +267,7 @@ export class ProcessesComponent implements Component {
       lines.push(padLine(""));
       const header =
         "  " +
-        dim("ID".padEnd(idWidth)) +
-        dim("Name".padEnd(nameWidth)) +
+        dim("Process".padEnd(processWidth)) +
         dim("Command".padEnd(cmdWidth)) +
         dim("Status".padEnd(statusWidth)) +
         dim("Time".padEnd(timeWidth)) +
@@ -297,11 +294,19 @@ export class ProcessesComponent implements Component {
         const statusPadding =
           statusWidth + (statusText.length - visibleWidth(statusText));
 
+        // Reserve space for " (proc_N)": 1 space + 1 open paren + id + 1 close paren
+        const maxNameLen = processWidth - proc.id.length - 3;
+        const tName = truncate(proc.name, Math.max(4, maxNameLen));
+        const idSuffix = dim(`(${proc.id})`);
+
+        const processCell = isSelected
+          ? `${accent(tName)} ${idSuffix}`
+          : `${tName} ${idSuffix}`;
+        const processCellPadding =
+          processWidth + (processCell.length - visibleWidth(processCell));
+
         const row =
-          (isSelected
-            ? accent(proc.id.padEnd(idWidth))
-            : proc.id.padEnd(idWidth)) +
-          truncate(proc.name, nameWidth - 1).padEnd(nameWidth) +
+          processCell.padEnd(processCellPadding) +
           truncate(proc.command, cmdWidth - 1).padEnd(cmdWidth) +
           statusText.padEnd(statusPadding) +
           formatRuntime(proc.startTime, proc.endTime).padEnd(timeWidth) +

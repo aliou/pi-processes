@@ -19,7 +19,7 @@ export function registerPsKillCommand(
       let processId: string | undefined;
 
       if (arg) {
-        const proc = manager.find(arg);
+        const proc = manager.get(arg);
         if (!proc) {
           return;
         }
@@ -49,18 +49,18 @@ export function registerPsKillCommand(
         }
       }
 
+      if (!processId) return;
+
       const proc = manager.get(processId);
-      if (!proc) {
-        return;
-      }
+      if (!proc) return;
 
       const signal =
         proc.status === "terminate_timeout" ? "SIGKILL" : "SIGTERM";
       const timeoutMs = signal === "SIGKILL" ? 200 : 3000;
-      const result = await manager.kill(processId, { signal, timeoutMs });
+      const result = await manager.kill(proc.id, { signal, timeoutMs });
 
       if (result.ok) {
-        if (dockActions.getFocusedProcessId() === processId) {
+        if (dockActions.getFocusedProcessId() === proc.id) {
           dockActions.setFocus(null);
         }
       }

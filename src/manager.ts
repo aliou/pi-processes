@@ -254,22 +254,6 @@ export class ProcessManager {
     return managed ? this.toProcessInfo(managed) : null;
   }
 
-  find(query: string): ProcessInfo | null {
-    const byId = this.processes.get(query);
-    if (byId) return this.toProcessInfo(byId);
-
-    const queryLower = query.toLowerCase();
-    for (const managed of this.processes.values()) {
-      if (managed.name.toLowerCase().includes(queryLower)) {
-        return this.toProcessInfo(managed);
-      }
-      if (managed.command.toLowerCase().includes(queryLower)) {
-        return this.toProcessInfo(managed);
-      }
-    }
-    return null;
-  }
-
   getOutput(
     id: string,
     tailLines = 100,

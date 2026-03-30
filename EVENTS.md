@@ -273,7 +273,7 @@ Search mode (bottom line replaced):
 | `list` | See all processes and their statuses |
 | `output` | Read recent stdout/stderr from memory (fast, limited) |
 | `logs` | Get file paths to read full logs with the `read` tool |
-| `kill` | Terminate a process by id or name |
+| `kill` | Terminate a process by id |
 | `clear` | Remove all finished processes |
 | `write` | Send input to a running process's stdin |
 

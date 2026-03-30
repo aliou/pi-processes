@@ -24,7 +24,7 @@ export function executeOutput(
     };
   }
 
-  const proc = manager.find(params.id);
+  const proc = manager.get(params.id);
   if (!proc) {
     const message = `Process not found: ${params.id}`;
     return {
@@ -40,7 +40,7 @@ export function executeOutput(
   const { defaultTailLines } = configLoader.getConfig().output;
   const output = manager.getOutput(proc.id, defaultTailLines);
   if (!output) {
-    const message = `Could not read output for: ${proc.id}`;
+    const message = `Could not read output for "${proc.name}" (${proc.id})`;
     return {
       content: [{ type: "text", text: message }],
       details: {

@@ -18,7 +18,7 @@ export function registerPsLogsCommand(
       let processId: string | undefined;
 
       if (arg) {
-        const proc = manager.find(arg);
+        const proc = manager.get(arg);
         if (!proc) return;
         processId = proc.id;
       }

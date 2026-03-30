@@ -35,7 +35,7 @@ export function executeWrite(
     };
   }
 
-  const process = manager.find(id);
+  const process = manager.get(id);
   if (!process) {
     return {
       content: [{ type: "text", text: `Process not found: ${id}` }],
@@ -75,7 +75,7 @@ export function executeWrite(
     content: [
       {
         type: "text",
-        text: `Wrote ${input.length} bytes to ${process.id}${suffix}`,
+        text: `Wrote ${input.length} bytes to "${process.name}" (${process.id})${suffix}`,
       },
     ],
     details: {

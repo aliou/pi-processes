@@ -43,6 +43,9 @@ export class ProcessManager {
   private watcher: ReturnType<typeof setInterval> | null = null;
   private getConfiguredShellPath: () => string | undefined;
 
+  private lastOutputEmitAt: Map<string, number> = new Map();
+  private pendingOutputEmit: Map<string, NodeJS.Timeout> = new Map();
+
   constructor(options?: ProcessManagerOptions) {
     this.logDir = join(tmpdir(), `pi-processes-${Date.now()}`);
     mkdirSync(this.logDir, { recursive: true });
@@ -57,6 +60,48 @@ export class ProcessManager {
 
   private emit(event: ManagerEvent): void {
     this.events.emit("event", event);
+  }
+
+  private notifyOutputChanged(id: string): void {
+    const now = Date.now();
+    const lastEmit = this.lastOutputEmitAt.get(id) ?? 0;
+    const elapsed = now - lastEmit;
+
+    if (elapsed >= 100) {
+      this.lastOutputEmitAt.set(id, now);
+      this.emit({ type: "process_output_changed", id });
+      return;
+    }
+
+    if (!this.pendingOutputEmit.has(id)) {
+      const delay = 100 - elapsed;
+      const timeout = setTimeout(() => {
+        this.pendingOutputEmit.delete(id);
+        // Invariant: every path that removes a process from `this.processes`
+        // must call `clearOutputChangedState(id)` first, which clears this
+        // timeout. This guard is a safety net, not a primary mechanism.
+        if (!this.processes.has(id)) return;
+        this.lastOutputEmitAt.set(id, Date.now());
+        this.emit({ type: "process_output_changed", id });
+      }, delay);
+      this.pendingOutputEmit.set(id, timeout);
+    }
+  }
+
+  private flushPendingOutputChanged(id: string): void {
+    const timeout = this.pendingOutputEmit.get(id);
+    if (!timeout) return;
+    clearTimeout(timeout);
+    this.pendingOutputEmit.delete(id);
+    this.lastOutputEmitAt.set(id, Date.now());
+    this.emit({ type: "process_output_changed", id });
+  }
+
+  private clearOutputChangedState(id: string): void {
+    const timeout = this.pendingOutputEmit.get(id);
+    if (timeout) clearTimeout(timeout);
+    this.pendingOutputEmit.delete(id);
+    this.lastOutputEmitAt.delete(id);
   }
 
   private transition(managed: ManagedProcess, next: ProcessStatus): void {
@@ -106,6 +151,8 @@ export class ProcessManager {
       if (!managed.endTime) {
         managed.endTime = Date.now();
       }
+
+      this.flushPendingOutputChanged(managed.id);
 
       if (managed.lastSignalSent) {
         managed.success = false;
@@ -188,6 +235,7 @@ export class ProcessManager {
           )
           .join("");
         if (tagged) appendFileSync(combinedFile, tagged);
+        this.notifyOutputChanged(id);
       } catch {
         // Ignore
       }
@@ -203,6 +251,7 @@ export class ProcessManager {
           )
           .join("");
         if (tagged) appendFileSync(combinedFile, tagged);
+        this.notifyOutputChanged(id);
       } catch {
         // Ignore
       }
@@ -214,6 +263,8 @@ export class ProcessManager {
       managed.exitCode = code;
       managed.endTime = Date.now();
       managed.success = code === 0;
+
+      this.flushPendingOutputChanged(id);
 
       if (signal) {
         this.transition(managed, "killed");
@@ -233,6 +284,7 @@ export class ProcessManager {
         managed.exitCode = -1;
         managed.success = false;
         managed.endTime = Date.now();
+        this.flushPendingOutputChanged(id);
         this.transition(managed, "exited");
       }
     });
@@ -389,6 +441,7 @@ export class ProcessManager {
       managed.success = false;
     }
 
+    this.flushPendingOutputChanged(id);
     this.transition(managed, "killed");
     return { ok: true, info: this.toProcessInfo(managed) };
   }
@@ -452,6 +505,7 @@ export class ProcessManager {
         // Ignore
       }
 
+      this.clearOutputChangedState(id);
       this.processes.delete(id);
       cleared++;
     }
@@ -484,6 +538,12 @@ export class ProcessManager {
 
   cleanup(): void {
     this.stopWatcher();
+
+    for (const timeout of this.pendingOutputEmit.values()) {
+      clearTimeout(timeout);
+    }
+    this.pendingOutputEmit.clear();
+    this.lastOutputEmitAt.clear();
 
     for (const p of this.processes.values()) {
       if (!LIVE_STATUSES.has(p.status)) continue;

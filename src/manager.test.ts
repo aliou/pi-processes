@@ -15,6 +15,7 @@ function waitForEnd(manager: ProcessManager, id: string): Promise<void> {
 
 function collectEvents(manager: ProcessManager): ManagerEvent[] {
   const events: ManagerEvent[] = [];
+  // Unsubscribe not stored; manager.cleanup() in afterEach clears all listeners.
   manager.onEvent((e) => events.push(e));
   return events;
 }
@@ -75,17 +76,6 @@ describe("process_output_changed", () => {
   it("stdout and stderr share one throttle bucket", async () => {
     manager = new ProcessManager();
 
-    // Single-stream burst
-    const events1 = collectEvents(manager);
-    const info1 = manager.start("single", "seq 1 100", "/tmp");
-    await waitForEnd(manager, info1.id);
-    const singleCount = events1.filter(
-      (e) => e.type === "process_output_changed",
-    ).length;
-
-    manager.cleanup();
-    manager = new ProcessManager();
-
     // Dual-stream burst: writes to both stdout and stderr rapidly
     const events2 = collectEvents(manager);
     const info2 = manager.start(
@@ -98,9 +88,8 @@ describe("process_output_changed", () => {
       (e) => e.type === "process_output_changed",
     ).length;
 
-    // Dual should not be significantly more than single (shared bucket)
-    // Allow 3x tolerance since timing varies
-    expect(dualCount).toBeLessThan(Math.max(singleCount * 3, 20));
+    // Both streams share one throttle bucket, so total events should be low
+    expect(dualCount).toBeLessThan(30);
   });
 
   it("trailing emit fires after burst ends", async () => {

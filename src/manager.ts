@@ -77,6 +77,9 @@ export class ProcessManager {
       const delay = 100 - elapsed;
       const timeout = setTimeout(() => {
         this.pendingOutputEmit.delete(id);
+        // Invariant: every path that removes a process from `this.processes`
+        // must call `clearOutputChangedState(id)` first, which clears this
+        // timeout. This guard is a safety net, not a primary mechanism.
         if (!this.processes.has(id)) return;
         this.lastOutputEmitAt.set(id, Date.now());
         this.emit({ type: "process_output_changed", id });

@@ -59,7 +59,7 @@ LLM calls process(action: "list")
 
 LLM calls process(action: "output", id)
   → executeOutput()
-      → reads in-memory stdout/stderr ring buffer from manager
+      → reads recent stdout/stderr from temp log files via manager
       → returns last N lines (no side effects)
 
 LLM calls process(action: "logs", id)
@@ -95,7 +95,7 @@ LLM calls process(action: "write", id, input)
 ```
 /ps
   → opens ProcessesComponent (full-screen takeover, blocks input)
-      keyboard: j/k scroll, Enter/Space select, q/Esc close
+      keyboard: j/k or arrows move, J/K scroll preview, Enter selects, x kills, c clears, q/Esc close
       on close with selection: dockState.setFocus(processId)  [expands dock]
       on close without selection: no side effect
 
@@ -135,7 +135,7 @@ LLM calls process(action: "write", id, input)
                    │
                    ▼
               ┌─────────┐
-              │ running │ ──── output lines accumulate in ring buffer (no event)
+              │ running │ ──── output lines append to temp log files (no event)
               └─────────┘
                │        │
          SIGTERM/kill  natural exit
@@ -219,9 +219,7 @@ The dock is a widget, not an overlay. It receives keyboard input only when
 pi routes input to it (implementation detail of pi-tui widget focus).
 
 ```
-Tab / Shift-Tab    cycle focus between processes
-f                  toggle follow mode for focused process
-(no search, no scroll keybindings — those live in the overlay)
+The dock is read-only. It does not handle keyboard input.
 ```
 
 ---
@@ -255,8 +253,8 @@ Search mode (bottom line replaced):
 ### Always visible (no command needed)
 | Widget | What it shows |
 |---|---|
-| Status widget | One-line summary of all processes, below the editor |
-| Dock widget | Log tail for the focused process (or first running), above the editor |
+| Status widget | Optional one-line summary of all processes, below the editor |
+| Dock widget | Collapsed summary or focused process logs, above the editor |
 
 ### User commands: for managing what you see
 | Command | When to use |
@@ -294,7 +292,7 @@ index.ts
   │     ├─ setupCleanupHook()       kills all processes on session end
   │     ├─ setupProcessEndHook()    sends LLM a turn when alertOnSuccess/Failure triggers
   │     ├─ setupBackgroundBlocker() intercepts shell commands (if configured)
-  │     ├─ setupProcessWidget()     ← subscribes to manager + dockState, drives widgets
+  │     ├─ setupProcessWidget()     ← subscribes to manager + dock state, drives widgets
   │     └─ setupMessageRenderer()   renders LLM tool call results
   │
   ├─ setupProcessesCommands(pi, manager, dockState)

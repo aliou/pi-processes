@@ -1,8 +1,8 @@
 /**
  * Configuration for the processes extension.
  *
- * Global: ~/.pi/agent/extensions/processes.json
- * Memory: ephemeral overrides via /process:settings
+ * Global: ~/.pi/agent/extensions/process.json
+ * Memory: ephemeral overrides via /ps:settings
  */
 
 import { ConfigLoader } from "@aliou/pi-utils-settings";
@@ -11,7 +11,7 @@ import { DEFAULT_KEYBINDINGS } from "./utils/keybindings";
 
 export interface ProcessesConfig {
   processList?: {
-    /** Max visible processes in the /process:list TUI list. */
+    /** Max visible processes in the /ps TUI list. */
     maxVisibleProcesses?: number;
     /** Max log preview lines shown below the selected process. */
     maxPreviewLines?: number;

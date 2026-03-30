@@ -13,7 +13,7 @@ export function buildSettingsSections(
           id: "processList.maxVisibleProcesses",
           label: "Max visible processes",
           description:
-            "Maximum processes shown in the /processes list before scrolling",
+            "Maximum processes shown in the /ps list before scrolling",
           currentValue: String(
             tabConfig?.processList?.maxVisibleProcesses ??
               resolved.processList.maxVisibleProcesses,

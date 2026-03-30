@@ -88,6 +88,14 @@ export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
 Important: You DON'T need to poll or wait for processes. Notifications arrive automatically based on your preferences. Start processes and continue with other work - you'll be informed if something requires attention.
 
 Note: User always sees process updates in the UI. The notify flags control whether YOU (the agent) get a turn to react (e.g. check results, fix code, restart).`,
+    promptSnippet:
+      "Manage background processes without blocking the conversation",
+    promptGuidelines: [
+      "Use this tool for long-running commands such as dev servers, test watchers, build watchers, and log tails instead of bash.",
+      "Avoid shell background patterns such as &, nohup, disown, or setsid when the process tool fits.",
+      "After starting a process, continue other work instead of waiting for it.",
+      "Use the pi-processes skill for examples and best practices when a task depends on background processes.",
+    ],
 
     parameters: ProcessesParams,
 

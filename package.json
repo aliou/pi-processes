@@ -18,6 +18,9 @@
     "extensions": [
       "./src/index.ts"
     ],
+    "skills": [
+      "./skills/pi-processes"
+    ],
     "video": "https://assets.aliou.me/pi-extensions/demos/pi-processes.mp4"
   },
   "publishConfig": {
@@ -25,7 +28,9 @@
   },
   "files": [
     "src",
-    "README.md"
+    "skills",
+    "README.md",
+    "CONTRIBUTING.md"
   ],
   "dependencies": {
     "@aliou/pi-utils-settings": "^0.10.0",

@@ -68,6 +68,7 @@
     "prepare": "[ -d .git ] && husky || true",
     "changeset": "changeset",
     "version": "changeset version",
+    "test": "vitest run",
     "release": "pnpm changeset publish"
   },
   "packageManager": "pnpm@10.26.1",

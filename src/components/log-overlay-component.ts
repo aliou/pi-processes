@@ -61,7 +61,6 @@ export class LogOverlayComponent implements Component {
   private mode: OverlayMode = "normal";
   private searchInput: Input = new Input();
 
-  private timer: ReturnType<typeof setInterval> | null = null;
   private unsubscribeManager: (() => void) | null = null;
 
   constructor(opts: LogOverlayOptions) {
@@ -90,10 +89,6 @@ export class LogOverlayComponent implements Component {
       this.tabIndex = Math.min(this.tabIndex, this.processes.length - 1);
       this.tui.requestRender();
     });
-
-    this.timer = setInterval(() => {
-      this.tui.requestRender();
-    }, 300);
 
     this.searchInput.onSubmit = (query) => {
       const trimmed = query.trim();
@@ -163,10 +158,6 @@ export class LogOverlayComponent implements Component {
   // ---------------------------------------------------------------------------
 
   private close(): void {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
-    }
     this.unsubscribeManager?.();
     this.unsubscribeManager = null;
     this.done();

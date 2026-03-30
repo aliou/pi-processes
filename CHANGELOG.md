@@ -1,5 +1,12 @@
 # @aliou/pi-processes
 
+## 0.6.4
+
+### Patch Changes
+
+- 11d03ca: Ship the bundled `pi-processes` skill and improve the published package docs.
+- 2bdee75: Sync process help text and docs references with the current `/ps` commands and config paths.
+
 ## 0.6.3
 
 ### Patch Changes

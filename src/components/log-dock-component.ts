@@ -17,8 +17,6 @@ import { LIVE_STATUSES } from "../constants";
 import type { ProcessManager } from "../manager";
 import { LogFileViewer } from "./log-file-viewer";
 
-const POLL_INTERVAL_MS = 500;
-
 const PROCESS_COLORS: ThemeColor[] = [
   "accent",
   "warning",
@@ -47,7 +45,6 @@ export class LogDockComponent implements Component {
   private mode: "collapsed" | "open";
   private focusedProcessId: string | null;
 
-  private timer: ReturnType<typeof setInterval> | null = null;
   private unsubscribeManager: (() => void) | null = null;
 
   /** One viewer per process, lazily created, follow:true. */
@@ -63,10 +60,6 @@ export class LogDockComponent implements Component {
     this.dockHeight = options.dockHeight ?? 12;
     this.mode = options.mode;
     this.focusedProcessId = options.focusedProcessId;
-
-    this.timer = setInterval(() => {
-      this.tui.requestRender();
-    }, POLL_INTERVAL_MS);
 
     this.unsubscribeManager = this.manager.onEvent(() => {
       this.tui.requestRender();
@@ -227,10 +220,6 @@ export class LogDockComponent implements Component {
   }
 
   dispose(): void {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
-    }
     this.unsubscribeManager?.();
     this.viewers.clear();
     this.processColors.clear();

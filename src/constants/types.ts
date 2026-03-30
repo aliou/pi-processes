@@ -35,6 +35,7 @@ export interface ProcessInfo {
 export type ManagerEvent =
   | { type: "process_started"; info: ProcessInfo }
   | { type: "process_ended"; info: ProcessInfo }
+  | { type: "process_output_changed"; id: string }
   | { type: "processes_changed" };
 
 export type KillResult =

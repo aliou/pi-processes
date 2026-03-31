@@ -48,6 +48,19 @@ function truncate(str: string, maxLen: number): string {
   return `${str.slice(0, maxLen - 3)}...`;
 }
 
+function fitCell(
+  value: string,
+  width: number,
+  align: "left" | "right" = "left",
+): string {
+  const truncated = truncateToWidth(value, Math.max(0, width));
+  const pad = Math.max(0, width - visibleWidth(truncated));
+  if (align === "right") {
+    return " ".repeat(pad) + truncated;
+  }
+  return truncated + " ".repeat(pad);
+}
+
 export class ProcessesComponent implements Component {
   private tui: { requestRender: () => void };
   private theme: Theme;
@@ -291,26 +304,24 @@ export class ProcessesComponent implements Component {
         const totalSize = sizes ? sizes.stdout + sizes.stderr : 0;
 
         const statusText = this.formatStatus(proc);
-        const statusPadding =
-          statusWidth + (statusText.length - visibleWidth(statusText));
 
-        // Reserve space for " (proc_N)": 1 space + 1 open paren + id + 1 close paren
-        const maxNameLen = processWidth - proc.id.length - 3;
-        const tName = truncate(proc.name, Math.max(4, maxNameLen));
-        const idSuffix = dim(`(${proc.id})`);
-
+        // Keep process cell bounded even with large IDs.
+        const idPlain = `(${proc.id})`;
+        const maxNameLen = Math.max(
+          1,
+          processWidth - visibleWidth(idPlain) - 1,
+        );
+        const tName = truncate(proc.name, maxNameLen);
         const processCell = isSelected
-          ? `${accent(tName)} ${idSuffix}`
-          : `${tName} ${idSuffix}`;
-        const processCellPadding =
-          processWidth + (processCell.length - visibleWidth(processCell));
+          ? `${accent(tName)} ${dim(` ${idPlain}`)}`
+          : `${tName}${dim(` ${idPlain}`)}`;
 
         const row =
-          processCell.padEnd(processCellPadding) +
-          truncate(proc.command, cmdWidth - 1).padEnd(cmdWidth) +
-          statusText.padEnd(statusPadding) +
-          formatRuntime(proc.startTime, proc.endTime).padEnd(timeWidth) +
-          formatBytes(totalSize).padStart(sizeWidth);
+          fitCell(processCell, processWidth) +
+          fitCell(truncate(proc.command, cmdWidth - 1), cmdWidth) +
+          fitCell(statusText, statusWidth) +
+          fitCell(formatRuntime(proc.startTime, proc.endTime), timeWidth) +
+          fitCell(formatBytes(totalSize), sizeWidth, "right");
 
         if (isSelected) {
           lines.push(padLine(`${accent(">")} ${row}`));

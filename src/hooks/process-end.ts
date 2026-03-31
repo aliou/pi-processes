@@ -4,6 +4,7 @@ import type { ProcessManager } from "../manager";
 import { formatRuntime } from "../utils";
 
 interface ProcessUpdateDetails {
+  kind: "lifecycle";
   processId: string;
   processName: string;
   command: string;
@@ -43,6 +44,7 @@ export function setupProcessEndHook(pi: ExtensionAPI, manager: ProcessManager) {
     // Send the message to the conversation - displayed via custom renderer in UI
     // Only trigger an agent turn when the notification preferences say so.
     const details: ProcessUpdateDetails = {
+      kind: "lifecycle",
       processId: info.id,
       processName: info.name,
       command: info.command,

@@ -14,6 +14,14 @@ export const LIVE_STATUSES: ReadonlySet<ProcessStatus> = new Set([
   "terminate_timeout",
 ]);
 
+export type LogWatchStream = "stdout" | "stderr" | "both";
+
+export interface LogWatch {
+  pattern: string;
+  stream?: LogWatchStream;
+  repeat?: boolean;
+}
+
 export interface ProcessInfo {
   id: string;
   name: string;
@@ -32,10 +40,25 @@ export interface ProcessInfo {
   alertOnKill: boolean;
 }
 
+export interface LogWatchMatchEvent {
+  processId: string;
+  processName: string;
+  processCommand: string;
+  source: "stdout" | "stderr";
+  line: string;
+  watch: {
+    index: number;
+    pattern: string;
+    stream: LogWatchStream;
+    repeat: boolean;
+  };
+}
+
 export type ManagerEvent =
   | { type: "process_started"; info: ProcessInfo }
   | { type: "process_ended"; info: ProcessInfo }
   | { type: "process_output_changed"; id: string }
+  | { type: "process_watch_matched"; match: LogWatchMatchEvent }
   | { type: "processes_changed" };
 
 export type KillResult =
@@ -53,6 +76,7 @@ export interface StartOptions {
   alertOnSuccess?: boolean;
   alertOnFailure?: boolean;
   alertOnKill?: boolean;
+  logWatches?: LogWatch[];
 }
 
 export interface ProcessesDetails {

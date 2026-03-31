@@ -2,6 +2,7 @@ import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { ExecuteResult } from "../../constants";
 import type { ProcessManager } from "../../manager";
 import { executeClear } from "./clear";
+import { executeDebugPreview } from "./debug";
 import { executeKill } from "./kill";
 import { executeList } from "./list";
 import { executeLogs } from "./logs";
@@ -19,6 +20,12 @@ interface ActionParams {
   alertOnSuccess?: boolean;
   alertOnFailure?: boolean;
   alertOnKill?: boolean;
+  logWatches?: Array<{
+    pattern: string;
+    stream?: "stdout" | "stderr" | "both";
+    repeat?: boolean;
+  }>;
+  preview?: "start" | "list" | "output" | "logs" | "error";
 }
 
 export async function executeAction(
@@ -41,6 +48,8 @@ export async function executeAction(
       return executeClear(manager);
     case "write":
       return executeWrite(params, manager);
+    case "debug_preview":
+      return executeDebugPreview(params);
     default:
       return {
         content: [{ type: "text", text: `Unknown action: ${params.action}` }],

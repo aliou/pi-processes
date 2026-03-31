@@ -14,6 +14,8 @@ import type { Writable } from "node:stream";
 import {
   type KillResult,
   LIVE_STATUSES,
+  type LogWatch,
+  type LogWatchStream,
   type ManagerEvent,
   type ProcessInfo,
   type ProcessStatus,
@@ -23,12 +25,24 @@ import {
 import { isProcessGroupAlive, killProcessGroup } from "./utils";
 import { spawnCommand } from "./utils/command-executor";
 
+interface ResolvedWatch {
+  index: number;
+  pattern: string;
+  regex: RegExp;
+  stream: LogWatchStream;
+  repeat: boolean;
+  fired: boolean;
+}
+
 interface ManagedProcess extends ProcessInfo {
   process: ChildProcess;
   stdin: Writable | null;
   stdinClosed: boolean;
   lastSignalSent: NodeJS.Signals | null;
   combinedFile: string;
+  stdoutPendingLine: string;
+  stderrPendingLine: string;
+  watches: ResolvedWatch[];
 }
 
 interface ProcessManagerOptions {
@@ -153,6 +167,7 @@ export class ProcessManager {
       }
 
       this.flushPendingOutputChanged(managed.id);
+      this.flushPendingLines(managed);
 
       if (managed.lastSignalSent) {
         managed.success = false;
@@ -172,6 +187,7 @@ export class ProcessManager {
     cwd: string,
     options?: StartOptions,
   ): ProcessInfo {
+    const resolvedWatches = this.resolveLogWatches(options?.logWatches);
     const id = `proc_${++this.counter}`;
     const stdoutFile = join(this.logDir, `${id}-stdout.log`);
     const stderrFile = join(this.logDir, `${id}-stderr.log`);
@@ -206,6 +222,9 @@ export class ProcessManager {
       stdin: child.stdin,
       stdinClosed: false,
       lastSignalSent: null,
+      stdoutPendingLine: "",
+      stderrPendingLine: "",
+      watches: resolvedWatches,
     };
 
     this.processes.set(id, managed);
@@ -226,15 +245,10 @@ export class ProcessManager {
     child.stdout?.on("data", (data: Buffer) => {
       try {
         appendFileSync(stdoutFile, data);
-        const lines = data.toString().split("\n");
-        // The last element after split is either empty (if data ended with \n)
-        // or a partial line. We write all parts with the prefix and newline.
-        const tagged = lines
-          .map((line, i) =>
-            i < lines.length - 1 ? `1:${line}\n` : line ? `1:${line}\n` : "",
-          )
-          .join("");
+        const lines = this.extractCompleteLines(managed, "stdout", data);
+        const tagged = lines.map((line) => `1:${line}\n`).join("");
         if (tagged) appendFileSync(combinedFile, tagged);
+        this.matchWatches(managed, "stdout", lines);
         this.notifyOutputChanged(id);
       } catch {
         // Ignore
@@ -244,13 +258,10 @@ export class ProcessManager {
     child.stderr?.on("data", (data: Buffer) => {
       try {
         appendFileSync(stderrFile, data);
-        const lines = data.toString().split("\n");
-        const tagged = lines
-          .map((line, i) =>
-            i < lines.length - 1 ? `2:${line}\n` : line ? `2:${line}\n` : "",
-          )
-          .join("");
+        const lines = this.extractCompleteLines(managed, "stderr", data);
+        const tagged = lines.map((line) => `2:${line}\n`).join("");
         if (tagged) appendFileSync(combinedFile, tagged);
+        this.matchWatches(managed, "stderr", lines);
         this.notifyOutputChanged(id);
       } catch {
         // Ignore
@@ -265,6 +276,7 @@ export class ProcessManager {
       managed.success = code === 0;
 
       this.flushPendingOutputChanged(id);
+      this.flushPendingLines(managed);
 
       if (signal) {
         this.transition(managed, "killed");
@@ -285,6 +297,7 @@ export class ProcessManager {
         managed.success = false;
         managed.endTime = Date.now();
         this.flushPendingOutputChanged(id);
+        this.flushPendingLines(managed);
         this.transition(managed, "exited");
       }
     });
@@ -442,6 +455,7 @@ export class ProcessManager {
     }
 
     this.flushPendingOutputChanged(id);
+    this.flushPendingLines(managed);
     this.transition(managed, "killed");
     return { ok: true, info: this.toProcessInfo(managed) };
   }
@@ -572,6 +586,132 @@ export class ProcessManager {
       };
     } catch {
       return { stdout: 0, stderr: 0 };
+    }
+  }
+
+  private resolveLogWatches(input?: LogWatch[]): ResolvedWatch[] {
+    if (!input || input.length === 0) return [];
+
+    return input.map((watch, index) => {
+      const pattern = watch.pattern?.trim();
+      if (!pattern) {
+        throw new Error(`logWatches[${index}].pattern is required`);
+      }
+
+      let regex: RegExp;
+      try {
+        regex = new RegExp(pattern);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "invalid regular expression";
+        throw new Error(
+          `Invalid log watch pattern at logWatches[${index}]: ${message}`,
+        );
+      }
+
+      const stream = watch.stream ?? "both";
+      if (stream !== "stdout" && stream !== "stderr" && stream !== "both") {
+        throw new Error(
+          `Invalid logWatches[${index}].stream: ${stream}. Expected stdout, stderr, or both`,
+        );
+      }
+
+      return {
+        index,
+        pattern,
+        regex,
+        stream,
+        repeat: watch.repeat ?? false,
+        fired: false,
+      };
+    });
+  }
+
+  private extractCompleteLines(
+    managed: ManagedProcess,
+    source: "stdout" | "stderr",
+    data: Buffer,
+  ): string[] {
+    const chunk = data.toString();
+    const pending =
+      source === "stdout"
+        ? managed.stdoutPendingLine
+        : managed.stderrPendingLine;
+    const merged = pending + chunk;
+    const parts = merged.split(/\r?\n/);
+    const completeLines = parts.slice(0, -1);
+    const nextPending = parts[parts.length - 1] ?? "";
+
+    if (source === "stdout") {
+      managed.stdoutPendingLine = nextPending;
+    } else {
+      managed.stderrPendingLine = nextPending;
+    }
+
+    return completeLines;
+  }
+
+  private flushPendingLines(managed: ManagedProcess): void {
+    if (managed.stdoutPendingLine) {
+      try {
+        appendFileSync(
+          managed.combinedFile,
+          `1:${managed.stdoutPendingLine}\n`,
+        );
+      } catch {
+        // Ignore
+      }
+      this.matchWatches(managed, "stdout", [managed.stdoutPendingLine]);
+      managed.stdoutPendingLine = "";
+    }
+
+    if (managed.stderrPendingLine) {
+      try {
+        appendFileSync(
+          managed.combinedFile,
+          `2:${managed.stderrPendingLine}\n`,
+        );
+      } catch {
+        // Ignore
+      }
+      this.matchWatches(managed, "stderr", [managed.stderrPendingLine]);
+      managed.stderrPendingLine = "";
+    }
+  }
+
+  private matchWatches(
+    managed: ManagedProcess,
+    source: "stdout" | "stderr",
+    lines: string[],
+  ): void {
+    if (managed.watches.length === 0 || lines.length === 0) return;
+
+    for (const line of lines) {
+      for (const watch of managed.watches) {
+        if (!watch.repeat && watch.fired) continue;
+        if (watch.stream !== "both" && watch.stream !== source) continue;
+
+        if (!watch.regex.test(line)) continue;
+
+        watch.fired = true;
+
+        this.emit({
+          type: "process_watch_matched",
+          match: {
+            processId: managed.id,
+            processName: managed.name,
+            processCommand: managed.command,
+            source,
+            line,
+            watch: {
+              index: watch.index,
+              pattern: watch.pattern,
+              stream: watch.stream,
+              repeat: watch.repeat,
+            },
+          },
+        });
+      }
     }
   }
 

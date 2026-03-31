@@ -5,6 +5,7 @@ import { setupBackgroundBlocker } from "./background-blocker";
 import { setupCleanupHook } from "./cleanup";
 import { setupMessageRenderer } from "./message-renderer";
 import { setupProcessEndHook } from "./process-end";
+import { setupProcessWatchHook } from "./process-watch";
 import { type DockActions, setupProcessWidget } from "./widget";
 
 export type { DockActions };
@@ -16,6 +17,7 @@ export function setupProcessesHooks(
 ): { update: () => void; dockActions: DockActions } {
   setupCleanupHook(pi, manager);
   setupProcessEndHook(pi, manager);
+  setupProcessWatchHook(pi, manager);
 
   if (config.interception.blockBackgroundCommands) {
     setupBackgroundBlocker(pi);

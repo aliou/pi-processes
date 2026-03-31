@@ -195,3 +195,137 @@ describe("process_output_changed", () => {
     expect(ids.has(info2.id)).toBe(true);
   });
 });
+
+describe("process_watch_matched", () => {
+  let manager: ProcessManager;
+
+  afterEach(() => {
+    manager.cleanup();
+  });
+
+  it("fires once by default on first matching line", async () => {
+    manager = new ProcessManager();
+    const events = collectEvents(manager);
+
+    const info = manager.start(
+      "watch-once",
+      "bash -c 'echo ready; echo ready; echo ready'",
+      "/tmp",
+      {
+        logWatches: [{ pattern: "ready" }],
+      },
+    );
+
+    await waitForEnd(manager, info.id);
+
+    const matches = events.filter((e) => e.type === "process_watch_matched");
+    expect(matches).toHaveLength(1);
+
+    const first = matches[0];
+    if (first.type === "process_watch_matched") {
+      expect(first.match.processId).toBe(info.id);
+      expect(first.match.source).toBe("stdout");
+      expect(first.match.watch.repeat).toBe(false);
+      expect(first.match.line).toBe("ready");
+    }
+  });
+
+  it("supports repeat watches", async () => {
+    manager = new ProcessManager();
+    const events = collectEvents(manager);
+
+    const info = manager.start(
+      "watch-repeat",
+      "bash -c 'echo done; echo done; echo done'",
+      "/tmp",
+      {
+        logWatches: [{ pattern: "done", repeat: true }],
+      },
+    );
+
+    await waitForEnd(manager, info.id);
+
+    const matches = events.filter((e) => e.type === "process_watch_matched");
+    expect(matches).toHaveLength(3);
+  });
+
+  it("respects stream scoping", async () => {
+    manager = new ProcessManager();
+    const events = collectEvents(manager);
+
+    const info = manager.start(
+      "watch-stream",
+      "bash -c 'echo out; echo err >&2'",
+      "/tmp",
+      {
+        logWatches: [{ pattern: "err", stream: "stderr" }],
+      },
+    );
+
+    await waitForEnd(manager, info.id);
+
+    const matches = events.filter((e) => e.type === "process_watch_matched");
+    expect(matches).toHaveLength(1);
+
+    const match = matches[0];
+    if (match.type === "process_watch_matched") {
+      expect(match.match.source).toBe("stderr");
+      expect(match.match.line).toBe("err");
+    }
+  });
+
+  it("stream both matches stdout and stderr", async () => {
+    manager = new ProcessManager();
+    const events = collectEvents(manager);
+
+    const info = manager.start(
+      "watch-both",
+      "bash -c 'echo marker; echo marker >&2'",
+      "/tmp",
+      {
+        logWatches: [{ pattern: "marker", stream: "both", repeat: true }],
+      },
+    );
+
+    await waitForEnd(manager, info.id);
+
+    const matches = events.filter((e) => e.type === "process_watch_matched");
+    expect(matches).toHaveLength(2);
+
+    const sources = new Set(
+      matches
+        .filter(
+          (e): e is Extract<ManagerEvent, { type: "process_watch_matched" }> =>
+            e.type === "process_watch_matched",
+        )
+        .map((e) => e.match.source),
+    );
+
+    expect(sources.has("stdout")).toBe(true);
+    expect(sources.has("stderr")).toBe(true);
+  });
+
+  it("matches trailing partial line at process end", async () => {
+    manager = new ProcessManager();
+    const events = collectEvents(manager);
+
+    const info = manager.start("watch-trailing", "printf ready", "/tmp", {
+      logWatches: [{ pattern: "ready" }],
+    });
+
+    await waitForEnd(manager, info.id);
+
+    const matches = events.filter((e) => e.type === "process_watch_matched");
+    expect(matches).toHaveLength(1);
+  });
+
+  it("throws for invalid watch regex", () => {
+    manager = new ProcessManager();
+
+    expect(() =>
+      manager.start("bad-watch", "echo ok", "/tmp", {
+        logWatches: [{ pattern: "(" }],
+      }),
+    ).toThrowError(/Invalid log watch pattern/);
+  });
+});

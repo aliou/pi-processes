@@ -114,6 +114,55 @@ Available settings include:
 - Linux: supported
 - Windows: not supported
 
+## Runtime log watch alerts
+
+Use `process` tool `start` with `logWatches` to trigger immediate alerts while the process is still running.
+
+- default behavior: each watch fires once (`repeat: false`)
+- set `repeat: true` to trigger on every match
+- scope by stream (`stdout`, `stderr`, `both`) to reduce noise
+
+Example: server ready marker (one-time default)
+
+```json
+{
+  "action": "start",
+  "name": "dev-server",
+  "command": "pnpm dev",
+  "logWatches": [
+    { "pattern": "ready on http://localhost:3000" }
+  ]
+}
+```
+
+Example: error marker from stderr
+
+```json
+{
+  "action": "start",
+  "name": "builder",
+  "command": "pnpm build --watch",
+  "logWatches": [
+    { "pattern": "TypeError|ReferenceError", "stream": "stderr" }
+  ]
+}
+```
+
+Example: repeatable watch on stdout only
+
+```json
+{
+  "action": "start",
+  "name": "worker",
+  "command": "pnpm worker",
+  "logWatches": [
+    { "pattern": "job completed", "stream": "stdout", "repeat": true }
+  ]
+}
+```
+
+Invalid regex patterns fail fast at process start with a clear error.
+
 ## Troubleshooting
 
 ### Pi started something and I want to see more output

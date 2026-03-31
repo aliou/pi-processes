@@ -6,7 +6,8 @@ import type {
 import { Text } from "@mariozechner/pi-tui";
 import { MESSAGE_TYPE_PROCESS_UPDATE } from "../constants";
 
-interface ProcessUpdateDetails {
+interface ProcessLifecycleDetails {
+  kind?: "lifecycle";
   processId: string;
   processName: string;
   command: string;
@@ -16,10 +17,25 @@ interface ProcessUpdateDetails {
   runtime: string;
 }
 
+interface ProcessWatchMatchDetails {
+  kind: "watch_matched";
+  processId: string;
+  processName: string;
+  command: string;
+  source: "stdout" | "stderr";
+  line: string;
+  watch: {
+    index: number;
+    pattern: string;
+    stream: "stdout" | "stderr" | "both";
+    repeat: boolean;
+  };
+}
+
 interface ProcessUpdateMessage {
   customType: string;
   content: string | Array<{ type: string; text?: string }>;
-  details?: ProcessUpdateDetails;
+  details?: ProcessLifecycleDetails | ProcessWatchMatchDetails;
 }
 
 function getContentText(
@@ -35,7 +51,9 @@ function getContentText(
 }
 
 export function setupMessageRenderer(pi: ExtensionAPI) {
-  pi.registerMessageRenderer<ProcessUpdateDetails>(
+  pi.registerMessageRenderer<
+    ProcessLifecycleDetails | ProcessWatchMatchDetails
+  >(
     MESSAGE_TYPE_PROCESS_UPDATE,
     (
       message: ProcessUpdateMessage,
@@ -46,6 +64,20 @@ export function setupMessageRenderer(pi: ExtensionAPI) {
 
       if (!details) {
         return new Text(getContentText(message.content), 0, 0);
+      }
+
+      if (details.kind === "watch_matched") {
+        const streamColor = details.source === "stderr" ? "warning" : "accent";
+        const text =
+          theme.fg("success", "* ") +
+          theme.fg("accent", `"${details.processName}"`) +
+          theme.fg("muted", ` (${details.processId}) `) +
+          theme.fg("success", "watch matched ") +
+          theme.fg("muted", `/${details.watch.pattern}/ `) +
+          theme.fg(streamColor, `[${details.source}]`) +
+          theme.fg("muted", ` ${details.line}`);
+
+        return new Text(text, 0, 0);
       }
 
       let icon: string;

@@ -26,10 +26,12 @@ ProcessManager is the only source of events. Everything else reacts to it.
 ```
 ProcessManager.emit()
   │
-  ├─ "process_started"      → fired once when a child process is spawned
-  ├─ "process_ended"        → fired once when a child process exits or is killed
-  └─ "processes_changed"    → fired when the list changes for any other reason
-                              (currently: after clear())
+  ├─ "process_started"        → fired once when a child process is spawned
+  ├─ "process_output_changed" → fired on output changes (throttled)
+  ├─ "process_watch_matched"  → fired when a log watch pattern matches while running
+  ├─ "process_ended"          → fired once when a child process exits or is killed
+  └─ "processes_changed"      → fired when the list changes for any other reason
+                                (currently: after clear())
 ```
 
 Subscribers (registered at boot, never removed):
@@ -51,6 +53,9 @@ LLM calls process(action: "start", name, command, ...)
           → emits "process_started"
               → widget.ts: dockState.autoShow()   [hidden→collapsed if followEnabled]
               → widget.ts: updateWidget()          [re-renders status widget + dock]
+          → while running, output is scanned against optional logWatches
+              → emits "process_watch_matched" for each match
+              → process-watch hook sends visible message + triggerTurn: true
 
 LLM calls process(action: "list")
   → executeList()

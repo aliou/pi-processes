@@ -1,6 +1,9 @@
 export type {
   ExecuteResult,
   KillResult,
+  LogWatch,
+  LogWatchMatchEvent,
+  LogWatchStream,
   ManagerEvent,
   ProcessesDetails,
   ProcessInfo,

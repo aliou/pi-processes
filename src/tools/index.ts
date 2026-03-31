@@ -15,10 +15,19 @@ import { executeAction } from "./actions";
 
 const ProcessesParams = Type.Object({
   action: StringEnum(
-    ["start", "list", "output", "logs", "kill", "clear", "write"] as const,
+    [
+      "start",
+      "list",
+      "output",
+      "logs",
+      "kill",
+      "clear",
+      "write",
+      "debug_preview",
+    ] as const,
     {
       description:
-        "Action: start (run command), list (show all), output (get recent output), logs (get log file paths), kill (terminate), clear (remove finished), write (write to stdin)",
+        "Action: start (run command), list (show all), output (get recent output), logs (get log file paths), kill (terminate), clear (remove finished), write (write to stdin), debug_preview (temporary UI preview, no side effects)",
     },
   ),
   command: Type.Optional(
@@ -65,6 +74,37 @@ const ProcessesParams = Type.Object({
         "Get a turn to react when process is killed by external signal (default: false). Note: killing via tool never triggers a turn.",
     }),
   ),
+  preview: Type.Optional(
+    StringEnum(["start", "list", "output", "logs", "error"] as const, {
+      description:
+        "For action=debug_preview only: which rendered result variant to preview (default: start)",
+    }),
+  ),
+  logWatches: Type.Optional(
+    Type.Array(
+      Type.Object(
+        {
+          pattern: Type.String({
+            description:
+              "Regular expression pattern to match against process output lines",
+          }),
+          stream: Type.Optional(
+            StringEnum(["stdout", "stderr", "both"] as const, {
+              description:
+                "Which stream to watch (default: both). Use stdout/stderr to reduce noise.",
+            }),
+          ),
+          repeat: Type.Optional(
+            Type.Boolean({
+              description:
+                "Trigger every time this pattern matches (default: false, one-time)",
+            }),
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+  ),
 });
 
 type ProcessesParamsType = Static<typeof ProcessesParams>;
@@ -78,12 +118,18 @@ export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
   - alertOnSuccess (default: false): Get a turn to react when process completes successfully
   - alertOnFailure (default: true): Get a turn to react when process crashes/fails
   - alertOnKill (default: false): Get a turn to react if killed by external signal (killing via tool never triggers a turn)
+  - logWatches (optional): Runtime output watches that trigger immediate alerts while running
+    - pattern: regex string to match per output line
+    - stream: stdout | stderr | both (default both)
+    - repeat: false by default (single-fire). Set true for repeat alerts
 - list: Show all managed processes with their IDs and names
 - output: Get recent stdout/stderr (requires 'id')
 - logs: Get log file paths to inspect with read tool (requires 'id')
 - kill: Terminate a process (requires 'id')
 - clear: Remove all finished processes from the list
 - write: Write to process stdin (requires 'id' and 'input', optional 'end' to close stdin)
+- debug_preview: Temporary renderer preview for process tool UIs (no process side effects)
+  - preview: start | list | output | logs | error (default: start)
 
 Important: You DON'T need to poll or wait for processes. Notifications arrive automatically based on your preferences. Start processes and continue with other work - you'll be informed if something requires attention.
 
@@ -122,6 +168,13 @@ Note: User always sees process updates in the UI. The notify flags control wheth
             longArgs.push({ label: "command", value: args.command });
           }
         }
+
+        if (args.logWatches && args.logWatches.length > 0) {
+          optionArgs.push({
+            label: "watches",
+            value: String(args.logWatches.length),
+          });
+        }
       }
 
       if (
@@ -132,6 +185,10 @@ Note: User always sees process updates in the UI. The notify flags control wheth
         args.id
       ) {
         mainArg = args.id;
+      }
+
+      if (args.action === "debug_preview" && args.preview) {
+        mainArg = args.preview;
       }
 
       if (args.action === "write" && args.input) {

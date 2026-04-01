@@ -1,4 +1,4 @@
-import { ToolBody } from "@aliou/pi-utils-ui";
+import { ToolBody, ToolFooter } from "@aliou/pi-utils-ui";
 import type {
   AgentToolResult,
   Theme,
@@ -160,5 +160,29 @@ export function renderListResult(
     showCollapsed: true,
   });
 
-  return new ToolBody({ fields }, options, theme);
+  const footerItems: Array<{
+    label: string;
+    value: string;
+  }> = [];
+  if (runningCount > 0) {
+    footerItems.push({ label: "running", value: String(runningCount) });
+  }
+  if (failed > 0) {
+    footerItems.push({ label: "failed", value: String(failed) });
+  }
+  if (killed > 0) {
+    footerItems.push({ label: "killed", value: String(killed) });
+  }
+
+  return new ToolBody(
+    {
+      fields,
+      footer:
+        footerItems.length > 0
+          ? new ToolFooter(theme, { items: footerItems, separator: " | " })
+          : undefined,
+    },
+    options,
+    theme,
+  );
 }

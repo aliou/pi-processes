@@ -165,19 +165,20 @@ Note: User always sees process updates in the UI. The notify flags control wheth
       options: ToolRenderResultOptions,
       theme: Theme,
     ) {
+      if (options.isPartial) {
+        return new Text(theme.fg("muted", "Process: running..."), 0, 0);
+      }
+
       const { details } = result;
 
-      if (!details) {
-        const message = result.content
-          .map((part) =>
-            part.type === "text" && "text" in part && part.text
-              ? part.text
-              : "",
-          )
-          .join("\n")
-          .trim();
-
-        return new Text(message || "Tool execution failed", 0, 0);
+      // Framework sets details to {} when tool throws.
+      // Detect by checking for missing expected fields.
+      if (!details?.action) {
+        const textBlock = result.content.find((c) => c.type === "text");
+        const errorMsg =
+          (textBlock?.type === "text" && textBlock.text) ||
+          "Tool execution failed";
+        return new Text(theme.fg("error", errorMsg), 0, 0);
       }
 
       if (!details.success) {

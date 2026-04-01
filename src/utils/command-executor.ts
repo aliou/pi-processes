@@ -1,3 +1,6 @@
+// Uses node:child_process directly instead of pi.exec() because process
+// management requires long-lived streaming processes with stdin/stdout piping
+// and detached process groups, which pi.exec() does not support.
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";

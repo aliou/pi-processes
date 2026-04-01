@@ -1,4 +1,4 @@
-import { ToolBody } from "@aliou/pi-utils-ui";
+import { ToolBody, ToolCallHeader } from "@aliou/pi-utils-ui";
 import type {
   AgentToolResult,
   ExtensionContext,
@@ -97,12 +97,11 @@ export function renderActionCall(
       return renderWriteCall(args, theme);
     case "debug_preview":
       return renderDebugCall(args, theme);
-    case "list":
-    case "clear":
-      // No custom renderCall for these actions
-      return undefined;
     default:
-      return undefined;
+      return new ToolCallHeader(
+        { toolName: "Process", action: args.action },
+        theme,
+      );
   }
 }
 

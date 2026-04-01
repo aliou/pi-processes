@@ -1,12 +1,131 @@
+import { ToolBody, ToolCallHeader } from "@aliou/pi-utils-ui";
+import type {
+  AgentToolResult,
+  Theme,
+  ToolRenderResultOptions,
+} from "@mariozechner/pi-coding-agent";
+import { Text } from "@mariozechner/pi-tui";
 import { configLoader } from "../../config";
-import type { ExecuteResult } from "../../constants";
+import type { ExecuteResult, ProcessesDetails } from "../../constants";
 import type { ProcessManager } from "../../manager";
-import { formatStatus, stripAnsi } from "../../utils";
+import { formatStatus, hasAnsi, stripAnsi } from "../../utils";
 
 const MAX_BYTES = 50 * 1024; // 50KB
 
 interface OutputParams {
   id?: string;
+}
+
+export function renderOutputCall(
+  args: OutputParams,
+  theme: Theme,
+): ToolCallHeader {
+  return new ToolCallHeader(
+    {
+      toolName: "Process",
+      action: "output",
+      mainArg: args.id,
+    },
+    theme,
+  );
+}
+
+export function renderOutputResult(
+  result: AgentToolResult<ProcessesDetails>,
+  options: ToolRenderResultOptions,
+  theme: Theme,
+): ToolBody {
+  const { details } = result;
+
+  if (!details.output) {
+    return new ToolBody(
+      {
+        fields: [
+          {
+            label: "Error",
+            value: "Missing output details",
+            showCollapsed: true,
+          },
+        ],
+      },
+      options,
+      theme,
+    );
+  }
+
+  const lines: string[] = [theme.fg("muted", details.message)];
+  let hadAnsi = false;
+
+  if (details.output.stdout.length > 0) {
+    lines.push("", theme.fg("accent", "stdout:"));
+    for (const line of details.output.stdout.slice(-20)) {
+      if (!hadAnsi && hasAnsi(line)) hadAnsi = true;
+      lines.push(stripAnsi(line));
+    }
+    if (details.output.stdout.length > 20) {
+      lines.push(
+        theme.fg(
+          "muted",
+          `... (${details.output.stdout.length - 20} more lines)`,
+        ),
+      );
+    }
+  }
+
+  if (details.output.stderr.length > 0) {
+    lines.push("", theme.fg("warning", "stderr:"));
+    for (const line of details.output.stderr.slice(-10)) {
+      if (!hadAnsi && hasAnsi(line)) hadAnsi = true;
+      lines.push(theme.fg("warning", stripAnsi(line)));
+    }
+    if (details.output.stderr.length > 10) {
+      lines.push(
+        theme.fg(
+          "muted",
+          `... (${details.output.stderr.length - 10} more lines)`,
+        ),
+      );
+    }
+  }
+
+  if (details.logFiles) {
+    lines.push(
+      "",
+      theme.fg("success", "Log files:"),
+      `  stdout: ${theme.fg("accent", details.logFiles.stdoutFile)}`,
+      `  stderr: ${theme.fg("accent", details.logFiles.stderrFile)}`,
+    );
+  }
+
+  if (hadAnsi) {
+    lines.push(
+      "",
+      theme.fg("muted", "ANSI escape codes were stripped from output"),
+    );
+  }
+
+  const fields: Array<
+    { label: string; value: string; showCollapsed?: boolean } | Text
+  > = [new Text(lines.join("\n"), 0, 0)];
+
+  // Collapsed summary
+  const previewSource =
+    details.output.stdout.length > 0
+      ? details.output.stdout
+      : details.output.stderr;
+  const preview = previewSource
+    .slice(-2)
+    .map((l) => stripAnsi(l))
+    .join("\n");
+  fields.push({
+    label: "Output",
+    value: preview
+      ? `${theme.fg("muted", preview)}`
+      : theme.fg("muted", "(empty)"),
+    showCollapsed: true,
+  });
+
+  return new ToolBody({ fields }, options, theme);
 }
 
 export function executeOutput(

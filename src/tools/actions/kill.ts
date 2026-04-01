@@ -1,8 +1,21 @@
+import { ToolCallHeader } from "@aliou/pi-utils-ui";
+import type { Theme } from "@mariozechner/pi-coding-agent";
 import type { ExecuteResult } from "../../constants";
 import type { ProcessManager } from "../../manager";
 
 interface KillParams {
   id?: string;
+}
+
+export function renderKillCall(args: KillParams, theme: Theme): ToolCallHeader {
+  return new ToolCallHeader(
+    {
+      toolName: "Process",
+      action: "kill",
+      mainArg: args.id,
+    },
+    theme,
+  );
 }
 
 export async function executeKill(

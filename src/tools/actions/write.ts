@@ -1,3 +1,5 @@
+import { ToolCallHeader } from "@aliou/pi-utils-ui";
+import type { Theme } from "@mariozechner/pi-coding-agent";
 import type { ExecuteResult } from "../../constants";
 import type { ProcessManager } from "../../manager";
 
@@ -5,6 +7,30 @@ interface WriteParams {
   id?: string;
   input?: string;
   end?: boolean;
+}
+
+export function renderWriteCall(
+  args: WriteParams,
+  theme: Theme,
+): ToolCallHeader {
+  const optionArgs: Array<{ label: string; value: string }> = [];
+
+  if (args.input) {
+    optionArgs.push({ label: "input", value: args.input });
+    if (args.end) {
+      optionArgs.push({ label: "end", value: "true" });
+    }
+  }
+
+  return new ToolCallHeader(
+    {
+      toolName: "Process",
+      action: "write",
+      mainArg: args.id,
+      optionArgs,
+    },
+    theme,
+  );
 }
 
 export function executeWrite(

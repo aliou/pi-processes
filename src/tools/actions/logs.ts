@@ -1,8 +1,66 @@
-import type { ExecuteResult } from "../../constants";
+import { ToolBody, ToolCallHeader } from "@aliou/pi-utils-ui";
+import type {
+  AgentToolResult,
+  Theme,
+  ToolRenderResultOptions,
+} from "@mariozechner/pi-coding-agent";
+import { Text } from "@mariozechner/pi-tui";
+import type { ExecuteResult, ProcessesDetails } from "../../constants";
 import type { ProcessManager } from "../../manager";
 
 interface LogsParams {
   id?: string;
+}
+
+export function renderLogsCall(args: LogsParams, theme: Theme): ToolCallHeader {
+  return new ToolCallHeader(
+    {
+      toolName: "Process",
+      action: "logs",
+      mainArg: args.id,
+    },
+    theme,
+  );
+}
+
+export function renderLogsResult(
+  result: AgentToolResult<ProcessesDetails>,
+  options: ToolRenderResultOptions,
+  theme: Theme,
+): ToolBody {
+  const { details } = result;
+
+  if (!details.logFiles) {
+    return new ToolBody(
+      {
+        fields: [
+          {
+            label: "Error",
+            value: "Missing log file details",
+            showCollapsed: true,
+          },
+        ],
+      },
+      options,
+      theme,
+    );
+  }
+
+  const fields: Array<
+    { label: string; value: string; showCollapsed?: boolean } | Text
+  > = [
+    new Text(
+      [
+        theme.fg("success", "Log files:"),
+        `  stdout: ${theme.fg("accent", details.logFiles.stdoutFile)}`,
+        `  stderr: ${theme.fg("accent", details.logFiles.stderrFile)}`,
+      ].join("\n"),
+      0,
+      0,
+    ),
+  ];
+
+  return new ToolBody({ fields }, options, theme);
 }
 
 export function executeLogs(

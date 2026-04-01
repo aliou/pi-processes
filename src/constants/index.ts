@@ -5,6 +5,7 @@ export type {
   LogWatchMatchEvent,
   LogWatchStream,
   ManagerEvent,
+  ProcessAction,
   ProcessesDetails,
   ProcessInfo,
   ProcessStatus,

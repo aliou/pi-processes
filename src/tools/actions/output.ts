@@ -79,6 +79,12 @@ export function executeOutput(
       success: true,
       message,
       output,
+      logFiles: logFiles
+        ? {
+            stdoutFile: logFiles.stdoutFile,
+            stderrFile: logFiles.stderrFile,
+          }
+        : undefined,
     },
   };
 }

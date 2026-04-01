@@ -16,6 +16,11 @@ During UI tests that require processes to be running, either give the user a pro
 
 - `pnpm typecheck`, `pnpm lint`, `pnpm format`, `pnpm changeset`
 
+## Debug flags
+
+- `PI_PROCESSES_DEBUG_PREVIEW=1` enables the temporary `process` tool action `debug_preview` for local renderer/UI preview work.
+- Keep this flag off in normal use and user-facing examples.
+
 ## Structure
 
 - `src/index.ts` - entry, `src/manager.ts` - process manager, `src/config.ts` - config loader, `src/constants/` - types/constants, `src/commands/` - slash commands + settings, `src/tools/` - tool/actions, `src/hooks/` - event hooks, `src/components/` - TUI, `src/utils/` - helpers, `src/test/` - test scripts

@@ -1,6 +1,16 @@
 // Custom message type for process update notifications
 export const MESSAGE_TYPE_PROCESS_UPDATE = "ad-process:update";
 
+export type ProcessAction =
+  | "start"
+  | "list"
+  | "output"
+  | "logs"
+  | "kill"
+  | "clear"
+  | "write"
+  | "debug_preview";
+
 export type ProcessStatus =
   | "running"
   | "terminating"
@@ -80,7 +90,7 @@ export interface StartOptions {
 }
 
 export interface ProcessesDetails {
-  action: string;
+  action: ProcessAction;
   success: boolean;
   message: string;
   process?: ProcessInfo;

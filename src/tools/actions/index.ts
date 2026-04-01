@@ -1,19 +1,30 @@
-import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
-import type { ExecuteResult } from "../../constants";
+import { ToolBody } from "@aliou/pi-utils-ui";
+import type {
+  AgentToolResult,
+  ExtensionContext,
+  Theme,
+  ToolRenderResultOptions,
+} from "@mariozechner/pi-coding-agent";
+import type { Component } from "@mariozechner/pi-tui";
+import type {
+  ExecuteResult,
+  ProcessAction,
+  ProcessesDetails,
+} from "../../constants";
 import type { ProcessManager } from "../../manager";
 import { executeClear } from "./clear";
-import { executeDebugPreview } from "./debug";
-import { executeKill } from "./kill";
-import { executeList } from "./list";
-import { executeLogs } from "./logs";
-import { executeOutput } from "./output";
-import { executeStart } from "./start";
-import { executeWrite } from "./write";
+import { executeDebugPreview, renderDebugCall } from "./debug";
+import { executeKill, renderKillCall } from "./kill";
+import { executeList, renderListResult } from "./list";
+import { executeLogs, renderLogsCall, renderLogsResult } from "./logs";
+import { executeOutput, renderOutputCall, renderOutputResult } from "./output";
+import { executeStart, renderStartCall, renderStartResult } from "./start";
+import { executeWrite, renderWriteCall } from "./write";
 
 const DEBUG_PREVIEW_ENABLED = process.env.PI_PROCESSES_DEBUG_PREVIEW === "1";
 
 interface ActionParams {
-  action: string;
+  action: ProcessAction | string;
   command?: string;
   name?: string;
   id?: string;
@@ -61,10 +72,79 @@ export async function executeAction(
       return {
         content: [{ type: "text", text: `Unknown action: ${params.action}` }],
         details: {
-          action: params.action,
+          action: params.action as ProcessAction,
           success: false,
           message: `Unknown action: ${params.action}`,
         },
       };
+  }
+}
+
+export function renderActionCall(
+  args: ActionParams,
+  theme: Theme,
+): Component | undefined {
+  switch (args.action) {
+    case "start":
+      return renderStartCall(args, theme);
+    case "output":
+      return renderOutputCall(args, theme);
+    case "logs":
+      return renderLogsCall(args, theme);
+    case "kill":
+      return renderKillCall(args, theme);
+    case "write":
+      return renderWriteCall(args, theme);
+    case "debug_preview":
+      return renderDebugCall(args, theme);
+    case "list":
+    case "clear":
+      // No custom renderCall for these actions
+      return undefined;
+    default:
+      return undefined;
+  }
+}
+
+export function renderActionResult(
+  result: AgentToolResult<ProcessesDetails>,
+  options: ToolRenderResultOptions,
+  theme: Theme,
+): Component | undefined {
+  const { details } = result;
+
+  if (!details) {
+    return undefined;
+  }
+
+  switch (details.action) {
+    case "start":
+      return renderStartResult(result, options, theme);
+    case "list":
+      return renderListResult(result, options, theme);
+    case "output":
+      return renderOutputResult(result, options, theme);
+    case "logs":
+      return renderLogsResult(result, options, theme);
+    case "kill":
+    case "write":
+    case "clear":
+    case "debug_preview":
+      // Default rendering for these actions
+      return new ToolBody(
+        {
+          fields: [
+            {
+              label: "Result",
+              value: details.message,
+              showCollapsed: true,
+            },
+          ],
+        },
+        options,
+        theme,
+      );
+    default:
+      return undefined;
   }
 }

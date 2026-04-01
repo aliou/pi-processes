@@ -1,7 +1,23 @@
+import { ToolCallHeader } from "@aliou/pi-utils-ui";
+import type { Theme } from "@mariozechner/pi-coding-agent";
 import type { ExecuteResult, ProcessInfo } from "../../constants";
 
 interface DebugParams {
   preview?: "start" | "list" | "output" | "logs" | "error";
+}
+
+export function renderDebugCall(
+  args: DebugParams,
+  theme: Theme,
+): ToolCallHeader {
+  return new ToolCallHeader(
+    {
+      toolName: "Process",
+      action: "debug_preview",
+      mainArg: args.preview,
+    },
+    theme,
+  );
 }
 
 function mockProcess(overrides?: Partial<ProcessInfo>): ProcessInfo {

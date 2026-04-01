@@ -80,7 +80,12 @@ export function executeStart(
     };
   }
 
-  const message = `Started "${proc.name}" (${proc.id}, PID: ${proc.pid})\nLogs: ${proc.stdoutFile}`;
+  const message = [
+    `Started "${proc.name}" (${proc.id}, PID: ${proc.pid})`,
+    "Log files:",
+    `  stdout: ${proc.stdoutFile}`,
+    `  stderr: ${proc.stderrFile}`,
+  ].join("\n");
   return {
     content: [{ type: "text", text: message }],
     details: {

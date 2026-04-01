@@ -35,7 +35,12 @@ export function executeDebugPreview(params: DebugParams): ExecuteResult {
 
   if (preview === "start") {
     const process = mockProcess();
-    const message = `Started "${process.name}" (${process.id}, PID: ${process.pid})\nLogs: ${process.stdoutFile}`;
+    const message = [
+      `Started "${process.name}" (${process.id}, PID: ${process.pid})`,
+      "Log files:",
+      `  stdout: ${process.stdoutFile}`,
+      `  stderr: ${process.stderrFile}`,
+    ].join("\n");
     return {
       content: [{ type: "text", text: message }],
       details: {
@@ -100,6 +105,10 @@ export function executeDebugPreview(params: DebugParams): ExecuteResult {
             "error: simulated stack trace line",
           ],
         },
+        logFiles: {
+          stdoutFile: "/tmp/pi-processes-demo/proc_42-stdout.log",
+          stderrFile: "/tmp/pi-processes-demo/proc_42-stderr.log",
+        },
       },
     };
   }
@@ -119,12 +128,5 @@ export function executeDebugPreview(params: DebugParams): ExecuteResult {
     };
   }
 
-  return {
-    content: [{ type: "text", text: "Debug preview: forced error" }],
-    details: {
-      action: "start",
-      success: false,
-      message: "Invalid logWatches[0].pattern: Unterminated group",
-    },
-  };
+  throw new Error("Invalid logWatches[0].pattern: Unterminated group");
 }

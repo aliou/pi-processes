@@ -10,6 +10,8 @@ import { executeOutput } from "./output";
 import { executeStart } from "./start";
 import { executeWrite } from "./write";
 
+const DEBUG_PREVIEW_ENABLED = process.env.PI_PROCESSES_DEBUG_PREVIEW === "1";
+
 interface ActionParams {
   action: string;
   command?: string;
@@ -49,6 +51,11 @@ export async function executeAction(
     case "write":
       return executeWrite(params, manager);
     case "debug_preview":
+      if (!DEBUG_PREVIEW_ENABLED) {
+        throw new Error(
+          "Action 'debug_preview' is disabled. Set PI_PROCESSES_DEBUG_PREVIEW=1 to enable.",
+        );
+      }
       return executeDebugPreview(params);
     default:
       return {

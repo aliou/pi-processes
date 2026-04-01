@@ -1,4 +1,4 @@
-import { ToolBody, ToolCallHeader, ToolFooter } from "@aliou/pi-utils-ui";
+import { ToolBody, ToolCallHeader } from "@aliou/pi-utils-ui";
 import { StringEnum } from "@mariozechner/pi-ai";
 import type {
   AgentToolResult,
@@ -10,26 +10,28 @@ import { Text } from "@mariozechner/pi-tui";
 import { type Static, Type } from "@sinclair/typebox";
 import type { ProcessesDetails } from "../constants";
 import type { ProcessManager } from "../manager";
-import { formatRuntime, hasAnsi, stripAnsi, truncateCmd } from "../utils";
+import { formatRuntime, hasAnsi, stripAnsi } from "../utils";
 import { executeAction } from "./actions";
 
+const DEBUG_PREVIEW_ENABLED = process.env.PI_PROCESSES_DEBUG_PREVIEW === "1";
+
+const PROCESS_ACTIONS = [
+  "start",
+  "list",
+  "output",
+  "logs",
+  "kill",
+  "clear",
+  "write",
+  ...(DEBUG_PREVIEW_ENABLED ? (["debug_preview"] as const) : []),
+] as const;
+
 const ProcessesParams = Type.Object({
-  action: StringEnum(
-    [
-      "start",
-      "list",
-      "output",
-      "logs",
-      "kill",
-      "clear",
-      "write",
-      "debug_preview",
-    ] as const,
-    {
-      description:
-        "Action: start (run command), list (show all), output (get recent output), logs (get log file paths), kill (terminate), clear (remove finished), write (write to stdin), debug_preview (temporary UI preview, no side effects)",
-    },
-  ),
+  action: StringEnum(PROCESS_ACTIONS, {
+    description: DEBUG_PREVIEW_ENABLED
+      ? "Action: start (run command), list (show all), output (get recent output), logs (get log file paths), kill (terminate), clear (remove finished), write (write to stdin), debug_preview (temporary UI preview, no side effects)"
+      : "Action: start (run command), list (show all), output (get recent output), logs (get log file paths), kill (terminate), clear (remove finished), write (write to stdin)",
+  }),
   command: Type.Optional(
     Type.String({ description: "Command to run (required for start)" }),
   ),
@@ -74,12 +76,16 @@ const ProcessesParams = Type.Object({
         "Get a turn to react when process is killed by external signal (default: false). Note: killing via tool never triggers a turn.",
     }),
   ),
-  preview: Type.Optional(
-    StringEnum(["start", "list", "output", "logs", "error"] as const, {
-      description:
-        "For action=debug_preview only: which rendered result variant to preview (default: start)",
-    }),
-  ),
+  ...(DEBUG_PREVIEW_ENABLED
+    ? {
+        preview: Type.Optional(
+          StringEnum(["start", "list", "output", "logs", "error"] as const, {
+            description:
+              "For action=debug_preview only: which rendered result variant to preview (default: start)",
+          }),
+        ),
+      }
+    : {}),
   logWatches: Type.Optional(
     Type.Array(
       Type.Object(
@@ -128,9 +134,11 @@ export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
 - kill: Terminate a process (requires 'id')
 - clear: Remove all finished processes from the list
 - write: Write to process stdin (requires 'id' and 'input', optional 'end' to close stdin)
-- debug_preview: Temporary renderer preview for process tool UIs (no process side effects)
-  - preview: start | list | output | logs | error (default: start)
-
+${
+  DEBUG_PREVIEW_ENABLED
+    ? "- debug_preview: Temporary renderer preview for process tool UIs (no process side effects)\n  - preview: start | list | output | logs | error (default: start)\n"
+    : ""
+}
 Important: You DON'T need to poll or wait for processes. Notifications arrive automatically based on your preferences. Start processes and continue with other work - you'll be informed if something requires attention.
 
 Note: User always sees process updates in the UI. The notify flags control whether YOU (the agent) get a turn to react (e.g. check results, fix code, restart).`,
@@ -218,17 +226,49 @@ Note: User always sees process updates in the UI. The notify flags control wheth
       const { details } = result;
 
       if (!details) {
-        const text = result.content[0];
-        return new Text(
-          text?.type === "text" && text.text ? text.text : "No result",
-          0,
-          0,
-        );
+        const message = result.content
+          .map((part) =>
+            part.type === "text" && "text" in part && part.text
+              ? part.text
+              : "",
+          )
+          .join("\n")
+          .trim();
+
+        return new Text(message || "Tool execution failed", 0, 0);
       }
 
       const fields: Array<
         { label: string; value: string; showCollapsed?: boolean } | Text
       > = [];
+
+      const formatTimestamp = (ts: number | null): string => {
+        if (!ts) return "-";
+        return new Date(ts).toISOString().replace("T", " ").slice(0, 19);
+      };
+
+      const formatStatusTag = (process: {
+        status: string;
+        success: boolean | null;
+        exitCode: number | null;
+      }): string => {
+        switch (process.status) {
+          case "running":
+            return theme.fg("accent", "running");
+          case "terminating":
+            return theme.fg("warning", "terminating");
+          case "terminate_timeout":
+            return theme.fg("error", "terminate_timeout");
+          case "killed":
+            return theme.fg("warning", "killed");
+          case "exited":
+            return process.success
+              ? theme.fg("success", "exit(0)")
+              : theme.fg("error", `exit(${process.exitCode ?? "?"})`);
+          default:
+            return theme.fg("muted", process.status);
+        }
+      };
 
       if (!details.success) {
         fields.push({
@@ -238,6 +278,24 @@ Note: User always sees process updates in the UI. The notify flags control wheth
         });
       } else if (details.action === "start" && details.process) {
         const process = details.process;
+
+        fields.push(
+          new Text(
+            [
+              theme.fg("success", "Started process"),
+              `  name: ${theme.fg("accent", process.name)}`,
+              `  command: ${process.command}`,
+              `  id: ${theme.fg("accent", process.id)}`,
+              `  pid: ${String(process.pid)}`,
+              "  Log files:",
+              `    - stdout: ${theme.fg("accent", process.stdoutFile)}`,
+              `    - stderr: ${theme.fg("accent", process.stderrFile)}`,
+            ].join("\n"),
+            0,
+            0,
+          ),
+        );
+
         fields.push({
           label: "Status",
           value:
@@ -281,6 +339,15 @@ Note: User always sees process updates in the UI. The notify flags control wheth
           }
         }
 
+        if (details.logFiles) {
+          lines.push(
+            "",
+            theme.fg("success", "Log files:"),
+            `  stdout: ${theme.fg("accent", details.logFiles.stdoutFile)}`,
+            `  stderr: ${theme.fg("accent", details.logFiles.stderrFile)}`,
+          );
+        }
+
         if (hadAnsi) {
           lines.push(
             "",
@@ -311,63 +378,92 @@ Note: User always sees process updates in the UI. The notify flags control wheth
         details.processes &&
         details.processes.length > 0
       ) {
+        const processes = [...details.processes];
+        const statusRank = (status: string): number => {
+          switch (status) {
+            case "running":
+              return 0;
+            case "terminating":
+              return 1;
+            case "terminate_timeout":
+              return 2;
+            case "killed":
+              return 3;
+            case "exited":
+              return 4;
+            default:
+              return 5;
+          }
+        };
+
+        processes.sort((a, b) => {
+          const rankDiff = statusRank(a.status) - statusRank(b.status);
+          if (rankDiff !== 0) return rankDiff;
+          return b.startTime - a.startTime;
+        });
+
+        const runningCount = processes.filter(
+          (p) => p.status === "running" || p.status === "terminating",
+        ).length;
+
         const lines: string[] = [
-          theme.fg("success", `${details.processes.length} process(es):`),
+          theme.fg(
+            "success",
+            `${processes.length} process(es), ${runningCount} running/terminating`,
+          ),
         ];
 
-        for (const process of details.processes) {
-          let status: string;
-          switch (process.status) {
-            case "running":
-              status = theme.fg("accent", "running");
-              break;
-            case "terminating":
-              status = theme.fg("warning", "terminating");
-              break;
-            case "terminate_timeout":
-              status = theme.fg("error", "terminate_timeout");
-              break;
-            case "killed":
-              status = theme.fg("warning", "killed");
-              break;
-            case "exited":
-              status = process.success
-                ? theme.fg("success", "exit(0)")
-                : theme.fg("error", `exit(${process.exitCode ?? "?"})`);
-              break;
-            default:
-              status = theme.fg("muted", process.status);
-          }
-
+        for (const process of processes) {
+          const status = formatStatusTag(process);
           lines.push(
-            `  ${theme.fg("accent", `"${process.name}"`)} ${theme.fg("muted", `(${process.id})`)}: ${truncateCmd(process.command)} [${status}] ${formatRuntime(process.startTime, process.endTime)}`,
+            [
+              `- ${theme.fg("accent", process.name)} ${theme.fg("muted", `(${process.id})`)}`,
+              `  pid: ${process.pid}   status: ${status}`,
+              `  started: ${theme.fg("muted", formatTimestamp(process.startTime))}`,
+              `  ended:   ${theme.fg("muted", formatTimestamp(process.endTime))}`,
+              `  runtime: ${theme.fg("muted", formatRuntime(process.startTime, process.endTime))}`,
+            ].join("\n"),
           );
         }
 
         fields.push(new Text(lines.join("\n"), 0, 0));
 
-        // Collapsed summary: first 3 processes
-        const summary = details.processes
-          .slice(0, 3)
-          .map((p) => {
-            const s =
-              p.status === "running"
-                ? theme.fg("accent", "running")
-                : p.status === "exited" && p.success
-                  ? theme.fg("success", "exit(0)")
-                  : p.status === "exited"
-                    ? theme.fg("error", `exit(${p.exitCode ?? "?"})`)
-                    : theme.fg("muted", p.status);
-            return `${theme.fg("accent", `"${p.name}"`)} [${s}]`;
-          })
-          .join(", ");
-        const more =
-          details.processes.length > 3
-            ? theme.fg("muted", ` +${details.processes.length - 3} more`)
+        const running = details.processes.filter(
+          (p) => p.status === "running" || p.status === "terminating",
+        );
+        const finishedOk = details.processes.filter(
+          (p) => p.status === "exited" && p.success,
+        ).length;
+        const failed = details.processes.filter(
+          (p) => p.status === "exited" && !p.success,
+        ).length;
+        const killed = details.processes.filter(
+          (p) => p.status === "killed",
+        ).length;
+
+        const runningSummary =
+          running.length > 0
+            ? running
+                .slice(0, 3)
+                .map(
+                  (p) =>
+                    `${theme.fg("accent", `"${p.name}"`)} [${formatStatusTag(p)}]`,
+                )
+                .join(", ")
+            : theme.fg("muted", "no running process");
+
+        const restParts: string[] = [];
+        if (finishedOk > 0) restParts.push(`${finishedOk} finished`);
+        if (failed > 0) restParts.push(`${failed} failed`);
+        if (killed > 0) restParts.push(`${killed} killed`);
+        const restSummary =
+          restParts.length > 0
+            ? theme.fg("muted", ` + ${restParts.join(", ")}`)
             : "";
+
         fields.push({
           label: "Processes",
-          value: summary + more,
+          value: runningSummary + restSummary,
           showCollapsed: true,
         });
       } else if (details.action === "logs" && details.logFiles) {
@@ -390,24 +486,7 @@ Note: User always sees process updates in the UI. The notify flags control wheth
         });
       }
 
-      const footerItems: Array<{
-        label: string;
-        value: string;
-        tone: "accent" | "success" | "error" | "warning" | "muted";
-      }> = [];
-      if (!details.success) {
-        footerItems.push({
-          label: "status",
-          value: "error",
-          tone: "error",
-        });
-      }
-      const footer =
-        footerItems.length > 0
-          ? new ToolFooter(theme, { items: footerItems })
-          : undefined;
-
-      return new ToolBody({ fields, footer }, options, theme);
+      return new ToolBody({ fields }, options, theme);
     },
   });
 }

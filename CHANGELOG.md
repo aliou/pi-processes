@@ -1,5 +1,20 @@
 # @aliou/pi-processes
 
+## 0.7.0
+
+### Minor Changes
+
+- 80f81ff: perf: replace polling timers with event-driven output rendering
+- a8965ad: Add runtime log watch alerts for managed processes.
+
+  - New `logWatches` option on `process` tool `start` action
+  - Watches match log lines on `stdout`, `stderr`, or `both`
+  - Default one-time behavior (`repeat: false`), with optional repeat mode
+  - On watch match, emit visible UI event and trigger an immediate agent turn
+  - Invalid watch config (including bad regex patterns) now fails fast at start time
+
+- 2f33586: Process lookup now uses exact ID matching only. Fuzzy name/command matching via `find()` has been removed. The `id` parameter in tool actions accepts only the process ID returned by `start` and `list`. The `/ps` list UI merges the ID and Name columns into a single "Process" column showing `name (id)`.
+
 ## 0.6.4
 
 ### Patch Changes

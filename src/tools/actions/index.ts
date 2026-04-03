@@ -80,10 +80,7 @@ export async function executeAction(
   }
 }
 
-export function renderActionCall(
-  args: ActionParams,
-  theme: Theme,
-): Component | undefined {
+export function renderActionCall(args: ActionParams, theme: Theme): Component {
   switch (args.action) {
     case "start":
       return renderStartCall(args, theme);
@@ -109,11 +106,23 @@ export function renderActionResult(
   result: AgentToolResult<ProcessesDetails>,
   options: ToolRenderResultOptions,
   theme: Theme,
-): Component | undefined {
+): Component {
   const { details } = result;
 
   if (!details) {
-    return undefined;
+    return new ToolBody(
+      {
+        fields: [
+          {
+            label: "Result",
+            value: "No result details available.",
+            showCollapsed: true,
+          },
+        ],
+      },
+      options,
+      theme,
+    );
   }
 
   switch (details.action) {
@@ -144,6 +153,18 @@ export function renderActionResult(
         theme,
       );
     default:
-      return undefined;
+      return new ToolBody(
+        {
+          fields: [
+            {
+              label: "Result",
+              value: details.message,
+              showCollapsed: true,
+            },
+          ],
+        },
+        options,
+        theme,
+      );
   }
 }

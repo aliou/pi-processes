@@ -156,7 +156,7 @@ Note: User always sees process updates in the UI. The notify flags control wheth
       return executeAction(params, manager, ctx);
     },
 
-    renderCall(args: ProcessesParamsType, theme: Theme) {
+    renderCall(args: ProcessesParamsType, theme: Theme, _context) {
       return renderActionCall(args, theme);
     },
 
@@ -164,6 +164,7 @@ Note: User always sees process updates in the UI. The notify flags control wheth
       result: AgentToolResult<ProcessesDetails>,
       options: ToolRenderResultOptions,
       theme: Theme,
+      _context,
     ) {
       if (options.isPartial) {
         return new Text(theme.fg("muted", "Process: running..."), 0, 0);

@@ -147,10 +147,6 @@ export function setupProcessWidget(
   });
 
   pi.on("session_start", async (_event, ctx) => {
-    latestContext = ctx;
-  });
-
-  pi.on("session_switch", async (_event, ctx) => {
     if (logDockComponent) {
       logDockComponent.dispose();
       logDockComponent = null;

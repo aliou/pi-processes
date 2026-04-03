@@ -1,5 +1,13 @@
 # @aliou/pi-processes
 
+## 0.7.1
+
+### Patch Changes
+
+- 36fd5c6: Update Pi packages to 0.65.0.
+
+  Migrate widget session lifecycle handling to current Pi session events, and align custom tool rendering with current Pi renderer requirements.
+
 ## 0.7.0
 
 ### Minor Changes

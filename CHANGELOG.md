@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.7.2
+
+### Patch Changes
+
+- e7cbf6b: Name tool explicitly in promptGuidelines so it makes sense in the global system prompt Guidelines section
+
 ## 0.7.1
 
 ### Patch Changes

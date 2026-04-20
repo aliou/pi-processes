@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.8.0
+
+### Minor Changes
+
+- da0de08: Remove @aliou/pi-evals devDependency
+
 ## 0.7.2
 
 ### Patch Changes

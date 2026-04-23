@@ -19,7 +19,7 @@ export function setupProcessWidget(
   manager: ProcessManager,
   config: ResolvedProcessesConfig,
 ) {
-  let latestContext: ExtensionContext | null = null;
+  let activeCtx: ExtensionContext | null = null;
   let logDockComponent: LogDockComponent | null = null;
   let logDockComponentTui: { requestRender(): void } | null = null;
 
@@ -30,30 +30,26 @@ export function setupProcessWidget(
   };
 
   function updateWidget() {
-    if (!latestContext?.hasUI) return;
+    if (!activeCtx?.hasUI) return;
 
     if (!configLoader.getConfig().widget.showStatusWidget) {
-      latestContext.ui.setWidget(STATUS_WIDGET_ID, undefined);
+      activeCtx.ui.setWidget(STATUS_WIDGET_ID, undefined);
     } else {
       const processes = manager.list();
       const maxWidth = process.stdout.columns || 120;
-      const lines = renderStatusWidget(
-        processes,
-        latestContext.ui.theme,
-        maxWidth,
-      );
+      const lines = renderStatusWidget(processes, activeCtx.ui.theme, maxWidth);
 
       if (lines.length === 0) {
-        latestContext.ui.setWidget(STATUS_WIDGET_ID, undefined);
+        activeCtx.ui.setWidget(STATUS_WIDGET_ID, undefined);
       } else {
-        latestContext.ui.setWidget(STATUS_WIDGET_ID, lines, {
+        activeCtx.ui.setWidget(STATUS_WIDGET_ID, lines, {
           placement: "belowEditor",
         });
       }
     }
 
     if (dockState.visibility === "hidden") {
-      latestContext.ui.setWidget(LOG_DOCK_WIDGET_ID, undefined);
+      activeCtx.ui.setWidget(LOG_DOCK_WIDGET_ID, undefined);
       if (logDockComponent) {
         logDockComponent.dispose();
         logDockComponent = null;
@@ -72,7 +68,7 @@ export function setupProcessWidget(
         dockHeight: height,
       });
     } else {
-      const ctx = latestContext;
+      const ctx = activeCtx;
       ctx.ui.setWidget(
         LOG_DOCK_WIDGET_ID,
         (tui: { requestRender(): void }, theme: typeof ctx.ui.theme) => {
@@ -152,8 +148,19 @@ export function setupProcessWidget(
       logDockComponent = null;
       logDockComponentTui = null;
     }
-    latestContext = ctx;
+    activeCtx = ctx;
     updateWidget();
+  });
+
+  pi.on("session_shutdown", async (_event, ctx) => {
+    activeCtx = null;
+    if (logDockComponent) {
+      logDockComponent.dispose();
+      logDockComponent = null;
+      logDockComponentTui = null;
+    }
+    ctx.ui.setWidget(STATUS_WIDGET_ID, undefined);
+    ctx.ui.setWidget(LOG_DOCK_WIDGET_ID, undefined);
   });
 
   return { update: updateWidget, dockActions };

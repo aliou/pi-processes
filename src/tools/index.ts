@@ -7,7 +7,7 @@ import type {
   ToolRenderResultOptions,
 } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
-import { type Static, Type } from "@sinclair/typebox";
+import { type Static, Type } from "typebox";
 import type { ProcessesDetails } from "../constants";
 import type { ProcessManager } from "../manager";
 import { executeAction, renderActionCall, renderActionResult } from "./actions";
@@ -75,16 +75,12 @@ const ProcessesParams = Type.Object({
         "Get a turn to react when process is killed by external signal (default: false). Note: killing via tool never triggers a turn.",
     }),
   ),
-  ...(DEBUG_PREVIEW_ENABLED
-    ? {
-        preview: Type.Optional(
-          StringEnum(["start", "list", "output", "logs", "error"] as const, {
-            description:
-              "For action=debug_preview only: which rendered result variant to preview (default: start)",
-          }),
-        ),
-      }
-    : {}),
+  preview: Type.Optional(
+    StringEnum(["start", "list", "output", "logs", "error"] as const, {
+      description:
+        "For action=debug_preview only: which rendered result variant to preview (default: start)",
+    }),
+  ),
   logWatches: Type.Optional(
     Type.Array(
       Type.Object(

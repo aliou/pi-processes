@@ -54,6 +54,7 @@ export function renderLogsResult(
         theme.fg("success", "Log files:"),
         `  stdout: ${theme.fg("accent", details.logFiles.stdoutFile)}`,
         `  stderr: ${theme.fg("accent", details.logFiles.stderrFile)}`,
+        `  combined: ${theme.fg("accent", details.logFiles.combinedFile)}`,
       ].join("\n"),
       0,
       0,
@@ -104,7 +105,7 @@ export function executeLogs(
     };
   }
 
-  const message = `Log files for "${proc.name}" (${proc.id}):\n  stdout: ${logFiles.stdoutFile}\n  stderr: ${logFiles.stderrFile}\n\nUse the read tool to inspect these files.`;
+  const message = `Log files for "${proc.name}" (${proc.id}):\n  stdout: ${logFiles.stdoutFile}\n  stderr: ${logFiles.stderrFile}\n  combined: ${logFiles.combinedFile}\n\nUse the read tool to inspect these files.`;
   return {
     content: [{ type: "text", text: message }],
     details: {

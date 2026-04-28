@@ -2,8 +2,11 @@ import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
 import {
   appendFileSync,
-  mkdirSync,
+  closeSync,
+  mkdtempSync,
+  openSync,
   readFileSync,
+  readSync,
   rmSync,
   statSync,
 } from "node:fs";
@@ -15,10 +18,15 @@ import {
   type KillResult,
   LIVE_STATUSES,
   type LogWatch,
+  type LogWatchInfo,
+  type LogWatchReplayMatch,
   type LogWatchStream,
+  type LogWatchUpdate,
   type ManagerEvent,
   type ProcessInfo,
+  type ProcessMetadataUpdate,
   type ProcessStatus,
+  type ProcessUpdateResult,
   type StartOptions,
   type WriteResult,
 } from "./constants";
@@ -43,6 +51,7 @@ interface ManagedProcess extends ProcessInfo {
   stdoutPendingLine: string;
   stderrPendingLine: string;
   watches: ResolvedWatch[];
+  nextWatchIndex: number;
 }
 
 interface ProcessManagerOptions {
@@ -61,8 +70,7 @@ export class ProcessManager {
   private pendingOutputEmit: Map<string, NodeJS.Timeout> = new Map();
 
   constructor(options?: ProcessManagerOptions) {
-    this.logDir = join(tmpdir(), `pi-processes-${Date.now()}`);
-    mkdirSync(this.logDir, { recursive: true });
+    this.logDir = mkdtempSync(join(tmpdir(), "pi-processes-"));
     this.getConfiguredShellPath =
       options?.getConfiguredShellPath ?? (() => undefined);
   }
@@ -187,7 +195,7 @@ export class ProcessManager {
     cwd: string,
     options?: StartOptions,
   ): ProcessInfo {
-    const resolvedWatches = this.resolveLogWatches(options?.logWatches);
+    const resolvedWatches = this.resolveLogWatches(options?.logWatches, 0);
     const id = `proc_${++this.counter}`;
     const stdoutFile = join(this.logDir, `${id}-stdout.log`);
     const stderrFile = join(this.logDir, `${id}-stderr.log`);
@@ -225,6 +233,7 @@ export class ProcessManager {
       stdoutPendingLine: "",
       stderrPendingLine: "",
       watches: resolvedWatches,
+      nextWatchIndex: resolvedWatches.length,
     };
 
     this.processes.set(id, managed);
@@ -379,6 +388,66 @@ export class ProcessManager {
     };
   }
 
+  update(id: string, patch: ProcessMetadataUpdate): ProcessUpdateResult {
+    const managed = this.processes.get(id);
+    if (!managed) {
+      return {
+        ok: false,
+        reason: "not_found",
+        message: `Process not found: ${id}`,
+      };
+    }
+
+    let replayMatches: LogWatchReplayMatch[] = [];
+    const nextName = patch.name?.trim();
+    const shouldEmitChange =
+      patch.name !== undefined ||
+      patch.alertOnSuccess !== undefined ||
+      patch.alertOnFailure !== undefined ||
+      patch.alertOnKill !== undefined ||
+      (patch.logWatchUpdate !== undefined &&
+        patch.logWatchUpdate.mode !== "list");
+
+    try {
+      if (patch.name !== undefined && !nextName) {
+        throw new Error("name must be a non-empty string");
+      }
+
+      if (patch.logWatchUpdate) {
+        replayMatches = this.applyLogWatchUpdate(managed, patch.logWatchUpdate);
+      }
+
+      if (nextName !== undefined) managed.name = nextName;
+      if (patch.alertOnSuccess !== undefined) {
+        managed.alertOnSuccess = patch.alertOnSuccess;
+      }
+      if (patch.alertOnFailure !== undefined) {
+        managed.alertOnFailure = patch.alertOnFailure;
+      }
+      if (patch.alertOnKill !== undefined) {
+        managed.alertOnKill = patch.alertOnKill;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        ok: false,
+        reason: "invalid",
+        message,
+        info: this.toProcessInfo(managed),
+        watches: this.logWatchInfo(managed.watches),
+      };
+    }
+
+    if (shouldEmitChange) this.emit({ type: "processes_changed" });
+
+    return {
+      ok: true,
+      info: this.toProcessInfo(managed),
+      watches: this.logWatchInfo(managed.watches),
+      replayMatches,
+    };
+  }
+
   async kill(
     id: string,
     opts?: { signal?: NodeJS.Signals; timeoutMs?: number },
@@ -400,6 +469,9 @@ export class ProcessManager {
           success: false,
           stdoutFile: "",
           stderrFile: "",
+          combinedFile: "",
+          watchCount: 0,
+          activeWatchCount: 0,
           alertOnSuccess: false,
           alertOnFailure: true,
           alertOnKill: false,
@@ -589,10 +661,166 @@ export class ProcessManager {
     }
   }
 
-  private resolveLogWatches(input?: LogWatch[]): ResolvedWatch[] {
+  private applyLogWatchUpdate(
+    managed: ManagedProcess,
+    update: LogWatchUpdate,
+  ): LogWatchReplayMatch[] {
+    switch (update.mode) {
+      case "list":
+        return [];
+      case "clear":
+        managed.watches = [];
+        return [];
+      case "remove": {
+        const indexes = this.normalizeWatchIndexes(update.watchIndexes);
+        const remove = new Set(indexes);
+        managed.watches = managed.watches.filter(
+          (watch) => !remove.has(watch.index),
+        );
+        return [];
+      }
+      case "append": {
+        if (!update.watches || update.watches.length === 0) {
+          throw new Error("logWatches is required for append");
+        }
+        const replayOptions = this.resolveReplayOptions(update);
+        const watches = this.resolveLogWatches(
+          update.watches,
+          managed.nextWatchIndex,
+        );
+        managed.nextWatchIndex += watches.length;
+        managed.watches = [...managed.watches, ...watches];
+        return this.replayWatches(managed, watches, replayOptions);
+      }
+      case "replace": {
+        if (!update.watches || update.watches.length === 0) {
+          throw new Error("logWatches is required for replace");
+        }
+        const replayOptions = this.resolveReplayOptions(update);
+        const watches = this.resolveLogWatches(
+          update.watches,
+          managed.nextWatchIndex,
+        );
+        managed.nextWatchIndex += watches.length;
+        managed.watches = watches;
+        return this.replayWatches(managed, watches, replayOptions);
+      }
+      default:
+        throw new Error(
+          `Unsupported logWatchUpdate.mode: ${String(update.mode)}`,
+        );
+    }
+  }
+
+  private normalizeWatchIndexes(indexes: number[] | undefined): number[] {
+    if (!indexes) throw new Error("watchIndexes is required for remove");
+    if (!Array.isArray(indexes))
+      throw new Error("watchIndexes must be an array");
+    return indexes.map((index, offset) => {
+      if (!Number.isInteger(index) || index < 0) {
+        throw new Error(
+          `watchIndexes[${offset}] must be a non-negative integer`,
+        );
+      }
+      return index;
+    });
+  }
+
+  private resolveReplayOptions(update: LogWatchUpdate): {
+    tailLines: number;
+    maxReplayMatches: number;
+  } {
+    return {
+      tailLines: this.normalizeNonNegativeInteger(
+        update.replayTailLines,
+        0,
+        10000,
+        "replayTailLines",
+      ),
+      maxReplayMatches: this.normalizeNonNegativeInteger(
+        update.maxReplayMatches,
+        20,
+        200,
+        "maxReplayMatches",
+      ),
+    };
+  }
+
+  private replayWatches(
+    managed: ManagedProcess,
+    watches: ResolvedWatch[],
+    options: { tailLines: number; maxReplayMatches: number },
+  ): LogWatchReplayMatch[] {
+    const { tailLines, maxReplayMatches } = options;
+    if (tailLines === 0 || watches.length === 0 || maxReplayMatches === 0) {
+      return [];
+    }
+
+    const matches: LogWatchReplayMatch[] = [];
+    const replay = (source: "stdout" | "stderr", lines: string[]) => {
+      for (const line of lines) {
+        for (const watch of watches) {
+          if (!watch.repeat && watch.fired) continue;
+          if (watch.stream !== "both" && watch.stream !== source) continue;
+          if (!watch.regex.test(line)) continue;
+
+          matches.push({
+            watchIndex: watch.index,
+            pattern: watch.pattern,
+            source,
+            line,
+          });
+          if (!watch.repeat) watch.fired = true;
+          if (matches.length >= maxReplayMatches) return;
+        }
+      }
+    };
+
+    replay("stdout", this.readTailLines(managed.stdoutFile, tailLines));
+    if (matches.length < maxReplayMatches) {
+      replay("stderr", this.readTailLines(managed.stderrFile, tailLines));
+    }
+    return matches;
+  }
+
+  private normalizeNonNegativeInteger(
+    value: number | undefined,
+    fallback: number,
+    max: number,
+    name: string,
+  ): number {
+    if (value === undefined) return fallback;
+    if (!Number.isFinite(value) || !Number.isInteger(value) || value < 0) {
+      throw new Error(`${name} must be a non-negative integer`);
+    }
+    if (value > max) {
+      throw new Error(`${name} must be <= ${max}`);
+    }
+    return value;
+  }
+
+  private logWatchInfo(watches: ResolvedWatch[]): LogWatchInfo[] {
+    return watches.map((watch) => ({
+      index: watch.index,
+      pattern: watch.pattern,
+      stream: watch.stream,
+      repeat: watch.repeat,
+      fired: watch.fired,
+    }));
+  }
+
+  private activeWatchCount(watches: ResolvedWatch[]): number {
+    return watches.filter((watch) => watch.repeat || !watch.fired).length;
+  }
+
+  private resolveLogWatches(
+    input: LogWatch[] | undefined,
+    startIndex: number,
+  ): ResolvedWatch[] {
     if (!input || input.length === 0) return [];
 
-    return input.map((watch, index) => {
+    return input.map((watch, offset) => {
+      const index = startIndex + offset;
       const pattern = watch.pattern?.trim();
       if (!pattern) {
         throw new Error(`logWatches[${index}].pattern is required`);
@@ -716,15 +944,49 @@ export class ProcessManager {
   }
 
   private readTailLines(filePath: string, lines: number): string[] {
+    if (lines <= 0) return [];
+
+    let fd: number | null = null;
     try {
-      const content = readFileSync(filePath, "utf-8");
-      const allLines = content.split("\n");
+      const fileSize = statSync(filePath).size;
+      if (fileSize === 0) return [];
+
+      fd = openSync(filePath, "r");
+      const chunks: Buffer[] = [];
+      const chunkSize = 64 * 1024;
+      let position = fileSize;
+      let newlineCount = 0;
+
+      while (position > 0 && newlineCount <= lines) {
+        const readSize = Math.min(chunkSize, position);
+        position -= readSize;
+
+        const buffer = Buffer.allocUnsafe(readSize);
+        const bytesRead = readSync(fd, buffer, 0, readSize, position);
+        const chunk = buffer.subarray(0, bytesRead);
+        chunks.unshift(chunk);
+
+        for (const byte of chunk) {
+          if (byte === 10) newlineCount++;
+        }
+      }
+
+      const content = Buffer.concat(chunks).toString("utf-8");
+      const allLines = content.split(/\r?\n/);
       if (allLines.length > 0 && allLines[allLines.length - 1] === "") {
         allLines.pop();
       }
       return allLines.slice(-lines);
     } catch {
       return [];
+    } finally {
+      if (fd !== null) {
+        try {
+          closeSync(fd);
+        } catch {
+          // Ignore close errors for best-effort log inspection.
+        }
+      }
     }
   }
 
@@ -742,6 +1004,11 @@ export class ProcessManager {
       success: managed.success,
       stdoutFile: managed.stdoutFile,
       stderrFile: managed.stderrFile,
+      combinedFile: managed.combinedFile,
+      watchCount: managed.watches.length,
+      activeWatchCount: LIVE_STATUSES.has(managed.status)
+        ? this.activeWatchCount(managed.watches)
+        : 0,
       alertOnSuccess: managed.alertOnSuccess,
       alertOnFailure: managed.alertOnFailure,
       alertOnKill: managed.alertOnKill,

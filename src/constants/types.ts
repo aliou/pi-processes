@@ -9,6 +9,7 @@ export type ProcessAction =
   | "kill"
   | "clear"
   | "write"
+  | "update"
   | "debug_preview";
 
 export type ProcessStatus =
@@ -32,6 +33,44 @@ export interface LogWatch {
   repeat?: boolean;
 }
 
+export interface LogWatchInfo {
+  index: number;
+  pattern: string;
+  stream: LogWatchStream;
+  repeat: boolean;
+  fired: boolean;
+}
+
+export interface LogWatchReplayMatch {
+  watchIndex: number;
+  pattern: string;
+  source: "stdout" | "stderr";
+  line: string;
+}
+
+export type LogWatchUpdateMode =
+  | "list"
+  | "append"
+  | "replace"
+  | "remove"
+  | "clear";
+
+export interface LogWatchUpdate {
+  mode: LogWatchUpdateMode;
+  watches?: LogWatch[];
+  watchIndexes?: number[];
+  replayTailLines?: number;
+  maxReplayMatches?: number;
+}
+
+export interface ProcessMetadataUpdate {
+  name?: string;
+  alertOnSuccess?: boolean;
+  alertOnFailure?: boolean;
+  alertOnKill?: boolean;
+  logWatchUpdate?: LogWatchUpdate;
+}
+
 export interface ProcessInfo {
   id: string;
   name: string;
@@ -45,6 +84,9 @@ export interface ProcessInfo {
   success: boolean | null; // null if running, true if exit code 0, false otherwise
   stdoutFile: string;
   stderrFile: string;
+  combinedFile: string;
+  watchCount?: number;
+  activeWatchCount?: number;
   alertOnSuccess: boolean;
   alertOnFailure: boolean;
   alertOnKill: boolean;
@@ -82,6 +124,21 @@ export type WriteResult =
       reason: "not_found" | "process_exited" | "stdin_closed" | "write_error";
     };
 
+export type ProcessUpdateResult =
+  | {
+      ok: true;
+      info: ProcessInfo;
+      watches: LogWatchInfo[];
+      replayMatches: LogWatchReplayMatch[];
+    }
+  | {
+      ok: false;
+      reason: "not_found" | "invalid";
+      message: string;
+      info?: ProcessInfo;
+      watches?: LogWatchInfo[];
+    };
+
 export interface StartOptions {
   alertOnSuccess?: boolean;
   alertOnFailure?: boolean;
@@ -96,7 +153,9 @@ export interface ProcessesDetails {
   process?: ProcessInfo;
   processes?: ProcessInfo[];
   output?: { stdout: string[]; stderr: string[]; status: string };
-  logFiles?: { stdoutFile: string; stderrFile: string };
+  logFiles?: { stdoutFile: string; stderrFile: string; combinedFile: string };
+  watches?: LogWatchInfo[];
+  replayMatches?: LogWatchReplayMatch[];
   cleared?: number;
 }
 

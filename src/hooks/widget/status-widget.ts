@@ -1,6 +1,7 @@
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import type { ProcessInfo } from "../../constants";
+import { formatMonitorSummary } from "../../utils";
 
 function formatProcessStatus(
   proc: ProcessInfo,
@@ -9,13 +10,20 @@ function formatProcessStatus(
   const name =
     proc.name.length > 20 ? `${proc.name.slice(0, 17)}...` : proc.name;
 
+  const monitor = formatMonitorSummary(proc);
+  const runningLabel = monitor ? `running ${monitor}` : "running";
+  const terminatingLabel = monitor ? `terminating ${monitor}` : "terminating";
+  const timeoutLabel = monitor
+    ? `terminate_timeout ${monitor}`
+    : "terminate_timeout";
+
   switch (proc.status) {
     case "running":
-      return `${theme.fg("accent", name)} ${theme.fg("dim", "running")}`;
+      return `${theme.fg("accent", name)} ${theme.fg("dim", runningLabel)}`;
     case "terminating":
-      return `${theme.fg("warning", name)} ${theme.fg("dim", "terminating")}`;
+      return `${theme.fg("warning", name)} ${theme.fg("dim", terminatingLabel)}`;
     case "terminate_timeout":
-      return `${theme.fg("error", name)} ${theme.fg("error", "terminate_timeout")}`;
+      return `${theme.fg("error", name)} ${theme.fg("error", timeoutLabel)}`;
     case "killed":
       return `${theme.fg("warning", name)} ${theme.fg("dim", "killed")}`;
     case "exited":

@@ -1,6 +1,36 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import type { ProcessInfo } from "../constants";
 
+function isLiveStatus(status: string): boolean {
+  return (
+    status === "running" ||
+    status === "terminating" ||
+    status === "terminate_timeout"
+  );
+}
+
+export function formatMonitorSummary(proc: {
+  status: string;
+  activeWatchCount?: number;
+  alertOnSuccess: boolean;
+  alertOnFailure: boolean;
+  alertOnKill: boolean;
+}): string {
+  if (!isLiveStatus(proc.status)) return "";
+
+  const parts: string[] = [];
+  const activeWatchCount = proc.activeWatchCount ?? 0;
+  if (activeWatchCount > 0) parts.push(`watch:${activeWatchCount}`);
+
+  const alerts: string[] = [];
+  if (proc.alertOnSuccess) alerts.push("ok");
+  if (proc.alertOnFailure) alerts.push("fail");
+  if (proc.alertOnKill) alerts.push("kill");
+  if (alerts.length > 0) parts.push(`alert:${alerts.join("/")}`);
+
+  return parts.join(" ");
+}
+
 export function formatRuntime(
   startTime: number,
   endTime: number | null,
@@ -21,20 +51,30 @@ export function formatRuntime(
 }
 
 export function formatStatus(proc: ProcessInfo): string {
+  let status: string;
   switch (proc.status) {
     case "running":
-      return "running";
+      status = "running";
+      break;
     case "terminating":
-      return "terminating";
+      status = "terminating";
+      break;
     case "terminate_timeout":
-      return "terminate_timeout";
+      status = "terminate_timeout";
+      break;
     case "killed":
-      return "killed";
+      status = "killed";
+      break;
     case "exited":
-      return proc.success ? "exit(0)" : `exit(${proc.exitCode ?? "?"})`;
+      status = proc.success ? "exit(0)" : `exit(${proc.exitCode ?? "?"})`;
+      break;
     default:
-      return proc.status;
+      status = proc.status;
+      break;
   }
+
+  const monitor = formatMonitorSummary(proc);
+  return monitor ? `${status}; ${monitor}` : status;
 }
 
 export function truncateCmd(cmd: string, max = 40): string {
@@ -52,23 +92,50 @@ export function formatStatusTag(
     status: string;
     success: boolean | null;
     exitCode: number | null;
+    activeWatchCount?: number;
+    alertOnSuccess?: boolean;
+    alertOnFailure?: boolean;
+    alertOnKill?: boolean;
   },
   theme: Theme,
 ): string {
+  let status: string;
+  let color: Parameters<Theme["fg"]>[0];
   switch (process.status) {
     case "running":
-      return theme.fg("accent", "running");
+      status = "running";
+      color = "accent";
+      break;
     case "terminating":
-      return theme.fg("warning", "terminating");
+      status = "terminating";
+      color = "warning";
+      break;
     case "terminate_timeout":
-      return theme.fg("error", "terminate_timeout");
+      status = "terminate_timeout";
+      color = "error";
+      break;
     case "killed":
-      return theme.fg("warning", "killed");
+      status = "killed";
+      color = "warning";
+      break;
     case "exited":
-      return process.success
-        ? theme.fg("success", "exit(0)")
-        : theme.fg("error", `exit(${process.exitCode ?? "?"})`);
+      status = process.success ? "exit(0)" : `exit(${process.exitCode ?? "?"})`;
+      color = process.success ? "success" : "error";
+      break;
     default:
-      return theme.fg("muted", process.status);
+      status = process.status;
+      color = "muted";
+      break;
   }
+
+  const monitor = formatMonitorSummary({
+    status: process.status,
+    activeWatchCount: process.activeWatchCount ?? 0,
+    alertOnSuccess: process.alertOnSuccess ?? false,
+    alertOnFailure: process.alertOnFailure ?? false,
+    alertOnKill: process.alertOnKill ?? false,
+  });
+  return monitor
+    ? `${theme.fg(color, status)} ${theme.fg("dim", monitor)}`
+    : theme.fg(color, status);
 }

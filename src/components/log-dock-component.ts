@@ -13,8 +13,9 @@ import {
 import type { Theme, ThemeColor } from "@mariozechner/pi-coding-agent";
 import type { Component } from "@mariozechner/pi-tui";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
-import { LIVE_STATUSES } from "../constants";
+import { LIVE_STATUSES, type ProcessInfo } from "../constants";
 import type { ProcessManager } from "../manager";
+import { formatMonitorSummary } from "../utils";
 import { LogFileViewer } from "./log-file-viewer";
 
 const PROCESS_COLORS: ThemeColor[] = [
@@ -108,6 +109,13 @@ export class LogDockComponent implements Component {
     return viewer;
   }
 
+  private formatProcessSummary(proc: ProcessInfo): string {
+    const monitor = formatMonitorSummary(proc);
+    return monitor
+      ? `${proc.name} ${this.theme.fg("dim", monitor)}`
+      : proc.name;
+  }
+
   render(width: number): string[] {
     if (this.mode === "collapsed") return this.renderCollapsed(width);
     return this.renderOpen(width);
@@ -137,7 +145,7 @@ export class LogDockComponent implements Component {
     const parts: string[] = [];
     for (const proc of running) {
       const color = this.getProcessColor(proc.id);
-      parts.push(`${fg(color, "●")} ${proc.name}`);
+      parts.push(`${fg(color, "●")} ${this.formatProcessSummary(proc)}`);
     }
     if (finished.length > 0) {
       parts.push(dim(`+${finished.length} finished`));
@@ -207,7 +215,7 @@ export class LogDockComponent implements Component {
 
     const logRows = Math.max(1, this.dockHeight - 2);
 
-    const title = `${targetProc.name} ${dim(`(${targetProc.id})`)}`;
+    const title = `${this.formatProcessSummary(targetProc)} ${dim(`(${targetProc.id})`)}`;
     const lines: string[] = [];
     lines.push(renderPanelTitleLine(title, width, theme));
 

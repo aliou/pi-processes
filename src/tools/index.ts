@@ -22,14 +22,15 @@ const PROCESS_ACTIONS = [
   "kill",
   "clear",
   "write",
+  "update",
   ...(DEBUG_PREVIEW_ENABLED ? (["debug_preview"] as const) : []),
 ] as const;
 
 const ProcessesParams = Type.Object({
   action: StringEnum(PROCESS_ACTIONS, {
     description: DEBUG_PREVIEW_ENABLED
-      ? "Action: start (run command), list (show all), output (get recent output), logs (get log file paths), kill (terminate), clear (remove finished), write (write to stdin), debug_preview (temporary UI preview, no side effects)"
-      : "Action: start (run command), list (show all), output (get recent output), logs (get log file paths), kill (terminate), clear (remove finished), write (write to stdin)",
+      ? "Action: start (run command), list (show all), output (get recent output), logs (get log file paths), kill (terminate), clear (remove finished), write (write to stdin), update (change mutable metadata/watches), debug_preview (temporary UI preview, no side effects)"
+      : "Action: start (run command), list (show all), output (get recent output), logs (get log file paths), kill (terminate), clear (remove finished), write (write to stdin), update (change mutable metadata/watches)",
   }),
   command: Type.Optional(
     Type.String({ description: "Command to run (required for start)" }),
@@ -37,7 +38,7 @@ const ProcessesParams = Type.Object({
   name: Type.Optional(
     Type.String({
       description:
-        "Friendly name for the process (required for start, e.g. 'backend-dev', 'test-runner')",
+        "Friendly name for the process (required for start; optional new name for update, e.g. 'backend-dev', 'test-runner')",
     }),
   ),
   id: Type.Optional(
@@ -79,6 +80,97 @@ const ProcessesParams = Type.Object({
     StringEnum(["start", "list", "output", "logs", "error"] as const, {
       description:
         "For action=debug_preview only: which rendered result variant to preview (default: start)",
+    }),
+  ),
+  logWatchUpdate: Type.Optional(
+    Type.Object(
+      {
+        mode: StringEnum(
+          ["list", "append", "replace", "remove", "clear"] as const,
+          {
+            description:
+              "How to update log watches. list shows current watches; append adds; replace removes existing and adds; remove deletes watchIndexes; clear removes all.",
+          },
+        ),
+        watches: Type.Optional(
+          Type.Array(
+            Type.Object(
+              {
+                pattern: Type.String({
+                  description:
+                    "Regular expression pattern to match against per output line",
+                }),
+                stream: Type.Optional(
+                  StringEnum(["stdout", "stderr", "both"] as const, {
+                    description: "Which stream to watch (default both)",
+                  }),
+                ),
+                repeat: Type.Optional(
+                  Type.Boolean({
+                    description:
+                      "Trigger every time this pattern matches (default false, one-time)",
+                  }),
+                ),
+              },
+              { additionalProperties: false },
+            ),
+          ),
+        ),
+        watchIndexes: Type.Optional(
+          Type.Array(Type.Number({ minimum: 0 }), {
+            description: "For mode=remove: watch indexes to remove",
+          }),
+        ),
+        replayTailLines: Type.Optional(
+          Type.Number({
+            minimum: 0,
+            maximum: 10000,
+            description:
+              "For append/replace: scan this many recent stdout/stderr lines once for newly added watches (default 0, max 10000).",
+          }),
+        ),
+        maxReplayMatches: Type.Optional(
+          Type.Number({
+            minimum: 0,
+            maximum: 200,
+            description:
+              "For append/replace with replayTailLines: maximum replay matches returned (default 20, max 200).",
+          }),
+        ),
+      },
+      {
+        additionalProperties: false,
+        description:
+          "For action=update only: structured log watch update. Prefer this over the flat watchAction fields when changing watches.",
+      },
+    ),
+  ),
+  watchAction: Type.Optional(
+    StringEnum(["list", "append", "replace", "remove", "clear"] as const, {
+      description:
+        "For action=update only: flat alias for logWatchUpdate.mode. list shows current watches; append adds; replace removes existing and adds; remove deletes watchIndexes; clear removes all.",
+    }),
+  ),
+  watchIndexes: Type.Optional(
+    Type.Array(Type.Number({ minimum: 0 }), {
+      description:
+        "For action=update with watchAction=remove: watch indexes to remove",
+    }),
+  ),
+  replayTailLines: Type.Optional(
+    Type.Number({
+      minimum: 0,
+      maximum: 10000,
+      description:
+        "For action=update append/replace: scan this many recent stdout/stderr lines once for newly added watches (default 0, max 10000).",
+    }),
+  ),
+  maxReplayMatches: Type.Optional(
+    Type.Number({
+      minimum: 0,
+      maximum: 200,
+      description:
+        "For action=update append/replace with replayTailLines: maximum replay matches returned (default 20, max 200).",
     }),
   ),
   logWatches: Type.Optional(
@@ -129,6 +221,12 @@ export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
 - kill: Terminate a process (requires 'id')
 - clear: Remove all finished processes from the list
 - write: Write to process stdin (requires 'id' and 'input', optional 'end' to close stdin)
+- update: Change mutable process metadata for a running or finished process (requires 'id')
+  - name/alertOnSuccess/alertOnFailure/alertOnKill can be updated
+  - logWatchUpdate.mode: list | append | replace | remove | clear
+  - logWatchUpdate.watches: watches for append/replace
+  - logWatchUpdate.watchIndexes: indexes for remove
+  - logWatchUpdate.replayTailLines: optional bounded one-time scan of recent output for newly added/replaced watches (max 10000 lines; maxReplayMatches max 200)
 ${
   DEBUG_PREVIEW_ENABLED
     ? "- debug_preview: Temporary renderer preview for process tool UIs (no process side effects)\n  - preview: start | list | output | logs | error (default: start)\n"
@@ -143,6 +241,10 @@ Note: User always sees process updates in the UI. The notify flags control wheth
       "Use the process tool for long-running commands such as dev servers, test watchers, build watchers, and log tails instead of bash.",
       "Avoid shell background patterns such as &, nohup, disown, or setsid when the process tool fits.",
       "After starting a process, continue other work instead of waiting for it.",
+      "After process start with alertOnSuccess, alertOnFailure, or logWatches, do not repeatedly call process output just to wait; do at most one quick sanity check, then continue independent work until a notification/watch event or a concrete next step needs logs.",
+      "If a running process has missing, wrong, or noisy logWatches, use process action:'update' to append, replace, remove, or clear watches instead of polling output or restarting the process.",
+      "If you add or replace watches after relevant output may have already appeared, use a small replayTailLines value instead of repeatedly polling process output.",
+      "Use process output for targeted inspection after a watch/alert, after the user asks for status, or when a concrete next step depends on current logs.",
       "Use the pi-processes skill for examples and best practices when a task depends on background processes.",
     ],
 

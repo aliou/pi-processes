@@ -14,6 +14,7 @@ Use this skill when work needs a long-running command to stay alive while Pi con
 - Give processes stable, clear names.
 - Continue the task after starting a process instead of waiting on it.
 - Inspect output or log files only when needed.
+- If watches or alert flags are wrong, use `process` action `update` instead of polling or restarting expensive work.
 - Kill and clear processes when they are no longer useful.
 
 ## Good fits
@@ -30,10 +31,12 @@ Use this skill when work needs a long-running command to stay alive while Pi con
 2. Continue the main task.
 3. Inspect `output` or `logs` if something needs attention.
 4. Use alert flags when success or failure should trigger a follow-up turn.
-5. Kill and clear the process when done.
+5. Use `update` to add, replace, remove, clear, or replay log watches when the original watch config was missing, noisy, or wrong.
+6. Kill and clear the process when done.
 
 ## Notes
 
 - Users can inspect and manage running processes from `/ps`.
 - Use `write` when a process expects stdin input.
 - Use `output` for a quick tail and `logs` when the full log files are more useful.
+- Do not repeatedly call `output` just to wait for a marker; add or fix a `logWatch` with `update` and, if the marker may already have appeared, use a small `replayTailLines` value.

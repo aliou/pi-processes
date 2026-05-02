@@ -6,6 +6,7 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
 import type { ExecuteResult, ProcessesDetails } from "../../constants";
+import { t } from "../../i18n";
 import type { ProcessManager } from "../../manager";
 import {
   formatRuntime,
@@ -20,11 +21,11 @@ export function executeList(manager: ProcessManager): ExecuteResult {
 
   if (processes.length === 0) {
     return {
-      content: [{ type: "text", text: "No background processes running" }],
+      content: [{ type: "text", text: t("list.none") }],
       details: {
         action: "list",
         success: true,
-        message: "No background processes running",
+        message: t("list.none"),
         processes: [],
       },
     };
@@ -37,7 +38,7 @@ export function executeList(manager: ProcessManager): ExecuteResult {
     )
     .join("\n");
 
-  const message = `${processes.length} process(es):\n${summary}`;
+  const message = t("list.summary", { count: processes.length, summary });
   return {
     content: [{ type: "text", text: message }],
     details: {
@@ -61,8 +62,8 @@ export function renderListResult(
       {
         fields: [
           {
-            label: "Processes",
-            value: "No background processes running",
+            label: t("list.field.processes"),
+            value: t("list.none"),
             showCollapsed: true,
           },
         ],
@@ -104,7 +105,7 @@ export function renderListResult(
   const lines: string[] = [
     theme.fg(
       "success",
-      `${processes.length} process(es), ${runningCount} running/terminating`,
+      t("list.header", { count: processes.length, running: runningCount }),
     ),
   ];
 
@@ -113,10 +114,10 @@ export function renderListResult(
     lines.push(
       [
         `- ${theme.fg("accent", process.name)} ${theme.fg("muted", `(${process.id})`)}`,
-        `  pid: ${process.pid}   status: ${status}`,
-        `  started: ${theme.fg("muted", formatTimestamp(process.startTime))}`,
-        `  ended:   ${theme.fg("muted", formatTimestamp(process.endTime))}`,
-        `  runtime: ${theme.fg("muted", formatRuntime(process.startTime, process.endTime))}`,
+        `  ${t("list.pid")}: ${process.pid}   ${t("list.status")}: ${status}`,
+        `  ${t("list.started")}: ${theme.fg("muted", formatTimestamp(process.startTime))}`,
+        `  ${t("list.ended")}:   ${theme.fg("muted", formatTimestamp(process.endTime))}`,
+        `  ${t("list.runtime")}: ${theme.fg("muted", formatRuntime(process.startTime, process.endTime))}`,
       ].join("\n"),
     );
   }
@@ -145,17 +146,17 @@ export function renderListResult(
               `${theme.fg("accent", `"${p.name}"`)} [${formatStatusTag(p, theme)}]`,
           )
           .join(", ")
-      : theme.fg("muted", "no running process");
+      : theme.fg("muted", t("list.noRunning"));
 
   const restParts: string[] = [];
-  if (finishedOk > 0) restParts.push(`${finishedOk} finished`);
-  if (failed > 0) restParts.push(`${failed} failed`);
-  if (killed > 0) restParts.push(`${killed} killed`);
+  if (finishedOk > 0) restParts.push(t("list.finished", { count: finishedOk }));
+  if (failed > 0) restParts.push(t("list.failed", { count: failed }));
+  if (killed > 0) restParts.push(t("list.killed", { count: killed }));
   const restSummary =
     restParts.length > 0 ? theme.fg("muted", ` + ${restParts.join(", ")}`) : "";
 
   fields.push({
-    label: "Processes",
+    label: t("list.field.processes"),
     value: runningSummary + restSummary,
     showCollapsed: true,
   });
@@ -165,13 +166,16 @@ export function renderListResult(
     value: string;
   }> = [];
   if (runningCount > 0) {
-    footerItems.push({ label: "running", value: String(runningCount) });
+    footerItems.push({
+      label: t("footer.running"),
+      value: String(runningCount),
+    });
   }
   if (failed > 0) {
-    footerItems.push({ label: "failed", value: String(failed) });
+    footerItems.push({ label: t("footer.failed"), value: String(failed) });
   }
   if (killed > 0) {
-    footerItems.push({ label: "killed", value: String(killed) });
+    footerItems.push({ label: t("footer.killed"), value: String(killed) });
   }
 
   return new ToolBody(

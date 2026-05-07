@@ -2,6 +2,7 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { MESSAGE_TYPE_PROCESS_UPDATE, type ProcessInfo } from "../constants";
 import type { ProcessManager } from "../manager";
 import { formatRuntime } from "../utils";
+import { safeSendMessage } from "./utils";
 
 interface ProcessUpdateDetails {
   kind: "lifecycle";
@@ -54,7 +55,8 @@ export function setupProcessEndHook(pi: ExtensionAPI, manager: ProcessManager) {
       runtime,
     };
 
-    pi.sendMessage(
+    safeSendMessage(
+      pi,
       {
         customType: MESSAGE_TYPE_PROCESS_UPDATE,
         content: message,

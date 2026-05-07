@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { MESSAGE_TYPE_PROCESS_UPDATE } from "../constants";
 import type { ProcessManager } from "../manager";
+import { safeSendMessage } from "./utils";
 
 interface ProcessWatchUpdateDetails {
   kind: "watch_matched";
@@ -70,7 +71,8 @@ export function setupProcessWatchHook(
       }
     }
 
-    pi.sendMessage(
+    safeSendMessage(
+      pi,
       {
         customType: MESSAGE_TYPE_PROCESS_UPDATE,
         content: message,

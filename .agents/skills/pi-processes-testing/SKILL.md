@@ -67,76 +67,7 @@ Always run `npm run reset` before a test session.
 2. Prompt must instruct the agent to use npm scripts (not raw shell commands)
 3. Prompt should tell the agent to not wait for confirmation between steps
 
-## Example test prompts
-
-### Testing the shipping feature workflow
-
-Tests: process start, foreground execution, output reading, failure handling, re-runs.
-
-```markdown
----
-description: Test the shipping feature workflow
----
-
-Run through all steps without waiting for confirmation. Keep messages short.
-
-## 1. Start the server
-Start `npm run server` (name: "api-server") as a background process.
-
-## 2. Run tests
-Run `npm run test` in the foreground. Note the error.
-
-## 3. Run migrations
-Run `npm run migrate` in the foreground. Check server logs to confirm restart.
-
-## 4. Run tests again
-Run `npm run test` in the foreground. Note the different error.
-
-## 5. Fix and re-run
-Run `npm run seed`, then `npm run test`. Tests should pass.
-
-## 6. Clean up
-Kill all processes and clear.
-```
-
-### Testing concurrent processes
-
-Tests: multiple background processes, dock log interleaving, list action.
-
-```markdown
----
-description: Test concurrent background processes
----
-
-Run through all steps without waiting for confirmation.
-
-## 1. Start services
-Start `npm run server` (name: "api-server") and `npm run dev` (name: "dev-server") as background processes.
-
-## 2. Run build and tests
-Start `npm run build` (name: "build", alertOnSuccess) and `npm run test` (name: "tests", alertOnFailure).
-
-## 3. React to alerts
-Handle each alert as it comes in.
-
-## 4. List processes
-Show all processes.
-
-## 5. Clean up
-Kill all and clear.
-```
-
 ## Manual QA checklist
-
-### Dock
-
-- Dock appears when processes start (follow mode)
-- `Ctrl+Shift+P` toggles dock visibility
-- `h/l` switches focused process
-- `f` toggles focus mode (single process filter)
-- `Shift+F` toggles follow mode
-- `x` kills focused process
-- `q` closes/unfocuses dock
 
 ### /ps overlay
 
@@ -155,7 +86,6 @@ Kill all and clear.
 - `j/k` scrolls
 - `f` toggles follow mode
 - Search: `/` enters search, `Enter` activates, `n/N` cycles, `Esc` clears
-- Current match highlight is stronger than non-current matches
 
 ## Reporting format
 

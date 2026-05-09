@@ -1,1 +1,0 @@
-export { registerProcessesSettings } from "./command";

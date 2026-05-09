@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.9.0
+
+### Minor Changes
+
+- 8f15f76: Prevent crash on `/new` with running background processes
+
 ## 0.8.1
 
 ### Patch Changes

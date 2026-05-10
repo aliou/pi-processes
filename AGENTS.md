@@ -14,7 +14,19 @@ During UI tests that require processes to be running, either give the user a pro
 
 ## Scripts
 
-- `pnpm typecheck`, `pnpm lint`, `pnpm format`, `pnpm changeset`
+- `pnpm typecheck`, `pnpm lint`, `pnpm format`, `pnpm test`, `pnpm test:e2e`, `pnpm changeset`
+
+## Testing
+
+Unit tests live next to the source as `src/**/*.test.ts` and run with `pnpm test`.
+
+Use unit tests for behavior that can be isolated with mocks: registry state, log storage, output parsing, watch matching, event emission, throttling, kill timeout behavior, command parsing, and other pure or narrowly scoped manager internals. Unit tests should stay fast, deterministic, and Pi-independent. Mock child processes, filesystem access, timers, and process-group calls when the test is about manager behavior rather than operating-system behavior.
+
+E2E tests live in `tests/e2e/**/*.e2e.ts` and run with `pnpm test:e2e`. They use `vitest.e2e.config.ts`, real temporary directories, real log files, and real child processes. Use e2e tests when the point is to prove integration with Node process spawning, process groups, stdin/stdout/stderr streams, real filesystem cleanup, executable scripts, shell scripts, Node scripts, or long-running watcher flows. E2E tests must remain Pi-independent and should not import extension UI code.
+
+E2E tests use the fixtures in `tests/e2e/fixtures.ts`. Each test gets a `cwd` temporary directory that is removed with fixture cleanup. Use `addScript(name)` to copy a fixture script into that directory, and `addFile(name, content?)` to create marker/input files during a test. Write commands explicitly in tests, such as `./server.sh`, `bash ./crash-on-file.sh`, or `node ./watcher.mjs`.
+
+Avoid fixed sleeps in both unit and e2e tests. Prefer event-driven helpers that wait for process end, watch matches, output events, or marker-driven script behavior. Use fake timers only for intentional timer behavior in unit tests.
 
 ## Structure
 

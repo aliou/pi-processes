@@ -1,7 +1,9 @@
 import { EventEmitter } from "node:events";
 
 import type {
+  AddLogWatchesResult,
   KillResult,
+  LogWatch,
   ManagerEvent,
   ProcessInfo,
   StartOptions,
@@ -178,6 +180,10 @@ export class ProcessManager {
     return this.runtime.writeToStdin(id, data, opts);
   }
 
+  addLogWatches(id: string, watches: LogWatch[]): AddLogWatchesResult {
+    return this.runtime.addLogWatches(id, watches);
+  }
+
   killAll(): void {
     this.runtime.killAll();
   }
@@ -205,7 +211,9 @@ export class ProcessManager {
 }
 
 export type {
+  AddLogWatchesResult,
   KillResult,
+  LogWatch,
   ManagerEvent,
   ProcessInfo,
   ProcessStatus,

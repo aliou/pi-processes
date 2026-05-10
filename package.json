@@ -53,7 +53,7 @@
     "husky": "^9.1.7",
     "memfs": "^4.57.2",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.5"
   },
   "pnpm": {
     "overrides": {
@@ -70,6 +70,7 @@
     "changeset": "changeset",
     "version": "changeset version",
     "test": "vitest run",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "release": "pnpm changeset publish"
   },
   "packageManager": "pnpm@10.26.1",

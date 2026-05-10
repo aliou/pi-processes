@@ -1,6 +1,12 @@
 import type { ChildProcess } from "node:child_process";
 
-import type { KillResult, StartOptions, WriteResult } from "../types";
+import type {
+  AddLogWatchesResult,
+  KillResult,
+  LogWatch,
+  StartOptions,
+  WriteResult,
+} from "../types";
 import { LIVE_STATUSES } from "../types";
 import { isProcessGroupAlive, killProcessGroup } from "../utils";
 import { spawnCommand } from "../utils/command-executor";
@@ -247,6 +253,34 @@ export class ProcessRuntimeController {
         reason: "write_error",
       };
     }
+  }
+
+  addLogWatches(id: string, watches: LogWatch[]): AddLogWatchesResult {
+    const managed = this.registry.getRecord(id);
+    if (!managed) {
+      return {
+        ok: false,
+        reason: "not_found",
+      };
+    }
+
+    if (!LIVE_STATUSES.has(managed.status)) {
+      return {
+        ok: false,
+        reason: "process_exited",
+      };
+    }
+
+    const resolved = this.outputTracker.resolveLogWatches(
+      watches,
+      managed.watches.length,
+    );
+    managed.watches.push(...resolved);
+
+    return {
+      ok: true,
+      added: resolved.length,
+    };
   }
 
   clearFinished(): number {

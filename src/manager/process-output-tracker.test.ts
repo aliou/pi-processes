@@ -77,6 +77,13 @@ describe("ProcessOutputTracker", () => {
       expect(watches[0].regex).toBeInstanceOf(RegExp);
     });
 
+    it("uses startIndex for resolved watch indexes", () => {
+      using tracker = createTracker();
+      const watches = tracker.resolveLogWatches([{ pattern: "ready" }], 3);
+
+      expect(watches[0].index).toBe(3);
+    });
+
     it("respects stream and repeat options", () => {
       using tracker = createTracker();
       const watches = tracker.resolveLogWatches([
@@ -155,6 +162,16 @@ describe("ProcessOutputTracker", () => {
       expect(() =>
         tracker.resolveLogWatches(
           Array.from({ length: 21 }, () => ({ pattern: "ok" })),
+        ),
+      ).toThrow(/at most 20/);
+    });
+
+    it("throws when added watches exceed the total watch limit", () => {
+      using tracker = createTracker();
+      expect(() =>
+        tracker.resolveLogWatches(
+          Array.from({ length: 2 }, () => ({ pattern: "ok" })),
+          19,
         ),
       ).toThrow(/at most 20/);
     });

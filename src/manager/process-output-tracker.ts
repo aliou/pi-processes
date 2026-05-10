@@ -71,13 +71,14 @@ export class ProcessOutputTracker {
     this.appendCombinedLine = deps.appendCombinedLine;
   }
 
-  resolveLogWatches(input?: LogWatch[]): ResolvedWatch[] {
+  resolveLogWatches(input?: LogWatch[], startIndex = 0): ResolvedWatch[] {
     if (!input || input.length === 0) return [];
-    if (input.length > MAX_LOG_WATCHES) {
+    if (startIndex + input.length > MAX_LOG_WATCHES) {
       throw new Error(`logWatches supports at most ${MAX_LOG_WATCHES} entries`);
     }
 
-    return input.map((watch, index) => {
+    return input.map((watch, offset) => {
+      const index = startIndex + offset;
       const pattern = watch.pattern?.trim();
       if (!pattern) {
         throw new Error(`logWatches[${index}].pattern is required`);

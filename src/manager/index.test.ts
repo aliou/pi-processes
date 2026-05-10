@@ -614,6 +614,72 @@ describe("process_watch_matched", () => {
     const matches = events.filter((e) => e.type === "process_watch_matched");
     expect(matches).toHaveLength(1);
   });
+
+  it("adds log watches to a running process", () => {
+    using manager = new ProcessManager();
+    const events = collectEvents(manager);
+    const info = manager.start("late-watch", "sleep 60", "/tmp");
+
+    expect(manager.addLogWatches(info.id, [{ pattern: "late ready" }])).toEqual(
+      {
+        ok: true,
+        added: 1,
+      },
+    );
+
+    const child = fakeProcesses.get(info.pid);
+    assert(child, "fake child should exist");
+    child.stdout.write("late ready\n");
+
+    const matches = events.filter((e) => e.type === "process_watch_matched");
+    expect(matches).toHaveLength(1);
+    if (matches[0].type === "process_watch_matched") {
+      expect(matches[0].match.watch.index).toBe(0);
+    }
+  });
+
+  it("appends log watches after existing watches", () => {
+    using manager = new ProcessManager();
+    const events = collectEvents(manager);
+    const info = manager.start("late-watch", "sleep 60", "/tmp", {
+      logWatches: [{ pattern: "first" }],
+    });
+
+    expect(manager.addLogWatches(info.id, [{ pattern: "second" }])).toEqual({
+      ok: true,
+      added: 1,
+    });
+
+    const child = fakeProcesses.get(info.pid);
+    assert(child, "fake child should exist");
+    child.stdout.write("second\n");
+
+    const matches = events.filter((e) => e.type === "process_watch_matched");
+    expect(matches).toHaveLength(1);
+    if (matches[0].type === "process_watch_matched") {
+      expect(matches[0].match.watch.index).toBe(1);
+    }
+  });
+
+  it("returns not_found when adding watches to an unknown process", () => {
+    using manager = new ProcessManager();
+
+    expect(manager.addLogWatches("missing", [{ pattern: "late" }])).toEqual({
+      ok: false,
+      reason: "not_found",
+    });
+  });
+
+  it("returns process_exited when adding watches to a finished process", async () => {
+    using manager = new ProcessManager();
+    const info = manager.start("finished", "echo hi", "/tmp");
+    await waitForEnd(manager, info.id);
+
+    expect(manager.addLogWatches(info.id, [{ pattern: "late" }])).toEqual({
+      ok: false,
+      reason: "process_exited",
+    });
+  });
 });
 
 // --- Kill ---

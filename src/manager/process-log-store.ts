@@ -1,6 +1,7 @@
 import {
   appendFileSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   rmSync,
   statSync,
@@ -14,8 +15,15 @@ export class ProcessLogStore {
   private logDir: string;
 
   constructor(logDir?: string) {
-    this.logDir = logDir ?? join(tmpdir(), `pi-processes-${Date.now()}`);
-    mkdirSync(this.logDir, { recursive: true });
+    if (logDir) {
+      this.logDir = logDir;
+      mkdirSync(this.logDir, { recursive: true });
+      return;
+    }
+
+    const tempParent = tmpdir();
+    mkdirSync(tempParent, { recursive: true });
+    this.logDir = mkdtempSync(join(tempParent, "pi-processes-"));
   }
 
   getLogDir(): string {

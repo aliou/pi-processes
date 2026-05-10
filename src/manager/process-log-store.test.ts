@@ -11,6 +11,13 @@ describe("ProcessLogStore", () => {
     vol.reset();
   });
 
+  it("uses a unique default log directory", () => {
+    using first = new ProcessLogStore();
+    using second = new ProcessLogStore();
+
+    expect(first.getLogDir()).not.toEqual(second.getLogDir());
+  });
+
   it("creates log files on createLogs", () => {
     using store = new ProcessLogStore("/tmp/test-logs");
     const paths = store.createLogs("proc_1");

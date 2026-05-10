@@ -28,6 +28,10 @@ export interface StartOptions {
   logWatches?: LogWatch[];
 }
 
+export type AddLogWatchesResult =
+  | { ok: true; added: number }
+  | { ok: false; reason: "not_found" | "process_exited" };
+
 export interface ProcessInfo {
   id: string;
   name: string;

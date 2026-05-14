@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { setupProcessesCommands } from "./commands";
 import { registerProcessesSettings } from "./commands/settings";
 import { configLoader } from "./config";

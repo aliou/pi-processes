@@ -1,7 +1,7 @@
 import type {
   ExtensionAPI,
   ExtensionContext,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import { LogDockComponent } from "../../components/log-dock-component";
 import { configLoader, type ResolvedProcessesConfig } from "../../config";
 import { LIVE_STATUSES } from "../../constants";

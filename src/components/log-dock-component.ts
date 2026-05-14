@@ -5,17 +5,17 @@
  * Open view: LogFileViewer for the focused process (or first running), follow mode on.
  */
 
+import type { Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
+import type { Component } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { LIVE_STATUSES } from "../constants";
+import type { ProcessManager } from "../manager";
+import { LogFileViewer } from "./log-file-viewer";
 import {
   createPanelPadder,
   renderPanelRule,
   renderPanelTitleLine,
-} from "@aliou/pi-utils-ui";
-import type { Theme, ThemeColor } from "@mariozechner/pi-coding-agent";
-import type { Component } from "@mariozechner/pi-tui";
-import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
-import { LIVE_STATUSES } from "../constants";
-import type { ProcessManager } from "../manager";
-import { LogFileViewer } from "./log-file-viewer";
+} from "./panel-helpers";
 
 const PROCESS_COLORS: ThemeColor[] = [
   "accent",

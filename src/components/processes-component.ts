@@ -1,19 +1,19 @@
-import {
-  createPanelPadder,
-  renderPanelRule,
-  renderPanelTitleLine,
-} from "@aliou/pi-utils-ui";
-import type { Theme } from "@mariozechner/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import {
   type Component,
   matchesKey,
   truncateToWidth,
   visibleWidth,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import { configLoader } from "../config";
 import type { ProcessInfo } from "../constants";
 import type { ProcessManager } from "../manager";
 import { stripAnsi } from "../utils";
+import {
+  createPanelPadder,
+  renderPanelRule,
+  renderPanelTitleLine,
+} from "./panel-helpers";
 import { statusIcon, statusLabel } from "./status-format";
 
 function formatRuntime(startTime: number, endTime: number | null): string {

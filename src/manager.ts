@@ -750,9 +750,9 @@ export class ProcessManager {
 }
 
 export type {
+  KillResult,
+  ManagerEvent,
   ProcessInfo,
   ProcessStatus,
-  ManagerEvent,
-  KillResult,
   WriteResult,
 };

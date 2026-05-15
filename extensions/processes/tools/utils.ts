@@ -1,0 +1,117 @@
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { Container, Text } from "@earendil-works/pi-tui";
+
+import type { ProcessInfo } from "../../../src/types";
+import {
+  formatRuntime,
+  formatStatus,
+  formatTimestamp,
+} from "../../../src/utils";
+import { truncateToWidth } from "../utils/truncate";
+
+export interface RenderOptions {
+  expanded?: boolean;
+}
+
+export type ProcessStatusTone = "success" | "warning" | "error" | "muted";
+
+export function buildField(
+  label: string,
+  value: string | number | null,
+  theme: Theme,
+): Text {
+  return new Text(
+    `${theme.fg("muted", `${label}:`)} ${String(value ?? "-")}`,
+    0,
+    0,
+  );
+}
+
+export function buildCommandField(
+  command: string,
+  theme: Theme,
+  options?: { truncate?: boolean },
+): Text {
+  const value = options?.truncate
+    ? truncateToWidth(command, 80, theme.fg("accent", "…"))
+    : command;
+  return buildField("command", theme.fg("accent", `\`${value}\``), theme);
+}
+
+export function buildProcessDetails(
+  process: ProcessInfo,
+  theme: Theme,
+  options?: { runtime?: boolean },
+): Container {
+  const container = new Container();
+  container.addChild(buildField("id", process.id, theme));
+  container.addChild(buildField("name", process.name, theme));
+  container.addChild(
+    buildField("status", formatColoredProcessStatus(process, theme), theme),
+  );
+  container.addChild(buildField("pid", process.pid, theme));
+  if (options?.runtime !== false) {
+    container.addChild(
+      buildField("runtime", formatProcessRuntime(process), theme),
+    );
+  }
+  container.addChild(
+    buildField("started", formatTimestamp(process.startTime), theme),
+  );
+  container.addChild(buildField("cwd", process.cwd, theme));
+  container.addChild(buildCommandField(process.command, theme));
+  container.addChild(buildField("stdout", process.stdoutFile, theme));
+  container.addChild(buildField("stderr", process.stderrFile, theme));
+  return container;
+}
+
+export function buildProcessSummaryRow(
+  process: ProcessInfo,
+  theme: Theme,
+): Text {
+  return new Text(
+    [
+      process.name,
+      theme.fg("accent", process.id),
+      `pid ${process.pid}`,
+      formatColoredProcessStatus(process, theme),
+    ].join("  "),
+    0,
+    0,
+  );
+}
+
+export function buildCompactProcessLine(
+  process: ProcessInfo,
+  theme: Theme,
+): Text {
+  return buildField("process", `${process.id} / pid ${process.pid}`, theme);
+}
+
+export function formatProcessRuntime(process: ProcessInfo): string {
+  if (process.startTime <= 0) return "-";
+  return formatRuntime(process.startTime, process.endTime);
+}
+
+export function formatColoredProcessStatus(
+  process: ProcessInfo,
+  theme: Theme,
+): string {
+  return theme.fg(getProcessStatusTone(process), formatStatus(process));
+}
+
+export function getProcessStatusTone(process: ProcessInfo): ProcessStatusTone {
+  if (process.status === "running") return "success";
+  if (process.status === "terminating") return "warning";
+  if (process.status === "terminate_timeout") return "error";
+  if (process.status === "killed") return "warning";
+  return process.success ? "muted" : "error";
+}
+
+export function plural(noun: string, count: number): string {
+  return count === 1 ? noun : `${noun}s`;
+}
+
+export function formatCount(count: number, singular: string): string {
+  return `${count} ${plural(singular, count)}`;
+}

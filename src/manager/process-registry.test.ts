@@ -97,13 +97,14 @@ describe("ProcessRegistry", () => {
     expect(registry.delete("proc_1")).toBe(false);
   });
 
-  it("list returns processes in reverse insertion order", () => {
+  it("list returns processes in insertion order", () => {
     using registry = new ProcessRegistry();
     registry.add(
       createMock<ManagedProcess>({
         ...managedDefaults,
         id: "proc_1",
-        name: "first",
+        name: "oldest",
+        startTime: 100,
         watches: [],
         appendedLines: [],
       }),
@@ -112,7 +113,8 @@ describe("ProcessRegistry", () => {
       createMock<ManagedProcess>({
         ...managedDefaults,
         id: "proc_2",
-        name: "second",
+        name: "newest",
+        startTime: 300,
         watches: [],
         appendedLines: [],
       }),
@@ -121,17 +123,44 @@ describe("ProcessRegistry", () => {
       createMock<ManagedProcess>({
         ...managedDefaults,
         id: "proc_3",
-        name: "third",
+        name: "middle",
+        startTime: 200,
         watches: [],
         appendedLines: [],
       }),
     );
 
     expect(registry.list().map((p) => p.name)).toEqual([
-      "third",
-      "second",
-      "first",
+      "oldest",
+      "newest",
+      "middle",
     ]);
+  });
+
+  it("keeps insertion order when start times match", () => {
+    using registry = new ProcessRegistry();
+    registry.add(
+      createMock<ManagedProcess>({
+        ...managedDefaults,
+        id: "proc_alpha",
+        name: "first",
+        startTime: 100,
+        watches: [],
+        appendedLines: [],
+      }),
+    );
+    registry.add(
+      createMock<ManagedProcess>({
+        ...managedDefaults,
+        id: "proc_beta",
+        name: "second",
+        startTime: 100,
+        watches: [],
+        appendedLines: [],
+      }),
+    );
+
+    expect(registry.list().map((p) => p.name)).toEqual(["first", "second"]);
   });
 
   it("has checks for existence", () => {

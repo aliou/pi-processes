@@ -1,0 +1,1 @@
+Start a background process named "no-shell-backgrounding" with a command that prints "running" every second. Do not use &, nohup, disown, setsid, or any shell background pattern. Use the process tool only.

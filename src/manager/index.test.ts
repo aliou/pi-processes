@@ -213,13 +213,13 @@ describe("start/list/get basics", () => {
     expect(info.pid).toBeGreaterThan(0);
   });
 
-  it("lists processes in reverse insertion order", () => {
+  it("lists processes in insertion order", () => {
     using manager = new ProcessManager();
     const info1 = manager.start("first", "echo one", "/tmp");
     const info2 = manager.start("second", "echo two", "/tmp");
 
     const list = manager.list();
-    expect(list.map((p) => p.id)).toEqual([info2.id, info1.id]);
+    expect(list.map((p) => p.id)).toEqual([info1.id, info2.id]);
   });
 
   it("gets a process by id", () => {

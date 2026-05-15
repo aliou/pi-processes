@@ -16,7 +16,7 @@
   },
   "pi": {
     "extensions": [
-      "./src/index.ts"
+      "./extensions/processes/index.ts"
     ],
     "skills": [
       "./skills/pi-processes"
@@ -28,6 +28,7 @@
   },
   "files": [
     "src",
+    "extensions",
     "skills",
     "README.md",
     "CONTRIBUTING.md"

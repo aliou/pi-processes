@@ -1,0 +1,1 @@
+Do a full smoke test of the process tool: start a process named "smoke-test" that prints "smoke" every second, list processes, stop that process, and list processes again. Use only the process tool for start/list/stop.

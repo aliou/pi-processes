@@ -1,6 +1,7 @@
 import { LIVE_STATUSES, type ProcessInfo } from "../types";
 import type { ManagedProcess } from "./internal-types";
 import { publicProcessInfo } from "./internal-types";
+
 export class ProcessRegistry {
   private processes: Map<string, ManagedProcess> = new Map();
   private counter = 0;
@@ -27,9 +28,7 @@ export class ProcessRegistry {
   }
 
   list(): ProcessInfo[] {
-    return Array.from(this.processes.values())
-      .map((p) => publicProcessInfo(p))
-      .reverse();
+    return Array.from(this.processes.values()).map((p) => publicProcessInfo(p));
   }
 
   values(): IterableIterator<ManagedProcess> {

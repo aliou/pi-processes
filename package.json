@@ -21,7 +21,7 @@
     "skills": [
       "./skills/pi-processes"
     ],
-    "video": "https://assets.aliou.me/pi-extensions/demos/pi-processes.mp4"
+    "video": "https://assets.aliou.me/github/aliou/pi-processes/demo.mp4"
   },
   "publishConfig": {
     "access": "public"

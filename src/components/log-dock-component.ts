@@ -15,6 +15,7 @@ import type { Component } from "@mariozechner/pi-tui";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import { LIVE_STATUSES } from "../constants";
 import type { ProcessManager } from "../manager";
+import { stripAnsi } from "../utils";
 import { LogFileViewer } from "./log-file-viewer";
 
 const PROCESS_COLORS: ThemeColor[] = [
@@ -153,7 +154,7 @@ export class LogDockComponent implements Component {
       const lastLogs = this.manager.getCombinedOutput(running[0].id, 1);
       if (lastLogs && lastLogs.length > 0) {
         const lastLog = truncateToWidth(
-          lastLogs[lastLogs.length - 1].text,
+          stripAnsi(lastLogs[lastLogs.length - 1].text),
           innerWidth,
         );
         lines.push(padLine(dim(lastLog)));

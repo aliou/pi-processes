@@ -37,3 +37,26 @@ Avoid fixed sleeps in both unit and e2e tests. Prefer event-driven helpers that 
 - `extensions/processes-dock/` - `/ps:dock`, `/ps:pin` commands, dock widget, status widget
 
 See `PLAN.md` for the full architecture and implementation plan.
+
+## Rendering conventions
+
+Build TUI output with `Container` + `addChild`. Do not join strings and pass them to `Text`.
+
+- Render functions must be pure. Do not mutate `this.children` inside `render()`.
+- Use a class extending `Container` (or implementing `Component`) for reused UI pieces.
+- Use inline `Container` composition for one-off render trees.
+
+## Builder pattern for UI helpers
+
+UI helper functions return a `Component`; they never mutate a passed-in container.
+
+- Name them `buildXxx(...)`, not `addXxx(container, ...)`.
+- The caller adds the result: `container.addChild(buildXxx(...))`.
+
+## Core layer boundaries
+
+`src/` manages process state. It has no opinions about display.
+
+- `ProcessManager` / `ProcessRegistry` return insertion order. No sorting, filtering, or formatting.
+- Process IDs are opaque strings. Do not assume they are numerical or monotonically increasing.
+- Display concerns (sorting, truncation, color) belong in the tool/UI layer only.

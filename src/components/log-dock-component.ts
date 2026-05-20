@@ -5,18 +5,18 @@
  * Open view: LogFileViewer for the focused process (or first running), follow mode on.
  */
 
-import {
-  createPanelPadder,
-  renderPanelRule,
-  renderPanelTitleLine,
-} from "@aliou/pi-utils-ui";
-import type { Theme, ThemeColor } from "@mariozechner/pi-coding-agent";
-import type { Component } from "@mariozechner/pi-tui";
-import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import type { Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
+import type { Component } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { LIVE_STATUSES } from "../constants";
 import type { ProcessManager } from "../manager";
 import { stripAnsi } from "../utils";
 import { LogFileViewer } from "./log-file-viewer";
+import {
+  createPanelPadder,
+  renderPanelRule,
+  renderPanelTitleLine,
+} from "./panel-helpers";
 
 const PROCESS_COLORS: ThemeColor[] = [
   "accent",
@@ -122,9 +122,10 @@ export class LogDockComponent implements Component {
     const processes = this.manager.list();
     const innerWidth = width - 2;
     const padLine = (content: string) => {
-      const w = visibleWidth(content);
       const line =
-        w > innerWidth ? truncateToWidth(content, innerWidth) : content;
+        visibleWidth(content) > innerWidth
+          ? truncateToWidth(content, innerWidth, "", true)
+          : content;
       return ` ${line}${" ".repeat(Math.max(0, width - 1 - visibleWidth(line)))}`;
     };
 
@@ -147,7 +148,7 @@ export class LogDockComponent implements Component {
     const firstLine = parts.join(" | ");
     const lines = [
       renderPanelRule(width, theme),
-      padLine(truncateToWidth(firstLine, innerWidth)),
+      padLine(truncateToWidth(firstLine, innerWidth, "", true)),
     ];
 
     if (running.length > 0) {
@@ -156,6 +157,8 @@ export class LogDockComponent implements Component {
         const lastLog = truncateToWidth(
           stripAnsi(lastLogs[lastLogs.length - 1].text),
           innerWidth,
+          "",
+          true,
         );
         lines.push(padLine(dim(lastLog)));
       }
@@ -170,12 +173,12 @@ export class LogDockComponent implements Component {
 
     const innerWidth = width - 2;
     const basePadLine = createPanelPadder(width);
-    const padLine = (content: string): string => {
-      const w = visibleWidth(content);
-      return basePadLine(
-        w > innerWidth ? truncateToWidth(content, innerWidth) : content,
+    const padLine = (content: string): string =>
+      basePadLine(
+        visibleWidth(content) > innerWidth
+          ? truncateToWidth(content, innerWidth, "", true)
+          : content,
       );
-    };
 
     const processes = this.manager.list();
     const running = processes.filter((p) => LIVE_STATUSES.has(p.status));

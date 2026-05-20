@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { ResolvedProcessesConfig } from "../config";
 import type { ProcessManager } from "../manager";
 import { setupBackgroundBlocker } from "./background-blocker";

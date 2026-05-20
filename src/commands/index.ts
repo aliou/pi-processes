@@ -9,7 +9,7 @@
  * /ps:dock [show|hide|toggle] - Control dock visibility
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { DockActions } from "../hooks/widget";
 import type { ProcessManager } from "../manager";
 import { registerPsClearCommand } from "./clear";

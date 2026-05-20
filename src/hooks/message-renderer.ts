@@ -2,8 +2,8 @@ import type {
   ExtensionAPI,
   MessageRenderOptions,
   Theme,
-} from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { MESSAGE_TYPE_PROCESS_UPDATE } from "../constants";
 
 interface ProcessLifecycleDetails {

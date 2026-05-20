@@ -1,5 +1,12 @@
 # @aliou/pi-processes
 
+## 0.9.1
+
+### Patch Changes
+
+- fbdf652: Refresh dependencies and migrate Pi imports to the `@earendil-works` namespace.
+- 7ccfa67: Sanitize terminal control characters before rendering process logs in the UI.
+
 ## 0.9.0
 
 ### Minor Changes

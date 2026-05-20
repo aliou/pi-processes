@@ -11,6 +11,20 @@ export const LIVE_STATUSES: ReadonlySet<ProcessStatus> = new Set([
   "terminate_timeout",
 ]);
 
+export type ProcessEndReason =
+  | "exit"
+  | "signal"
+  | "spawn_error"
+  | "missing_pid"
+  | "kill_timeout"
+  | "lost";
+
+export interface ProcessSignalInfo {
+  name: NodeJS.Signals;
+  number: number | null;
+  description: string;
+}
+
 export interface ProcessInfo {
   id: string;
   name: string;
@@ -24,6 +38,9 @@ export interface ProcessInfo {
   success: boolean | null; // null if running, true if exit code 0, false otherwise
   stdoutFile: string;
   stderrFile: string;
+  endReason: ProcessEndReason | null;
+  signal: ProcessSignalInfo | null;
+  errorMessage: string | null;
 }
 
 export type ManagerEvent =

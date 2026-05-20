@@ -1,7 +1,12 @@
 import type { ChildProcess } from "node:child_process";
 import type { Writable } from "node:stream";
 
-import type { ProcessInfo, ProcessStatus } from "../types";
+import type {
+  ProcessEndReason,
+  ProcessInfo,
+  ProcessSignalInfo,
+  ProcessStatus,
+} from "../types";
 
 export interface ProcessLogPaths {
   stdoutFile: string;
@@ -29,6 +34,9 @@ interface ProcessPublicState {
   success: boolean | null;
   stdoutFile: string;
   stderrFile: string;
+  endReason: ProcessEndReason | null;
+  signal: ProcessSignalInfo | null;
+  errorMessage: string | null;
 }
 
 /**
@@ -111,5 +119,8 @@ export function formatProcess(record: ManagedProcessRecord): ProcessInfo {
     success: record.success,
     stdoutFile: record.stdoutFile,
     stderrFile: record.stderrFile,
+    endReason: record.endReason,
+    signal: record.signal,
+    errorMessage: record.errorMessage,
   };
 }

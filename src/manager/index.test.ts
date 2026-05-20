@@ -22,7 +22,7 @@ const fakeProcesses = new Map<number, FakeChildProcess>();
 let nextPid = 10_000;
 
 class FakeChildProcess extends EventEmitter {
-  pid = ++nextPid;
+  pid: number | undefined = ++nextPid;
   stdout = new PassThrough();
   stderr = new PassThrough();
   stdin = new PassThrough();
@@ -42,7 +42,7 @@ class FakeChildProcess extends EventEmitter {
     if (this.exitCode !== null || this.signalCode !== null) return;
     this.exitCode = code;
     this.signalCode = signal;
-    fakeProcesses.delete(this.pid);
+    if (this.pid !== undefined) fakeProcesses.delete(this.pid);
     this.stdout.end();
     this.stderr.end();
     queueMicrotask(() => this.emit("close", code, signal));
@@ -126,8 +126,15 @@ vi.mock("../utils/command-executor", () => ({
   resolveShellExecutable: vi.fn(() => "/bin/bash"),
   spawnCommand: vi.fn((command: string) => {
     const child = new FakeChildProcess();
-    fakeProcesses.set(child.pid, child);
-    queueMicrotask(() => emitCommandOutput(child, command));
+    if (command === "missing pid") child.pid = undefined;
+    if (child.pid !== undefined) fakeProcesses.set(child.pid, child);
+    queueMicrotask(() => {
+      if (command === "spawn error") {
+        child.emit("error", new Error("spawn failed"));
+        return;
+      }
+      emitCommandOutput(child, command);
+    });
     return child;
   }),
 }));
@@ -205,6 +212,9 @@ describe("start/list/get basics", () => {
         success: null,
         exitCode: null,
         endTime: null,
+        endReason: null,
+        signal: null,
+        errorMessage: null,
       }),
     );
     expect(info.pid).toBeGreaterThan(0);
@@ -266,6 +276,9 @@ describe("lifecycle events", () => {
           status: "exited",
           success: true,
           exitCode: 0,
+          endReason: "exit",
+          signal: null,
+          errorMessage: null,
         }),
       );
       expect(ended[0].info.endTime).not.toBeNull();
@@ -281,7 +294,96 @@ describe("lifecycle events", () => {
     const ended = events.filter((e) => e.type === "process_ended");
     if (ended[0].type === "process_ended") {
       expect(ended[0].info).toEqual(
-        expect.objectContaining({ success: false, exitCode: 1 }),
+        expect.objectContaining({
+          success: false,
+          exitCode: 1,
+          endReason: "exit",
+        }),
+      );
+    }
+  });
+
+  it("records signal metadata when a child closes from a signal", async () => {
+    using manager = new ProcessManager();
+    const events = collectEvents(manager);
+    const info = manager.start("test", "sleep 60", "/tmp");
+    const child = fakeProcesses.get(info.pid);
+    assert(child, "fake child should exist");
+
+    child.finish(null, "SIGTERM");
+    await waitForEnd(manager, info.id);
+
+    const ended = events.filter((e) => e.type === "process_ended");
+    if (ended[0].type === "process_ended") {
+      expect(ended[0].info).toEqual(
+        expect.objectContaining({
+          status: "killed",
+          success: false,
+          endReason: "signal",
+          signal: {
+            name: "SIGTERM",
+            number: 15,
+            description: "termination request",
+          },
+        }),
+      );
+    }
+  });
+
+  it("records spawn errors", async () => {
+    using manager = new ProcessManager();
+    const events = collectEvents(manager);
+    const info = manager.start("test", "spawn error", "/tmp");
+    await waitForEnd(manager, info.id);
+
+    const ended = events.filter((e) => e.type === "process_ended");
+    if (ended[0].type === "process_ended") {
+      expect(ended[0].info).toEqual(
+        expect.objectContaining({
+          status: "exited",
+          success: false,
+          exitCode: -1,
+          endReason: "spawn_error",
+          errorMessage: "spawn failed",
+        }),
+      );
+    }
+  });
+
+  it("records missing pid", () => {
+    using manager = new ProcessManager();
+    const info = manager.start("test", "missing pid", "/tmp");
+
+    expect(info).toEqual(
+      expect.objectContaining({
+        status: "exited",
+        success: false,
+        exitCode: -1,
+        endReason: "missing_pid",
+        errorMessage: "Spawn error: missing pid",
+      }),
+    );
+  });
+
+  it("records lost processes found by liveness watcher", async () => {
+    vi.useFakeTimers();
+    using manager = new ProcessManager();
+    const events = collectEvents(manager);
+    const info = manager.start("test", "sleep 60", "/tmp");
+
+    fakeProcesses.delete(info.pid);
+    await vi.advanceTimersByTimeAsync(5000);
+
+    const ended = events.filter((e) => e.type === "process_ended");
+    expect(ended).toHaveLength(1);
+    if (ended[0].type === "process_ended") {
+      expect(ended[0].info).toEqual(
+        expect.objectContaining({
+          status: "exited",
+          success: false,
+          endReason: "lost",
+          signal: null,
+        }),
       );
     }
   });
@@ -473,7 +575,41 @@ describe("kill", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(["killed", "exited"]).toContain(result.info.status);
+      expect(result.info).toEqual(
+        expect.objectContaining({
+          success: false,
+          endReason: "signal",
+          signal: expect.objectContaining({ name: "SIGTERM", number: 15 }),
+        }),
+      );
     }
+  });
+
+  it("records kill timeout", async () => {
+    vi.useFakeTimers();
+    using manager = new ProcessManager();
+    const info = manager.start("test", "sleep 60", "/tmp");
+    const child = fakeProcesses.get(info.pid);
+    assert(child, "fake child should exist");
+    child.kill = () => {
+      child.killed = true;
+      return true;
+    };
+
+    const resultPromise = manager.kill(info.id);
+    await vi.advanceTimersByTimeAsync(3000);
+    const result = await resultPromise;
+
+    expect(result).toEqual({
+      ok: false,
+      reason: "timeout",
+      info: expect.objectContaining({
+        status: "terminate_timeout",
+        success: false,
+        endReason: "kill_timeout",
+        signal: expect.objectContaining({ name: "SIGTERM", number: 15 }),
+      }),
+    });
   });
 
   it("returns ok for already-exited process", async () => {

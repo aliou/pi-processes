@@ -4,6 +4,7 @@ import type { KillResult, ManagerEvent, WriteResult } from "../types";
 import { LIVE_STATUSES } from "../types";
 import { isProcessGroupAlive, killProcessGroup } from "../utils";
 import { spawnCommand } from "../utils/command-executor";
+import { formatSignalInfo } from "../utils/signals";
 import type { ManagedProcessRecord } from "./internal-types";
 import { formatProcess } from "./internal-types";
 import type { ProcessLogStore } from "./process-log-store";
@@ -59,6 +60,9 @@ export class ProcessRuntimeController {
       success: null,
       stdoutFile: logPaths.stdoutFile,
       stderrFile: logPaths.stderrFile,
+      endReason: null,
+      signal: null,
+      errorMessage: null,
       combinedFile: logPaths.combinedFile,
       process: child,
       stdin: child.stdin,
@@ -75,6 +79,8 @@ export class ProcessRuntimeController {
       this.logs.appendErrorLine(managed.stderrFile, "Spawn error: missing pid");
       managed.exitCode = -1;
       managed.success = false;
+      managed.endReason = "missing_pid";
+      managed.errorMessage = "Spawn error: missing pid";
       managed.endTime = Date.now();
       this.transition(managed, "exited");
       return managed;
@@ -121,6 +127,9 @@ export class ProcessRuntimeController {
           success: false,
           stdoutFile: "",
           stderrFile: "",
+          endReason: null,
+          signal: null,
+          errorMessage: null,
         },
         reason: "not_found",
       };
@@ -155,6 +164,9 @@ export class ProcessRuntimeController {
     const alive = isProcessGroupAlive(managed.pid);
 
     if (alive) {
+      managed.endReason = "kill_timeout";
+      managed.signal = formatSignalInfo(signal);
+      managed.success = false;
       this.transition(managed, "terminate_timeout");
       return {
         ok: false,
@@ -167,6 +179,14 @@ export class ProcessRuntimeController {
       managed.endTime = Date.now();
       managed.exitCode = null;
       managed.success = false;
+    }
+
+    if (managed.lastSignalSent) {
+      managed.endReason = "signal";
+      managed.signal = formatSignalInfo(managed.lastSignalSent);
+    } else {
+      managed.endReason = "lost";
+      managed.signal = null;
     }
 
     this.output.flush(managed);
@@ -300,13 +320,18 @@ export class ProcessRuntimeController {
 
       managed.exitCode = code;
       managed.endTime = Date.now();
-      managed.success = code === 0;
 
       this.output.flush(managed);
 
       if (signal) {
+        managed.success = false;
+        managed.endReason = "signal";
+        managed.signal = formatSignalInfo(signal);
         this.transition(managed, "killed");
       } else {
+        managed.success = code === 0;
+        managed.endReason = "exit";
+        managed.signal = null;
         this.transition(managed, "exited");
       }
     });
@@ -320,6 +345,8 @@ export class ProcessRuntimeController {
       if (!managed.endTime) {
         managed.exitCode = -1;
         managed.success = false;
+        managed.endReason = "spawn_error";
+        managed.errorMessage = err.message;
         managed.endTime = Date.now();
         this.output.flush(managed);
         this.transition(managed, "exited");
@@ -358,13 +385,15 @@ export class ProcessRuntimeController {
 
       this.output.flush(managed);
 
+      managed.success = false;
+      managed.exitCode = null;
+      managed.endReason = "lost";
+
       if (managed.lastSignalSent) {
-        managed.success = false;
-        managed.exitCode = null;
+        managed.signal = formatSignalInfo(managed.lastSignalSent);
         this.transition(managed, "killed");
       } else {
-        managed.success = false;
-        managed.exitCode = null;
+        managed.signal = null;
         this.transition(managed, "exited");
       }
     }

@@ -39,8 +39,8 @@
     "typebox": "^1.1.38"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.75.3",
-    "@earendil-works/pi-tui": "^0.75.3"
+    "@earendil-works/pi-coding-agent": ">0.70.0 <1",
+    "@earendil-works/pi-tui": ">0.70.0 <1"
   },
   "devDependencies": {
     "@aliou/biome-plugins": "^0.8.1",

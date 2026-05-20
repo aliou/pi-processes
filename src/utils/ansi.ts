@@ -7,45 +7,39 @@
  * - APC sequences (\x1b_...\x07 or \x1b_...\x1b\\)
  * - Remaining C0 control chars except tab/newline
  */
+const ESC = String.fromCodePoint(0x001b);
+const BEL = String.fromCodePoint(0x0007);
+
+const ANSI_REPLACEMENTS: RegExp[] = [
+  // CSI sequences: SGR, cursor movement, erase, scroll, etc.
+  new RegExp(`${ESC}\\[[0-9;]*[A-Za-z]`, "gu"),
+  // OSC sequences: ESC]...<BEL> or ESC]...<ESC>\\.
+  new RegExp(`${ESC}\\][^${BEL}${ESC}]*(?:${BEL}|${ESC}\\\\)`, "gu"),
+  // APC sequences: ESC_...<BEL> or ESC_...<ESC>\\.
+  new RegExp(`${ESC}_[^${BEL}${ESC}]*(?:${BEL}|${ESC}\\\\)`, "gu"),
+];
+
+// Strip C0 terminal control characters that can corrupt TUI layout when
+// rendered back into pi, such as carriage return and backspace. Keep tabs and
+// newlines because logs use them as printable whitespace/line breaks.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: this regex intentionally targets terminal control characters.
+const TERMINAL_CONTROL_CHARS = /[\u0000-\u0008\u000b-\u001f\u007f]/gu;
+
 /**
  * Check if a string contains ANSI escape codes.
  */
 export function hasAnsi(str: string): boolean {
-  return str.includes(String.fromCodePoint(0x001b));
+  return str.includes(ESC);
 }
 
 export function stripAnsi(str: string): string {
-  // ESC = \u001b, BEL = \u0007
-  const ESC = String.fromCodePoint(0x001b);
-  const BEL = String.fromCodePoint(0x0007);
-
   let clean = str;
 
   if (str.includes(ESC)) {
-    // Strip all CSI sequences (ESC[...X where X is any letter)
-    clean = clean.replace(new RegExp(`${ESC}\\[[0-9;]*[A-Za-z]`, "gu"), "");
-    // Strip OSC sequences: ESC]...<BEL> or ESC]...<ESC>\\
-    clean = clean.replace(
-      new RegExp(`${ESC}\\][^${BEL}${ESC}]*(?:${BEL}|${ESC}\\\\)`, "gu"),
-      "",
-    );
-    // Strip APC sequences: ESC_...<BEL> or ESC_...<ESC>\\ (used for cursor marker)
-    clean = clean.replace(
-      new RegExp(`${ESC}_[^${BEL}${ESC}]*(?:${BEL}|${ESC}\\\\)`, "gu"),
-      "",
-    );
+    for (const pattern of ANSI_REPLACEMENTS) {
+      clean = clean.replace(pattern, "");
+    }
   }
 
-  // Strip terminal control chars like carriage return/backspace that can
-  // corrupt TUI layout when rendered back into pi.
-  return Array.from(clean)
-    .filter((char) => {
-      const code = char.codePointAt(0) ?? 0;
-      const isDisallowedC0 =
-        (code >= 0x00 && code <= 0x08) ||
-        (code >= 0x0b && code <= 0x1f) ||
-        code === 0x7f;
-      return !isDisallowedC0;
-    })
-    .join("");
+  return clean.replace(TERMINAL_CONTROL_CHARS, "");
 }

@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.9.2
+
+### Patch Changes
+
+- c2287ac: Leave one terminal column unused in the collapsed log dock so long process output does not wrap into the editor.
+
 ## 0.9.1
 
 ### Patch Changes

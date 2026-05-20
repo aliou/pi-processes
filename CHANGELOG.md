@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.9.3
+
+### Patch Changes
+
+- e812981: Relax Pi peer dependency ranges to avoid npm update conflicts in extension environments with older Pi package peers.
+
 ## 0.9.2
 
 ### Patch Changes

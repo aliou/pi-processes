@@ -1,13 +1,18 @@
+import { randomBytes } from "node:crypto";
+
 import { LIVE_STATUSES, type ProcessInfo } from "../types";
 import type { ManagedProcessRecord } from "./internal-types";
 import { formatProcess } from "./internal-types";
 
 export class ProcessRegistry {
   private processes: Map<string, ManagedProcessRecord> = new Map();
-  private counter = 0;
 
   nextId(): string {
-    return `proc_${++this.counter}`;
+    let id: string;
+    do {
+      id = `proc_${randomBytes(2).toString("hex")}`;
+    } while (this.processes.has(id));
+    return id;
   }
 
   add(process: ManagedProcessRecord): void {

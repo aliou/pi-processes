@@ -195,7 +195,7 @@ describe("start/list/get basics", () => {
     using manager = new ProcessManager();
     const info = manager.start("test", "echo hello", "/tmp");
 
-    expect(info.id).toMatch(/^proc_\d+$/);
+    expect(info.id).toMatch(/^proc_[0-9a-f]{4}$/);
     expect(info).toEqual(
       expect.objectContaining({
         name: "test",

@@ -7,9 +7,8 @@ import type {
   WriteResult,
 } from "../types";
 import { formatProcess } from "./internal-types";
-import { OutputChangeNotifier } from "./output-change-notifier";
 import { ProcessLogStore } from "./process-log-store";
-import { ProcessOutputTracker } from "./process-output-tracker";
+import { ProcessOutput } from "./process-output";
 import { ProcessRegistry } from "./process-registry";
 import { ProcessRuntimeController } from "./process-runtime-controller";
 
@@ -21,9 +20,8 @@ export class ProcessManager {
   private events = new EventEmitter();
 
   private registry: ProcessRegistry;
-  private logs: ProcessLogStore;
-  private outputTracker: ProcessOutputTracker;
-  private outputNotifier: OutputChangeNotifier;
+  private logStore: ProcessLogStore;
+  private output: ProcessOutput;
   private runtime: ProcessRuntimeController;
 
   constructor(options?: ProcessManagerOptions) {
@@ -32,29 +30,17 @@ export class ProcessManager {
     };
 
     this.registry = new ProcessRegistry();
-    this.logs = new ProcessLogStore();
+    this.logStore = new ProcessLogStore();
 
-    this.outputTracker = new ProcessOutputTracker({
-      appendCombinedLine: (file, source, line) =>
-        this.logs.appendCombinedLine(file, source, line),
-    });
-
-    this.outputNotifier = new OutputChangeNotifier({
+    this.output = new ProcessOutput({
       emit,
-      getAppendedLines: (id) => {
-        const managed = this.registry.getRecord(id);
-        return managed
-          ? this.outputTracker.drainAppendedLines(managed)
-          : undefined;
-      },
-      hasProcess: (id) => this.registry.has(id),
+      logStore: this.logStore,
     });
 
     this.runtime = new ProcessRuntimeController({
       registry: this.registry,
-      logs: this.logs,
-      outputTracker: this.outputTracker,
-      outputNotifier: this.outputNotifier,
+      logs: this.logStore,
+      output: this.output,
       emit,
       getConfiguredShellPath:
         options?.getConfiguredShellPath ?? (() => undefined),
@@ -87,8 +73,8 @@ export class ProcessManager {
     if (!managed) return null;
 
     return {
-      stdout: this.logs.readTailLines(managed.stdoutFile, tailLines),
-      stderr: this.logs.readTailLines(managed.stderrFile, tailLines),
+      stdout: this.logStore.readTailLines(managed.stdoutFile, tailLines),
+      stderr: this.logStore.readTailLines(managed.stderrFile, tailLines),
       status: managed.status,
     };
   }
@@ -99,15 +85,15 @@ export class ProcessManager {
   ): Array<{ type: "stdout" | "stderr"; text: string }> | null {
     const managed = this.registry.getRecord(id);
     if (!managed) return null;
-    return this.logs.getCombinedOutput(managed.combinedFile, tailLines);
+    return this.logStore.getCombinedOutput(managed.combinedFile, tailLines);
   }
 
   getFullOutput(id: string): { stdout: string; stderr: string } | null {
     const managed = this.registry.getRecord(id);
     if (!managed) return null;
     return {
-      stdout: this.logs.readFullFile(managed.stdoutFile),
-      stderr: this.logs.readFullFile(managed.stderrFile),
+      stdout: this.logStore.readFullFile(managed.stdoutFile),
+      stderr: this.logStore.readFullFile(managed.stderrFile),
     };
   }
 
@@ -126,7 +112,7 @@ export class ProcessManager {
   getFileSize(id: string): { stdout: number; stderr: number } | null {
     const managed = this.registry.getRecord(id);
     if (!managed) return null;
-    return this.logs.getFileSize({
+    return this.logStore.getFileSize({
       stdoutFile: managed.stdoutFile,
       stderrFile: managed.stderrFile,
       combinedFile: managed.combinedFile,
@@ -162,9 +148,9 @@ export class ProcessManager {
 
   cleanup(): void {
     this.runtime.stopWatcher();
-    this.outputNotifier.clearAll();
+    this.output.clearAll();
     this.runtime.killAllLive();
-    this.logs.cleanup();
+    this.logStore.cleanup();
   }
 
   [Symbol.dispose](): void {

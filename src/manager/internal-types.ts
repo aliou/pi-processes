@@ -59,7 +59,7 @@ interface ProcessLogState {
  * Output parser state for incomplete line chunks.
  *
  * Node streams can split a single logical line across multiple chunks. These
- * buffers let `ProcessOutputTracker` emit only completed lines in events/logs.
+ * buffers let `ProcessOutput` emit only completed lines in events/logs.
  */
 interface ProcessLineBufferState {
   stdoutPendingLine: string;
@@ -69,7 +69,7 @@ interface ProcessLineBufferState {
 /**
  * Output lines accumulated since the last `process_output_changed` event.
  *
- * `OutputChangeNotifier` drains this buffer when it emits an output event. This
+ * `ProcessOutput` drains this buffer when it emits an output event. This
  * gives extension code live lines without re-reading log files or polling.
  */
 interface ProcessOutputEventBufferState {

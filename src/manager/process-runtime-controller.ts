@@ -1,32 +1,27 @@
 import type { ChildProcess } from "node:child_process";
 
-import type { KillResult, WriteResult } from "../types";
+import type { KillResult, ManagerEvent, WriteResult } from "../types";
 import { LIVE_STATUSES } from "../types";
 import { isProcessGroupAlive, killProcessGroup } from "../utils";
 import { spawnCommand } from "../utils/command-executor";
 import type { ManagedProcessRecord } from "./internal-types";
 import { formatProcess } from "./internal-types";
-import type { OutputChangeNotifier } from "./output-change-notifier";
 import type { ProcessLogStore } from "./process-log-store";
-import type { ProcessOutputTracker } from "./process-output-tracker";
+import type { ProcessOutput } from "./process-output";
 import type { ProcessRegistry } from "./process-registry";
 
 interface ProcessRuntimeControllerDeps {
   registry: ProcessRegistry;
   logs: ProcessLogStore;
-  outputTracker: ProcessOutputTracker;
-  outputNotifier: OutputChangeNotifier;
+  output: ProcessOutput;
   emit: (event: ManagerEvent) => void;
   getConfiguredShellPath: () => string | undefined;
 }
 
-import type { ManagerEvent } from "../types";
-
 export class ProcessRuntimeController {
   private registry: ProcessRegistry;
   private logs: ProcessLogStore;
-  private outputTracker: ProcessOutputTracker;
-  private outputNotifier: OutputChangeNotifier;
+  private output: ProcessOutput;
   private emit: (event: ManagerEvent) => void;
   private getConfiguredShellPath: () => string | undefined;
 
@@ -35,8 +30,7 @@ export class ProcessRuntimeController {
   constructor(deps: ProcessRuntimeControllerDeps) {
     this.registry = deps.registry;
     this.logs = deps.logs;
-    this.outputTracker = deps.outputTracker;
-    this.outputNotifier = deps.outputNotifier;
+    this.output = deps.output;
     this.emit = deps.emit;
     this.getConfiguredShellPath = deps.getConfiguredShellPath;
   }
@@ -46,6 +40,10 @@ export class ProcessRuntimeController {
     const logPaths = this.logs.createLogs(id);
 
     const child = spawnCommand(command, cwd, this.getConfiguredShellPath());
+    // Spawned commands run in detached process groups so TERM/KILL can target
+    // the whole tree. `unref()` keeps the manager's Node process from staying
+    // alive only because a managed child still exists; extension shutdown and
+    // explicit cleanup remain responsible for killing live process groups.
     child.unref();
 
     const managed: ManagedProcessRecord = {
@@ -171,8 +169,7 @@ export class ProcessRuntimeController {
       managed.success = false;
     }
 
-    this.outputTracker.flushPendingLines(managed);
-    this.outputNotifier.flush(id);
+    this.output.flush(managed);
     this.transition(managed, "killed");
     return { ok: true, info: formatProcess(managed) };
   }
@@ -245,7 +242,7 @@ export class ProcessRuntimeController {
         combinedFile: managed.combinedFile,
       });
 
-      this.outputNotifier.clear(id);
+      this.output.clear(id);
       this.registry.delete(id);
       cleared++;
     }
@@ -290,14 +287,12 @@ export class ProcessRuntimeController {
   ): void {
     child.stdout?.on("data", (data: Buffer) => {
       this.logs.appendStdout(managed.stdoutFile, data);
-      this.outputTracker.onStdoutChunk(managed, data);
-      this.outputNotifier.notify(managed.id);
+      this.output.onStdoutChunk(managed, data);
     });
 
     child.stderr?.on("data", (data: Buffer) => {
       this.logs.appendStderr(managed.stderrFile, data);
-      this.outputTracker.onStderrChunk(managed, data);
-      this.outputNotifier.notify(managed.id);
+      this.output.onStderrChunk(managed, data);
     });
 
     child.on("close", (code, signal) => {
@@ -307,8 +302,7 @@ export class ProcessRuntimeController {
       managed.endTime = Date.now();
       managed.success = code === 0;
 
-      this.outputTracker.flushPendingLines(managed);
-      this.outputNotifier.flush(managed.id);
+      this.output.flush(managed);
 
       if (signal) {
         this.transition(managed, "killed");
@@ -327,8 +321,7 @@ export class ProcessRuntimeController {
         managed.exitCode = -1;
         managed.success = false;
         managed.endTime = Date.now();
-        this.outputTracker.flushPendingLines(managed);
-        this.outputNotifier.flush(managed.id);
+        this.output.flush(managed);
         this.transition(managed, "exited");
       }
     });
@@ -363,8 +356,7 @@ export class ProcessRuntimeController {
         managed.endTime = Date.now();
       }
 
-      this.outputTracker.flushPendingLines(managed);
-      this.outputNotifier.flush(managed.id);
+      this.output.flush(managed);
 
       if (managed.lastSignalSent) {
         managed.success = false;

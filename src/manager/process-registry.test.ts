@@ -26,11 +26,16 @@ const managedDefaults = {
 } satisfies PartialFuncReturn<ManagedProcessRecord>;
 
 describe("ProcessRegistry", () => {
-  it("generates sequential IDs", () => {
+  it("generates random process IDs", () => {
     using registry = new ProcessRegistry();
-    expect(registry.nextId()).toBe("proc_1");
-    expect(registry.nextId()).toBe("proc_2");
-    expect(registry.nextId()).toBe("proc_3");
+    const first = registry.nextId();
+    const second = registry.nextId();
+    const third = registry.nextId();
+
+    expect(first).toMatch(/^proc_[0-9a-f]{4}$/);
+    expect(second).toMatch(/^proc_[0-9a-f]{4}$/);
+    expect(third).toMatch(/^proc_[0-9a-f]{4}$/);
+    expect(new Set([first, second, third]).size).toBe(3);
   });
 
   it("add and getRecord", () => {

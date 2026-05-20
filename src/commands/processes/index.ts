@@ -1,1 +1,0 @@
-export { registerPsCommand } from "./command";

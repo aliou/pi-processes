@@ -1,1 +1,0 @@
-export { registerPsPinCommand } from "./command";

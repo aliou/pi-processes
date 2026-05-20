@@ -1,6 +1,9 @@
-import type { Theme } from "@mariozechner/pi-coding-agent";
-import type { ProcessInfo } from "../constants";
+import type { ProcessStatus } from "../types";
 
+/**
+ * Format a process runtime as a human-readable string.
+ * "3s", "2m 15s", "1h 30m"
+ */
 export function formatRuntime(
   startTime: number,
   endTime: number | null,
@@ -20,8 +23,16 @@ export function formatRuntime(
   return `${seconds}s`;
 }
 
-export function formatStatus(proc: ProcessInfo): string {
-  switch (proc.status) {
+/**
+ * Format a process status as a plain string.
+ * "running", "exit(0)", "exit(1)"
+ */
+export function formatStatus(proc: {
+  status: string;
+  success: boolean | null;
+  exitCode: number | null;
+}): string {
+  switch (proc.status as ProcessStatus) {
     case "running":
       return "running";
     case "terminating":
@@ -37,38 +48,18 @@ export function formatStatus(proc: ProcessInfo): string {
   }
 }
 
+/**
+ * Truncate a command string to a maximum length.
+ */
 export function truncateCmd(cmd: string, max = 40): string {
   if (cmd.length <= max) return cmd;
   return `${cmd.slice(0, max - 3)}...`;
 }
 
+/**
+ * Format a timestamp as an ISO string or "-" if null.
+ */
 export function formatTimestamp(ts: number | null): string {
   if (!ts) return "-";
   return new Date(ts).toISOString().replace("T", " ").slice(0, 19);
-}
-
-export function formatStatusTag(
-  process: {
-    status: string;
-    success: boolean | null;
-    exitCode: number | null;
-  },
-  theme: Theme,
-): string {
-  switch (process.status) {
-    case "running":
-      return theme.fg("accent", "running");
-    case "terminating":
-      return theme.fg("warning", "terminating");
-    case "terminate_timeout":
-      return theme.fg("error", "terminate_timeout");
-    case "killed":
-      return theme.fg("warning", "killed");
-    case "exited":
-      return process.success
-        ? theme.fg("success", "exit(0)")
-        : theme.fg("error", `exit(${process.exitCode ?? "?"})`);
-    default:
-      return theme.fg("muted", process.status);
-  }
 }

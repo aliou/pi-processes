@@ -104,6 +104,7 @@ export function renderStartResult(
         "  Log files:",
         `    - stdout: ${theme.fg("accent", process.stdoutFile)}`,
         `    - stderr: ${theme.fg("accent", process.stderrFile)}`,
+        `    - combined: ${theme.fg("accent", process.combinedFile)}`,
       ].join("\n"),
       0,
       0,
@@ -186,7 +187,13 @@ export function executeStart(
     "Log files:",
     `  stdout: ${proc.stdoutFile}`,
     `  stderr: ${proc.stderrFile}`,
-  ].join("\n");
+    `  combined: ${proc.combinedFile}`,
+    params.logWatches && params.logWatches.length > 0
+      ? `Watches active: ${params.logWatches.length}. Continue other work; watch/exit notifications will trigger follow-up.`
+      : undefined,
+  ]
+    .filter(Boolean)
+    .join("\n");
   return {
     content: [{ type: "text", text: message }],
     details: {

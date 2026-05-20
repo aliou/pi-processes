@@ -1,20 +1,31 @@
 import type { ProcessInfo, ProcessStatus } from "../constants";
+import { formatMonitorSummary } from "../utils";
 
 export function statusLabel(proc: ProcessInfo): string {
+  let status: string;
   switch (proc.status) {
     case "running":
-      return "running";
+      status = "running";
+      break;
     case "terminating":
-      return "terminating";
+      status = "terminating";
+      break;
     case "terminate_timeout":
-      return "terminate_timeout";
+      status = "terminate_timeout";
+      break;
     case "killed":
-      return "killed";
+      status = "killed";
+      break;
     case "exited":
-      return proc.success ? "exit(0)" : `exit(${proc.exitCode ?? "?"})`;
+      status = proc.success ? "exit(0)" : `exit(${proc.exitCode ?? "?"})`;
+      break;
     default:
-      return proc.status;
+      status = proc.status;
+      break;
   }
+
+  const monitor = formatMonitorSummary(proc);
+  return monitor ? `${status} ${monitor}` : status;
 }
 
 export function statusIcon(

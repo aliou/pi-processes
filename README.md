@@ -42,6 +42,7 @@ Use `/ps` to open the main process panel.
 From there you can:
 
 - see running and finished processes
+- see active watch and alert indicators on monitored processes
 - inspect recent output
 - pin a process to the dock
 - kill a running process
@@ -164,6 +165,25 @@ Example: repeatable watch on stdout only
 ```
 
 Invalid regex patterns fail fast at process start with a clear error.
+
+If Pi starts a long-running process with missing, noisy, or incorrect watches, it can update the process metadata later without restarting the process. The `process` tool `update` action can change alert flags and list, append, replace, remove, or clear log watches. When adding or replacing watches after output may have already passed the relevant marker, Pi can use `replayTailLines` to scan a small tail of recent output once. Replay is intentionally bounded: `replayTailLines` must be at most `10000`, and `maxReplayMatches` must be at most `200`.
+
+Example: replace noisy watches and replay recent output
+
+```json
+{
+  "action": "update",
+  "id": "proc_1",
+  "alertOnSuccess": true,
+  "logWatchUpdate": {
+    "mode": "replace",
+    "watches": [
+      { "pattern": "Ready|ERROR|FAIL", "stream": "both", "repeat": true }
+    ],
+    "replayTailLines": 100
+  }
+}
+```
 
 ## Troubleshooting
 

@@ -94,6 +94,7 @@ export function renderOutputResult(
       theme.fg("success", "Log files:"),
       `  stdout: ${theme.fg("accent", details.logFiles.stdoutFile)}`,
       `  stderr: ${theme.fg("accent", details.logFiles.stderrFile)}`,
+      `  combined: ${theme.fg("accent", details.logFiles.combinedFile)}`,
     );
   }
 
@@ -178,6 +179,11 @@ export function executeOutput(
   // Build the full text content (ANSI-stripped), then truncate from the tail
   // like bash does, so the agent sees the most recent output.
   const outputParts: string[] = [message];
+  if (output.status === "running") {
+    outputParts.push(
+      "Process is still running. Use output for targeted inspection only; if you are waiting for a marker, update logWatches instead of polling.",
+    );
+  }
   if (output.stdout.length > 0) {
     outputParts.push("\nstdout:");
     outputParts.push(...output.stdout.map(stripAnsi));
@@ -202,6 +208,7 @@ export function executeOutput(
         ? {
             stdoutFile: logFiles.stdoutFile,
             stderrFile: logFiles.stderrFile,
+            combinedFile: logFiles.combinedFile,
           }
         : undefined,
     },
@@ -215,7 +222,11 @@ export function executeOutput(
  */
 function truncateTail(
   text: string,
-  logFiles: { stdoutFile: string; stderrFile: string } | null,
+  logFiles: {
+    stdoutFile: string;
+    stderrFile: string;
+    combinedFile: string;
+  } | null,
   maxLines: number,
 ): string {
   const totalBytes = Buffer.byteLength(text, "utf-8");
@@ -254,7 +265,7 @@ function truncateTail(
   result += `\n\n[Showing lines ${startLine}-${totalLines} of ${totalLines}${sizeNote}.`;
 
   if (logFiles) {
-    result += ` Full logs: ${logFiles.stdoutFile} , ${logFiles.stderrFile}`;
+    result += ` Full logs: ${logFiles.stdoutFile} , ${logFiles.stderrFile} , ${logFiles.combinedFile}`;
   }
 
   result += "]";

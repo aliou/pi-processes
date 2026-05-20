@@ -1,3 +1,4 @@
+import { dirname } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ManagerEvent } from "./constants";
 import { ProcessManager } from "./manager";
@@ -19,6 +20,40 @@ function collectEvents(manager: ProcessManager): ManagerEvent[] {
   manager.onEvent((e) => events.push(e));
   return events;
 }
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function waitForWatchMatch(manager: ProcessManager, id: string): Promise<void> {
+  return new Promise((resolve) => {
+    const unsub = manager.onEvent((e) => {
+      if (e.type === "process_watch_matched" && e.match.processId === id) {
+        unsub();
+        resolve();
+      }
+    });
+  });
+}
+
+describe("process log directories", () => {
+  it("uses a unique log directory for each manager", () => {
+    const first = new ProcessManager();
+    const second = new ProcessManager();
+
+    try {
+      const firstInfo = first.start("first", "cat", "/tmp");
+      const secondInfo = second.start("second", "cat", "/tmp");
+
+      expect(dirname(firstInfo.stdoutFile)).not.toBe(
+        dirname(secondInfo.stdoutFile),
+      );
+    } finally {
+      first.cleanup();
+      second.cleanup();
+    }
+  });
+});
 
 describe("process_output_changed", () => {
   let manager: ProcessManager;
@@ -319,6 +354,21 @@ describe("process_watch_matched", () => {
     expect(matches).toHaveLength(1);
   });
 
+  it("does not report active watches for exited processes", async () => {
+    manager = new ProcessManager();
+
+    const info = manager.start("watch-exit", "echo ready", "/tmp", {
+      logWatches: [{ pattern: "ready", repeat: true }],
+    });
+
+    await waitForEnd(manager, info.id);
+
+    expect(manager.get(info.id)).toMatchObject({
+      watchCount: 1,
+      activeWatchCount: 0,
+    });
+  });
+
   it("throws for invalid watch regex", () => {
     manager = new ProcessManager();
 
@@ -327,5 +377,208 @@ describe("process_watch_matched", () => {
         logWatches: [{ pattern: "(" }],
       }),
     ).toThrowError(/Invalid log watch pattern/);
+  });
+
+  it("appends watches to a running process", async () => {
+    manager = new ProcessManager();
+    const events = collectEvents(manager);
+    const info = manager.start("watch-update", "cat", "/tmp");
+
+    const update = manager.update(info.id, {
+      logWatchUpdate: {
+        mode: "append",
+        watches: [{ pattern: "ready" }],
+      },
+    });
+
+    expect(update.ok).toBe(true);
+    if (update.ok) {
+      expect(update.watches).toMatchObject([
+        { index: 0, pattern: "ready", stream: "both", repeat: false },
+      ]);
+    }
+    expect(manager.get(info.id)).toMatchObject({
+      watchCount: 1,
+      activeWatchCount: 1,
+    });
+
+    const matched = waitForWatchMatch(manager, info.id);
+    manager.writeToStdin(info.id, "ready\n");
+    await matched;
+
+    const matches = events.filter((e) => e.type === "process_watch_matched");
+    expect(matches).toHaveLength(1);
+    expect(manager.get(info.id)).toMatchObject({
+      watchCount: 1,
+      activeWatchCount: 0,
+    });
+    const match = matches[0];
+    if (match.type === "process_watch_matched") {
+      expect(match.match.watch.index).toBe(0);
+      expect(match.match.line).toBe("ready");
+    }
+  });
+
+  it("replaces noisy watches without reusing indexes", async () => {
+    manager = new ProcessManager();
+    const events = collectEvents(manager);
+    const info = manager.start("watch-replace", "cat", "/tmp", {
+      logWatches: [{ pattern: "noise", repeat: true }],
+    });
+
+    const update = manager.update(info.id, {
+      logWatchUpdate: {
+        mode: "replace",
+        watches: [{ pattern: "ready" }],
+      },
+    });
+
+    expect(update.ok).toBe(true);
+    if (update.ok) {
+      expect(update.watches).toMatchObject([
+        { index: 1, pattern: "ready", stream: "both", repeat: false },
+      ]);
+    }
+
+    const matched = waitForWatchMatch(manager, info.id);
+    manager.writeToStdin(info.id, "noise\nready\n");
+    await matched;
+    await sleep(100);
+
+    const matches = events.filter((e) => e.type === "process_watch_matched");
+    expect(matches).toHaveLength(1);
+    const match = matches[0];
+    if (match.type === "process_watch_matched") {
+      expect(match.match.watch.index).toBe(1);
+      expect(match.match.line).toBe("ready");
+    }
+  });
+
+  it("removes and clears watches by stable index", () => {
+    manager = new ProcessManager();
+    const info = manager.start("watch-remove", "cat", "/tmp", {
+      logWatches: [{ pattern: "one" }, { pattern: "two" }],
+    });
+
+    const remove = manager.update(info.id, {
+      logWatchUpdate: { mode: "remove", watchIndexes: [0] },
+    });
+    expect(remove.ok).toBe(true);
+    if (remove.ok) {
+      expect(remove.watches).toMatchObject([{ index: 1, pattern: "two" }]);
+    }
+
+    const clear = manager.update(info.id, {
+      logWatchUpdate: { mode: "clear" },
+    });
+    expect(clear.ok).toBe(true);
+    if (clear.ok) expect(clear.watches).toHaveLength(0);
+  });
+
+  it("does not mutate existing watches when an update has invalid regex", () => {
+    manager = new ProcessManager();
+    const info = manager.start("watch-invalid", "cat", "/tmp", {
+      logWatches: [{ pattern: "ready" }],
+    });
+
+    const update = manager.update(info.id, {
+      logWatchUpdate: {
+        mode: "append",
+        watches: [{ pattern: "(" }],
+      },
+    });
+
+    expect(update.ok).toBe(false);
+    if (!update.ok) {
+      expect(update.reason).toBe("invalid");
+      expect(update.watches).toMatchObject([{ index: 0, pattern: "ready" }]);
+    }
+
+    const list = manager.update(info.id, { logWatchUpdate: { mode: "list" } });
+    expect(list.ok).toBe(true);
+    if (list.ok) {
+      expect(list.watches).toMatchObject([{ index: 0, pattern: "ready" }]);
+    }
+  });
+
+  it("replays recent output for newly added one-time watches", async () => {
+    manager = new ProcessManager();
+    const events = collectEvents(manager);
+    const info = manager.start("watch-replay", "cat", "/tmp");
+
+    manager.writeToStdin(info.id, "done\n");
+    await sleep(100);
+
+    const update = manager.update(info.id, {
+      logWatchUpdate: {
+        mode: "append",
+        watches: [{ pattern: "done" }],
+        replayTailLines: 10,
+      },
+    });
+
+    expect(update.ok).toBe(true);
+    if (update.ok) {
+      expect(update.replayMatches).toMatchObject([
+        { watchIndex: 0, source: "stdout", line: "done" },
+      ]);
+      expect(update.watches).toMatchObject([{ index: 0, fired: true }]);
+    }
+
+    manager.writeToStdin(info.id, "done\n");
+    await sleep(100);
+
+    const matches = events.filter((e) => e.type === "process_watch_matched");
+    expect(matches).toHaveLength(0);
+  });
+
+  it("rejects replay limits above the bounded caps without mutating watches", () => {
+    manager = new ProcessManager();
+    const info = manager.start("watch-replay-cap", "cat", "/tmp", {
+      logWatches: [{ pattern: "ready" }],
+    });
+
+    const update = manager.update(info.id, {
+      logWatchUpdate: {
+        mode: "append",
+        watches: [{ pattern: "done" }],
+        replayTailLines: 10001,
+      },
+    });
+
+    expect(update.ok).toBe(false);
+    if (!update.ok) {
+      expect(update.message).toBe("replayTailLines must be <= 10000");
+      expect(update.watches).toMatchObject([{ index: 0, pattern: "ready" }]);
+    }
+  });
+
+  it("updates process metadata alert flags and name", () => {
+    manager = new ProcessManager();
+    const info = manager.start("old-name", "cat", "/tmp");
+
+    const update = manager.update(info.id, {
+      name: "new-name",
+      alertOnSuccess: true,
+      alertOnFailure: false,
+      alertOnKill: true,
+    });
+
+    expect(update.ok).toBe(true);
+    if (update.ok) {
+      expect(update.info.name).toBe("new-name");
+      expect(update.info.alertOnSuccess).toBe(true);
+      expect(update.info.alertOnFailure).toBe(false);
+      expect(update.info.alertOnKill).toBe(true);
+    }
+  });
+
+  it("exposes combined log file paths in process info and log details", () => {
+    manager = new ProcessManager();
+    const info = manager.start("combined", "cat", "/tmp");
+
+    expect(info.combinedFile).toMatch(/proc_\d+-combined\.log$/);
+    expect(manager.get(info.id)?.combinedFile).toBe(info.combinedFile);
+    expect(manager.getLogFiles(info.id)?.combinedFile).toBe(info.combinedFile);
   });
 });

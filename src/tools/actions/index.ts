@@ -8,6 +8,7 @@ import type {
 import type { Component } from "@mariozechner/pi-tui";
 import type {
   ExecuteResult,
+  LogWatchUpdate,
   ProcessAction,
   ProcessesDetails,
 } from "../../constants";
@@ -19,6 +20,7 @@ import { executeList, renderListResult } from "./list";
 import { executeLogs, renderLogsCall, renderLogsResult } from "./logs";
 import { executeOutput, renderOutputCall, renderOutputResult } from "./output";
 import { executeStart, renderStartCall, renderStartResult } from "./start";
+import { executeUpdate, renderUpdateCall, renderUpdateResult } from "./update";
 import { executeWrite, renderWriteCall } from "./write";
 
 const DEBUG_PREVIEW_ENABLED = process.env.PI_PROCESSES_DEBUG_PREVIEW === "1";
@@ -38,6 +40,11 @@ interface ActionParams {
     stream?: "stdout" | "stderr" | "both";
     repeat?: boolean;
   }>;
+  logWatchUpdate?: LogWatchUpdate;
+  watchAction?: "list" | "append" | "replace" | "remove" | "clear";
+  watchIndexes?: number[];
+  replayTailLines?: number;
+  maxReplayMatches?: number;
   preview?: "start" | "list" | "output" | "logs" | "error";
 }
 
@@ -61,6 +68,8 @@ export async function executeAction(
       return executeClear(manager);
     case "write":
       return executeWrite(params, manager);
+    case "update":
+      return executeUpdate(params, manager);
     case "debug_preview":
       if (!DEBUG_PREVIEW_ENABLED) {
         throw new Error(
@@ -92,6 +101,8 @@ export function renderActionCall(args: ActionParams, theme: Theme): Component {
       return renderKillCall(args, theme);
     case "write":
       return renderWriteCall(args, theme);
+    case "update":
+      return renderUpdateCall(args, theme);
     case "debug_preview":
       return renderDebugCall(args, theme);
     default:
@@ -134,6 +145,8 @@ export function renderActionResult(
       return renderOutputResult(result, options, theme);
     case "logs":
       return renderLogsResult(result, options, theme);
+    case "update":
+      return renderUpdateResult(result, options, theme);
     case "kill":
     case "write":
     case "clear":

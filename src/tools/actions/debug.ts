@@ -35,6 +35,9 @@ function mockProcess(overrides?: Partial<ProcessInfo>): ProcessInfo {
     success: null,
     stdoutFile: "/tmp/pi-processes-demo/proc_42-stdout.log",
     stderrFile: "/tmp/pi-processes-demo/proc_42-stderr.log",
+    combinedFile: "/tmp/pi-processes-demo/proc_42-combined.log",
+    watchCount: 1,
+    activeWatchCount: 1,
     alertOnSuccess: false,
     alertOnFailure: true,
     alertOnKill: false,
@@ -56,6 +59,7 @@ export function executeDebugPreview(params: DebugParams): ExecuteResult {
       "Log files:",
       `  stdout: ${process.stdoutFile}`,
       `  stderr: ${process.stderrFile}`,
+      `  combined: ${process.combinedFile}`,
     ].join("\n");
     return {
       content: [{ type: "text", text: message }],
@@ -124,6 +128,7 @@ export function executeDebugPreview(params: DebugParams): ExecuteResult {
         logFiles: {
           stdoutFile: "/tmp/pi-processes-demo/proc_42-stdout.log",
           stderrFile: "/tmp/pi-processes-demo/proc_42-stderr.log",
+          combinedFile: "/tmp/pi-processes-demo/proc_42-combined.log",
         },
       },
     };
@@ -139,6 +144,7 @@ export function executeDebugPreview(params: DebugParams): ExecuteResult {
         logFiles: {
           stdoutFile: "/tmp/pi-processes-demo/proc_42-stdout.log",
           stderrFile: "/tmp/pi-processes-demo/proc_42-stderr.log",
+          combinedFile: "/tmp/pi-processes-demo/proc_42-combined.log",
         },
       },
     };

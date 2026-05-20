@@ -1,5 +1,6 @@
 export { hasAnsi, stripAnsi } from "./ansi";
 export {
+  formatMonitorSummary,
   formatRuntime,
   formatStatus,
   formatStatusTag,

@@ -29,6 +29,24 @@ const PROCESS_COLORS: ThemeColor[] = [
   "warning",
 ];
 
+const COLLAPSED_DOCK_RIGHT_MARGIN = 1;
+
+function getCollapsedDockLineWidth(width: number): number {
+  return Math.max(0, width - COLLAPSED_DOCK_RIGHT_MARGIN);
+}
+
+export function renderCollapsedDockLine(
+  content: string,
+  width: number,
+): string {
+  const lineWidth = getCollapsedDockLineWidth(width);
+  if (lineWidth === 0) return "";
+
+  const innerWidth = Math.max(0, lineWidth - 2);
+  const line = truncateToWidth(content, innerWidth, "", true);
+  return ` ${line}${" ".repeat(Math.max(0, lineWidth - 1 - visibleWidth(line)))}`;
+}
+
 interface LogDockOptions {
   manager: ProcessManager;
   theme: Theme;
@@ -120,17 +138,12 @@ export class LogDockComponent implements Component {
     const fg = (color: ThemeColor, s: string) => theme.fg(color, s);
 
     const processes = this.manager.list();
-    const innerWidth = width - 2;
-    const padLine = (content: string) => {
-      const line =
-        visibleWidth(content) > innerWidth
-          ? truncateToWidth(content, innerWidth, "", true)
-          : content;
-      return ` ${line}${" ".repeat(Math.max(0, width - 1 - visibleWidth(line)))}`;
-    };
+    const lineWidth = getCollapsedDockLineWidth(width);
+    const padLine = (content: string) =>
+      renderCollapsedDockLine(content, width);
 
     if (processes.length === 0) {
-      return [renderPanelRule(width, theme), padLine(dim("No processes"))];
+      return [renderPanelRule(lineWidth, theme), padLine(dim("No processes"))];
     }
 
     const running = processes.filter((p) => LIVE_STATUSES.has(p.status));
@@ -146,20 +159,12 @@ export class LogDockComponent implements Component {
     }
 
     const firstLine = parts.join(" | ");
-    const lines = [
-      renderPanelRule(width, theme),
-      padLine(truncateToWidth(firstLine, innerWidth, "", true)),
-    ];
+    const lines = [renderPanelRule(lineWidth, theme), padLine(firstLine)];
 
     if (running.length > 0) {
       const lastLogs = this.manager.getCombinedOutput(running[0].id, 1);
       if (lastLogs && lastLogs.length > 0) {
-        const lastLog = truncateToWidth(
-          stripAnsi(lastLogs[lastLogs.length - 1].text),
-          innerWidth,
-          "",
-          true,
-        );
+        const lastLog = stripAnsi(lastLogs[lastLogs.length - 1].text);
         lines.push(padLine(dim(lastLog)));
       }
     }

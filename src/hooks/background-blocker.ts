@@ -6,7 +6,7 @@
  */
 
 import { parse } from "@aliou/sh";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { walkCommands, wordToString } from "../utils/shell-utils";
 
 const BACKGROUND_CMD_NAMES = new Set(["nohup", "disown", "setsid"]);

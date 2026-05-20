@@ -1,12 +1,12 @@
 import { ToolBody } from "@aliou/pi-utils-ui";
-import { StringEnum } from "@mariozechner/pi-ai";
+import { StringEnum } from "@earendil-works/pi-ai";
 import type {
   AgentToolResult,
   ExtensionAPI,
   Theme,
   ToolRenderResultOptions,
-} from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { type Static, Type } from "typebox";
 import type { ProcessesDetails } from "../constants";
 import type { ProcessManager } from "../manager";

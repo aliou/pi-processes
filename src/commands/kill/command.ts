@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { LIVE_STATUSES } from "../../constants";
 import type { DockActions } from "../../hooks/widget";
 import type { ProcessManager } from "../../manager";

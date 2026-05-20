@@ -1,19 +1,19 @@
-import {
-  createPanelPadder,
-  renderPanelRule,
-  renderPanelTitleLine,
-} from "@aliou/pi-utils-ui";
-import type { Theme } from "@mariozechner/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import {
   type Component,
   matchesKey,
   truncateToWidth,
   visibleWidth,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import { configLoader } from "../config";
 import type { ProcessInfo } from "../constants";
 import type { ProcessManager } from "../manager";
 import { stripAnsi } from "../utils";
+import {
+  createPanelPadder,
+  renderPanelRule,
+  renderPanelTitleLine,
+} from "./panel-helpers";
 import { statusIcon, statusLabel } from "./status-format";
 
 function formatRuntime(startTime: number, endTime: number | null): string {
@@ -236,7 +236,7 @@ export class ProcessesComponent implements Component {
     const padLine = (content: string): string =>
       basePadLine(
         visibleWidth(content) > innerWidth
-          ? truncateToWidth(content, innerWidth)
+          ? truncateToWidth(content, innerWidth, "", true)
           : content,
       );
 
@@ -417,8 +417,6 @@ export class ProcessesComponent implements Component {
       }
     }
 
-    lines.push(renderPanelRule(width, theme));
-
     const footerLeft =
       `${dim("enter")} stream  ` +
       `${dim("j/k")} select  ` +
@@ -448,6 +446,7 @@ export class ProcessesComponent implements Component {
       footer = truncateToWidth(footer, innerWidth);
     }
 
+    lines.push(renderPanelRule(width, theme));
     lines.push(padLine(footer));
 
     this.cachedLines = lines;

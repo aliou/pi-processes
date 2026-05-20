@@ -1,6 +1,7 @@
 import { ToolCallHeader } from "@aliou/pi-utils-ui";
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import type { ExecuteResult } from "../../constants";
+import { t } from "../../i18n";
 import type { ProcessManager } from "../../manager";
 
 interface KillParams {
@@ -24,18 +25,18 @@ export async function executeKill(
 ): Promise<ExecuteResult> {
   if (!params.id) {
     return {
-      content: [{ type: "text", text: "Missing required parameter: id" }],
+      content: [{ type: "text", text: t("kill.missingId") }],
       details: {
         action: "kill",
         success: false,
-        message: "Missing required parameter: id",
+        message: t("kill.missingId"),
       },
     };
   }
 
   const proc = manager.get(params.id);
   if (!proc) {
-    const message = `Process not found: ${params.id}`;
+    const message = t("kill.notFound", { id: params.id });
     return {
       content: [{ type: "text", text: message }],
       details: {
@@ -52,7 +53,7 @@ export async function executeKill(
   });
 
   if (result.ok) {
-    const message = `Terminated "${proc.name}" (${proc.id})`;
+    const message = t("kill.terminated", { name: proc.name, id: proc.id });
     return {
       content: [{ type: "text", text: message }],
       details: {
@@ -64,9 +65,7 @@ export async function executeKill(
   }
 
   if (result.reason === "timeout") {
-    const message =
-      `SIGTERM timed out for "${proc.name}" (${proc.id}). ` +
-      "Run /ps and press x on terminate_timeout to force kill (SIGKILL).";
+    const message = t("kill.timeout", { name: proc.name, id: proc.id });
     return {
       content: [{ type: "text", text: message }],
       details: {
@@ -77,7 +76,7 @@ export async function executeKill(
     };
   }
 
-  const message = `Failed to terminate "${proc.name}" (${proc.id})`;
+  const message = t("kill.failed", { name: proc.name, id: proc.id });
   return {
     content: [{ type: "text", text: message }],
     details: {

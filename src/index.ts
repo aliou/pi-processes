@@ -3,10 +3,13 @@ import { setupProcessesCommands } from "./commands";
 import { registerProcessesSettings } from "./commands/settings";
 import { configLoader } from "./config";
 import { setupProcessesHooks } from "./hooks";
+import { initI18n } from "./i18n";
 import { ProcessManager } from "./manager";
 import { setupProcessesTools } from "./tools";
 
 export default async function (pi: ExtensionAPI) {
+  initI18n(pi);
+
   if (process.platform === "win32") {
     pi.on("session_start", async (_event, ctx) => {
       if (!ctx.hasUI) return;

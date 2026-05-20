@@ -188,7 +188,7 @@ extensions/
     index.ts
     config.ts
     i18n.ts
-    safe-send-message.ts
+    notification-sender.ts
     tools/
       index.ts
       schema.ts
@@ -670,7 +670,7 @@ High-level decisions:
 
 Phase 2B implementation slices:
 1. Add manager end-cause metadata. See `docs/process-notifications-plan.md#manager-update-end-cause-metadata`.
-2. Add notification message infrastructure: constants, safe send wrapper, XML content builder, custom message renderer.
+2. Add notification message infrastructure: constants, normal notification sender, XML content builder, custom message renderer.
 3. Add notification registry/service: classify process ends, compile/evaluate log matchers from `appendedText`, track intentional stops, and send custom messages.
 4. Add `notify` to the `process start` tool schema with attention-only values.
 5. Update `process stop` to mark intentional stops before calling `manager.kill()`.
@@ -1373,7 +1373,7 @@ The skill file and prompt guidelines do not need persistence-specific behavior.
 
 1. **Listener leaks**: Every `pi.events.on()` and `manager.onEvent()` returns an unsubscribe function. These MUST be stored and called on session_shutdown. The EventBus is never cleared by Pi.
 
-2. **Stale Pi context**: After `/new`/`/fork`/`/resume`, the old `pi` proxy throws on any method call. The `safeSendMessage` wrapper handles this for async manager events that fire between shutdown and cleanup. All pi.events listeners from the old instance must be unsubscribed.
+2. **Stale Pi context**: After `/new`/`/fork`/`/resume`, the old `pi` proxy throws on any method call. Do not solve this by swallowing stale-proxy errors. Prevent stale calls through lifecycle ownership: notification services must be extension-instance scoped, expose `dispose()`, set a disposed flag before cleanup, unsubscribe manager/pi event listeners, and never send after disposal.
 
 3. **Exit hook duplication**: The `process.once("exit", ...)` handler in `hooks/exit.ts` must be guarded by a globalThis flag. Without this, each extension reload would add another exit handler. The guarded handler must iterate a global manager set, not close over one manager from the first extension load.
 

@@ -530,7 +530,7 @@ Guidelines:
 ```txt
 extensions/processes/
   constants.ts
-  safe-send-message.ts
+  notification-sender.ts
   message-renderer.ts
   notifications/
     types.ts
@@ -599,9 +599,13 @@ Initial minimum:
 
 Builds XML-like `content` strings and JSON `details`.
 
+#### `notification-sender.ts`
+
+Small wrapper around `pi.sendMessage()` that builds the custom message payload. It must not catch and swallow stale proxy errors. Stale sends are prevented by disposing the notification service before manager cleanup and by unsubscribing all event listeners.
+
 #### `service.ts`
 
-Subscribes to manager events and sends messages.
+Subscribes to manager events and sends messages. The service is extension-instance scoped. It may close over the current extension instance's `pi`, but it must not store it globally or use it after disposal.
 
 Inputs:
 
@@ -613,6 +617,14 @@ interface NotificationServiceDeps {
   getProcess: (id: string) => ProcessInfo | null;
 }
 ```
+
+Lifecycle requirements:
+
+- The service owns every `manager.onEvent()` / `pi.events.on()` disposer it creates.
+- `dispose()` sets `disposed = true` before unsubscribing.
+- The send path checks `disposed` and returns without sending after disposal.
+- Session shutdown must dispose the notification service before calling `manager.killAll()` or `manager.cleanup()`.
+- Do not catch stale `pi` / revoked-proxy errors as normal control flow. If such an error occurs, the lifecycle cleanup is wrong and should be fixed.
 
 Behavior:
 
@@ -665,15 +677,15 @@ Update `extensions/processes/index.ts`:
 export default function processesExtension(pi: ExtensionAPI): void {
   const manager = getManager();
   const notifications = createNotificationRegistry();
+  const notificationService = registerNotificationService(pi, manager, notifications);
 
   registerMessageRenderer(pi);
-  registerNotificationService(pi, manager, notifications);
   registerProcessTool(pi, manager, notifications);
-  registerCleanupHook(pi, manager, notifications);
+  registerCleanupHook(pi, manager, notifications, notificationService);
 }
 ```
 
-All listeners must return disposers and be cleaned up on `session_shutdown`.
+All listeners must return disposers and be cleaned up on `session_shutdown`. Cleanup order matters: dispose notification services/listeners before killing or cleaning up the manager, because manager cleanup can emit process events.
 
 ## Phased implementation
 
@@ -699,7 +711,7 @@ pnpm lint
 Scope:
 
 - Add constants.
-- Add `safe-send-message.ts`.
+- Add `notification-sender.ts`.
 - Add XML content renderer.
 - Add TUI message renderer.
 - Add notification details types.
@@ -723,7 +735,7 @@ Validation:
 
 - Unit-test classifier.
 - Unit-test log matching.
-- Unit-test service with mocked `pi.sendMessage()` and fake manager events.
+- Unit-test service with mocked `pi.sendMessage()` and fake manager events. Include disposal tests that prove no send happens after `dispose()`.
 
 ### Phase 4: tool schema and action integration
 

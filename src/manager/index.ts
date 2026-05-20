@@ -1,14 +1,12 @@
 import { EventEmitter } from "node:events";
 
 import type {
-  AddLogWatchesResult,
   KillResult,
-  LogWatch,
   ManagerEvent,
   ProcessInfo,
-  StartOptions,
   WriteResult,
 } from "../types";
+import { formatProcess } from "./internal-types";
 import { OutputChangeNotifier } from "./output-change-notifier";
 import { ProcessLogStore } from "./process-log-store";
 import { ProcessOutputTracker } from "./process-output-tracker";
@@ -37,7 +35,6 @@ export class ProcessManager {
     this.logs = new ProcessLogStore();
 
     this.outputTracker = new ProcessOutputTracker({
-      emit,
       appendCombinedLine: (file, source, line) =>
         this.logs.appendCombinedLine(file, source, line),
     });
@@ -64,39 +61,14 @@ export class ProcessManager {
     });
   }
 
-  // --- Event subscription ---
-
   onEvent(listener: (event: ManagerEvent) => void): () => void {
     this.events.on("event", listener);
     return () => this.events.off("event", listener);
   }
 
-  // --- Process lifecycle ---
-
-  start(
-    name: string,
-    command: string,
-    cwd: string,
-    options?: StartOptions,
-  ): ProcessInfo {
-    const managed = this.runtime.start(name, command, cwd, options);
-    return {
-      id: managed.id,
-      name: managed.name,
-      pid: managed.pid,
-      command: managed.command,
-      cwd: managed.cwd,
-      startTime: managed.startTime,
-      endTime: managed.endTime,
-      status: managed.status,
-      exitCode: managed.exitCode,
-      success: managed.success,
-      stdoutFile: managed.stdoutFile,
-      stderrFile: managed.stderrFile,
-      alertOnSuccess: managed.alertOnSuccess,
-      alertOnFailure: managed.alertOnFailure,
-      alertOnKill: managed.alertOnKill,
-    };
+  start(name: string, command: string, cwd: string): ProcessInfo {
+    const managed = this.runtime.start(name, command, cwd);
+    return formatProcess(managed);
   }
 
   list(): ProcessInfo[] {
@@ -106,8 +78,6 @@ export class ProcessManager {
   get(id: string): ProcessInfo | null {
     return this.registry.getPublicInfo(id);
   }
-
-  // --- Output retrieval ---
 
   getOutput(
     id: string,
@@ -163,8 +133,6 @@ export class ProcessManager {
     });
   }
 
-  // --- Kill operations ---
-
   async kill(
     id: string,
     opts?: { signal?: NodeJS.Signals; timeoutMs?: number },
@@ -180,15 +148,9 @@ export class ProcessManager {
     return this.runtime.writeToStdin(id, data, opts);
   }
 
-  addLogWatches(id: string, watches: LogWatch[]): AddLogWatchesResult {
-    return this.runtime.addLogWatches(id, watches);
-  }
-
   killAll(): void {
     this.runtime.killAll();
   }
-
-  // --- Cleanup ---
 
   clearFinished(): number {
     return this.runtime.clearFinished();
@@ -211,9 +173,7 @@ export class ProcessManager {
 }
 
 export type {
-  AddLogWatchesResult,
   KillResult,
-  LogWatch,
   ManagerEvent,
   ProcessInfo,
   ProcessStatus,

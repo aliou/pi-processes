@@ -6,7 +6,7 @@ import type { ManagerEvent } from "../../src/types";
 import { test } from "./fixtures";
 import { collectEvents, waitForEnd } from "./utils";
 
-test("runs a real process and records logs, events, output, and watches", async ({
+test("runs a real process and records logs, events, and output", async ({
   cwd,
   addScript,
 }) => {
@@ -14,16 +14,7 @@ test("runs a real process and records logs, events, output, and watches", async 
   const events = collectEvents(manager);
   addScript("emit-output.sh");
 
-  const info = manager.start("real-output", "./emit-output.sh", cwd, {
-    alertOnSuccess: true,
-    alertOnFailure: false,
-    alertOnKill: true,
-    logWatches: [
-      { pattern: "server ready on http://localhost:3000" },
-      { pattern: "TypeError|ReferenceError", mode: "regex", stream: "stderr" },
-      { pattern: "job completed", stream: "stdout", repeat: true },
-    ],
-  });
+  const info = manager.start("real-output", "./emit-output.sh", cwd);
 
   const ended = await waitForEnd(manager, info.id);
 
@@ -33,9 +24,6 @@ test("runs a real process and records logs, events, output, and watches", async 
       status: "exited",
       exitCode: 0,
       success: true,
-      alertOnSuccess: true,
-      alertOnFailure: false,
-      alertOnKill: true,
     }),
   );
 
@@ -97,27 +85,6 @@ test("runs a real process and records logs, events, output, and watches", async 
       { type: "stderr", text: "TypeError: broken fixture" },
     ]),
   );
-
-  const watchMatches = events.filter(
-    (
-      event,
-    ): event is Extract<ManagerEvent, { type: "process_watch_matched" }> =>
-      event.type === "process_watch_matched",
-  );
-  expect(watchMatches).toHaveLength(3);
-  expect(watchMatches.map((event) => event.match.watch.pattern)).toEqual(
-    expect.arrayContaining([
-      "server ready on http://localhost:3000",
-      "TypeError|ReferenceError",
-      "job completed",
-    ]),
-  );
-  expect(
-    watchMatches.find(
-      (event) =>
-        event.match.watch.pattern === "server ready on http://localhost:3000",
-    )?.match.watch.mode,
-  ).toBe("literal");
 
   expect(events.some((event) => event.type === "process_started")).toBe(true);
   expect(events.some((event) => event.type === "process_ended")).toBe(true);

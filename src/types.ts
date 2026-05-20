@@ -11,27 +11,6 @@ export const LIVE_STATUSES: ReadonlySet<ProcessStatus> = new Set([
   "terminate_timeout",
 ]);
 
-export type LogWatchStream = "stdout" | "stderr" | "both";
-export type LogWatchMode = "literal" | "regex";
-
-export interface LogWatch {
-  pattern: string;
-  mode?: LogWatchMode;
-  stream?: LogWatchStream;
-  repeat?: boolean;
-}
-
-export interface StartOptions {
-  alertOnSuccess?: boolean; // default false
-  alertOnFailure?: boolean; // default true
-  alertOnKill?: boolean; // default false
-  logWatches?: LogWatch[];
-}
-
-export type AddLogWatchesResult =
-  | { ok: true; added: number }
-  | { ok: false; reason: "not_found" | "process_exited" };
-
 export interface ProcessInfo {
   id: string;
   name: string;
@@ -45,24 +24,6 @@ export interface ProcessInfo {
   success: boolean | null; // null if running, true if exit code 0, false otherwise
   stdoutFile: string;
   stderrFile: string;
-  alertOnSuccess: boolean;
-  alertOnFailure: boolean;
-  alertOnKill: boolean;
-}
-
-export interface LogWatchMatchEvent {
-  processId: string;
-  processName: string;
-  processCommand: string;
-  source: "stdout" | "stderr";
-  line: string;
-  watch: {
-    index: number;
-    pattern: string;
-    mode: LogWatchMode;
-    stream: LogWatchStream;
-    repeat: boolean;
-  };
 }
 
 export type ManagerEvent =
@@ -73,7 +34,6 @@ export type ManagerEvent =
       id: string;
       appendedText?: Array<{ type: "stdout" | "stderr"; text: string }>;
     }
-  | { type: "process_watch_matched"; match: LogWatchMatchEvent }
   | { type: "processes_changed" };
 
 export type KillResult =

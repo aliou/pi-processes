@@ -1,11 +1,10 @@
-import type { KillResult, LogWatchMatchEvent, ProcessInfo } from "./types";
+import type { KillResult, ProcessInfo } from "./types";
 
 export const CHANNELS = {
   // Core broadcasts
   STARTED: "processes:started",
   ENDED: "processes:ended",
   OUTPUT_CHANGED: "processes:output_changed",
-  WATCH_MATCHED: "processes:watch_matched",
   CHANGED: "processes:changed",
 
   // Request channels (UI -> core, sync callback)
@@ -35,7 +34,6 @@ export type ProcessesOutputChangedPayload = {
   id: string;
   appendedText?: Array<{ type: "stdout" | "stderr"; text: string }>;
 };
-export type ProcessesWatchMatchedPayload = LogWatchMatchEvent;
 export type ProcessesChangedPayload = {
   reason: "started" | "ended" | "cleared";
 };

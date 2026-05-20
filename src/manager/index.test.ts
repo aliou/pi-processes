@@ -205,9 +205,6 @@ describe("start/list/get basics", () => {
         success: null,
         exitCode: null,
         endTime: null,
-        alertOnSuccess: false,
-        alertOnFailure: true,
-        alertOnKill: false,
       }),
     );
     expect(info.pid).toBeGreaterThan(0);
@@ -234,23 +231,6 @@ describe("start/list/get basics", () => {
   it("returns null for unknown process id", () => {
     using manager = new ProcessManager();
     expect(manager.get("nonexistent")).toBeNull();
-  });
-
-  it("custom alert flags in StartOptions", () => {
-    using manager = new ProcessManager();
-    const info = manager.start("test", "echo hi", "/tmp", {
-      alertOnSuccess: true,
-      alertOnFailure: false,
-      alertOnKill: true,
-    });
-
-    expect(info).toEqual(
-      expect.objectContaining({
-        alertOnSuccess: true,
-        alertOnFailure: false,
-        alertOnKill: true,
-      }),
-    );
   });
 });
 
@@ -468,220 +448,6 @@ describe("killAll", () => {
   });
 });
 
-// --- Watch matching ---
-
-describe("process_watch_matched", () => {
-  it("fires once by default on first matching line", async () => {
-    using manager = new ProcessManager();
-    const events = collectEvents(manager);
-
-    const info = manager.start(
-      "watch-once",
-      "bash -c 'echo ready; echo ready; echo ready'",
-      "/tmp",
-      {
-        logWatches: [{ pattern: "ready" }],
-      },
-    );
-
-    await waitForEnd(manager, info.id);
-
-    const matches = events.filter((e) => e.type === "process_watch_matched");
-    expect(matches).toHaveLength(1);
-
-    const first = matches[0];
-    if (first.type === "process_watch_matched") {
-      expect(first.match).toEqual(
-        expect.objectContaining({
-          processId: info.id,
-          source: "stdout",
-          line: "ready",
-        }),
-      );
-      expect(first.match.watch.repeat).toBe(false);
-    }
-  });
-
-  it("supports repeat watches", async () => {
-    using manager = new ProcessManager();
-    const events = collectEvents(manager);
-
-    const info = manager.start(
-      "watch-repeat",
-      "bash -c 'echo done; echo done; echo done'",
-      "/tmp",
-      {
-        logWatches: [{ pattern: "done", repeat: true }],
-      },
-    );
-
-    await waitForEnd(manager, info.id);
-
-    const matches = events.filter((e) => e.type === "process_watch_matched");
-    expect(matches).toHaveLength(3);
-  });
-
-  it("respects stream scoping", async () => {
-    using manager = new ProcessManager();
-    const events = collectEvents(manager);
-
-    const info = manager.start(
-      "watch-stream",
-      "bash -c 'echo out; echo err >&2'",
-      "/tmp",
-      {
-        logWatches: [{ pattern: "err", stream: "stderr" }],
-      },
-    );
-
-    await waitForEnd(manager, info.id);
-
-    const matches = events.filter((e) => e.type === "process_watch_matched");
-    expect(matches).toHaveLength(1);
-
-    const match = matches[0];
-    if (match.type === "process_watch_matched") {
-      expect(match.match).toEqual(
-        expect.objectContaining({ source: "stderr", line: "err" }),
-      );
-    }
-  });
-
-  it("stream both matches stdout and stderr", async () => {
-    using manager = new ProcessManager();
-    const events = collectEvents(manager);
-
-    const info = manager.start(
-      "watch-both",
-      "bash -c 'echo marker; echo marker >&2'",
-      "/tmp",
-      {
-        logWatches: [{ pattern: "marker", stream: "both", repeat: true }],
-      },
-    );
-
-    await waitForEnd(manager, info.id);
-
-    const matches = events.filter((e) => e.type === "process_watch_matched");
-    expect(matches).toHaveLength(2);
-
-    const sources = new Set(
-      matches
-        .filter(
-          (e): e is Extract<ManagerEvent, { type: "process_watch_matched" }> =>
-            e.type === "process_watch_matched",
-        )
-        .map((e) => e.match.source),
-    );
-
-    expect(sources).toEqual(new Set(["stdout", "stderr"]));
-  });
-
-  it("matches trailing partial line at process end", async () => {
-    using manager = new ProcessManager();
-    const events = collectEvents(manager);
-
-    const info = manager.start("watch-trailing", "printf ready", "/tmp", {
-      logWatches: [{ pattern: "ready" }],
-    });
-
-    await waitForEnd(manager, info.id);
-
-    const matches = events.filter((e) => e.type === "process_watch_matched");
-    expect(matches).toHaveLength(1);
-  });
-
-  it("throws for invalid watch regex", () => {
-    using manager = new ProcessManager();
-
-    expect(() =>
-      manager.start("bad-watch", "echo ok", "/tmp", {
-        logWatches: [{ pattern: "(", mode: "regex" }],
-      }),
-    ).toThrowError(/Invalid log watch pattern/);
-  });
-
-  it("uses literal watch matching by default", async () => {
-    using manager = new ProcessManager();
-    const events = collectEvents(manager);
-
-    const info = manager.start("literal-watch", "echo '('", "/tmp", {
-      logWatches: [{ pattern: "(" }],
-    });
-
-    await waitForEnd(manager, info.id);
-
-    const matches = events.filter((e) => e.type === "process_watch_matched");
-    expect(matches).toHaveLength(1);
-  });
-
-  it("adds log watches to a running process", () => {
-    using manager = new ProcessManager();
-    const events = collectEvents(manager);
-    const info = manager.start("late-watch", "sleep 60", "/tmp");
-
-    expect(manager.addLogWatches(info.id, [{ pattern: "late ready" }])).toEqual(
-      {
-        ok: true,
-        added: 1,
-      },
-    );
-
-    const child = fakeProcesses.get(info.pid);
-    assert(child, "fake child should exist");
-    child.stdout.write("late ready\n");
-
-    const matches = events.filter((e) => e.type === "process_watch_matched");
-    expect(matches).toHaveLength(1);
-    if (matches[0].type === "process_watch_matched") {
-      expect(matches[0].match.watch.index).toBe(0);
-    }
-  });
-
-  it("appends log watches after existing watches", () => {
-    using manager = new ProcessManager();
-    const events = collectEvents(manager);
-    const info = manager.start("late-watch", "sleep 60", "/tmp", {
-      logWatches: [{ pattern: "first" }],
-    });
-
-    expect(manager.addLogWatches(info.id, [{ pattern: "second" }])).toEqual({
-      ok: true,
-      added: 1,
-    });
-
-    const child = fakeProcesses.get(info.pid);
-    assert(child, "fake child should exist");
-    child.stdout.write("second\n");
-
-    const matches = events.filter((e) => e.type === "process_watch_matched");
-    expect(matches).toHaveLength(1);
-    if (matches[0].type === "process_watch_matched") {
-      expect(matches[0].match.watch.index).toBe(1);
-    }
-  });
-
-  it("returns not_found when adding watches to an unknown process", () => {
-    using manager = new ProcessManager();
-
-    expect(manager.addLogWatches("missing", [{ pattern: "late" }])).toEqual({
-      ok: false,
-      reason: "not_found",
-    });
-  });
-
-  it("returns process_exited when adding watches to a finished process", async () => {
-    using manager = new ProcessManager();
-    const info = manager.start("finished", "echo hi", "/tmp");
-    await waitForEnd(manager, info.id);
-
-    expect(manager.addLogWatches(info.id, [{ pattern: "late" }])).toEqual({
-      ok: false,
-      reason: "process_exited",
-    });
-  });
-});
-
 // --- Kill ---
 
 describe("kill", () => {
@@ -717,22 +483,6 @@ describe("kill", () => {
 
     const result = await manager.kill(info.id);
     expect(result).toEqual({ ok: true, info: expect.any(Object) });
-  });
-
-  it("sets alertOnKill to false on kill", async () => {
-    vi.useFakeTimers();
-    using manager = new ProcessManager();
-    const info = manager.start("test", "sleep 60", "/tmp", {
-      alertOnKill: true,
-    });
-
-    const resultPromise = manager.kill(info.id);
-    await vi.advanceTimersByTimeAsync(3000);
-    await resultPromise;
-
-    const updated = manager.get(info.id);
-    assert(updated, "process should exist");
-    expect(updated.alertOnKill).toBe(false);
   });
 });
 

@@ -13,9 +13,7 @@ test("kills a real running process and clears finished logs", async ({
   const events = collectEvents(manager);
   addScript("wait-for-file.sh");
 
-  const info = manager.start("kill-target", "./wait-for-file.sh never", cwd, {
-    alertOnKill: true,
-  });
+  const info = manager.start("kill-target", "./wait-for-file.sh never", cwd);
   const files = manager.getLogFiles(info.id);
   assert(files, "log files should exist");
 
@@ -26,7 +24,6 @@ test("kills a real running process and clears finished logs", async ({
   expect(result.ok).toBe(true);
   if (result.ok) {
     expect(result.info.status).toBe("killed");
-    expect(result.info.alertOnKill).toBe(false);
   }
 
   expect(events.some((event) => event.type === "process_ended")).toBe(true);

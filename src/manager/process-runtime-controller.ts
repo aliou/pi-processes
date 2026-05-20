@@ -1,17 +1,11 @@
 import type { ChildProcess } from "node:child_process";
 
-import type {
-  AddLogWatchesResult,
-  KillResult,
-  LogWatch,
-  StartOptions,
-  WriteResult,
-} from "../types";
+import type { KillResult, WriteResult } from "../types";
 import { LIVE_STATUSES } from "../types";
 import { isProcessGroupAlive, killProcessGroup } from "../utils";
 import { spawnCommand } from "../utils/command-executor";
-import type { ManagedProcess } from "./internal-types";
-import { publicProcessInfo } from "./internal-types";
+import type { ManagedProcessRecord } from "./internal-types";
+import { formatProcess } from "./internal-types";
 import type { OutputChangeNotifier } from "./output-change-notifier";
 import type { ProcessLogStore } from "./process-log-store";
 import type { ProcessOutputTracker } from "./process-output-tracker";
@@ -47,22 +41,14 @@ export class ProcessRuntimeController {
     this.getConfiguredShellPath = deps.getConfiguredShellPath;
   }
 
-  start(
-    name: string,
-    command: string,
-    cwd: string,
-    options?: StartOptions,
-  ): ManagedProcess {
-    const resolvedWatches = this.outputTracker.resolveLogWatches(
-      options?.logWatches,
-    );
+  start(name: string, command: string, cwd: string): ManagedProcessRecord {
     const id = this.registry.nextId();
     const logPaths = this.logs.createLogs(id);
 
     const child = spawnCommand(command, cwd, this.getConfiguredShellPath());
     child.unref();
 
-    const managed: ManagedProcess = {
+    const managed: ManagedProcessRecord = {
       id,
       name,
       pid: child.pid ?? -1,
@@ -76,16 +62,12 @@ export class ProcessRuntimeController {
       stdoutFile: logPaths.stdoutFile,
       stderrFile: logPaths.stderrFile,
       combinedFile: logPaths.combinedFile,
-      alertOnSuccess: options?.alertOnSuccess ?? false,
-      alertOnFailure: options?.alertOnFailure ?? true,
-      alertOnKill: options?.alertOnKill ?? false,
       process: child,
       stdin: child.stdin,
       stdinClosed: false,
       lastSignalSent: null,
       stdoutPendingLine: "",
       stderrPendingLine: "",
-      watches: resolvedWatches,
       appendedLines: [],
     };
 
@@ -102,18 +84,18 @@ export class ProcessRuntimeController {
 
     this.wireStdioHandlers(managed, child);
 
-    this.emit({ type: "process_started", info: publicProcessInfo(managed) });
+    this.emit({ type: "process_started", info: formatProcess(managed) });
     this.ensureWatcherRunning();
 
     return managed;
   }
 
-  transition(managed: ManagedProcess, next: typeof managed.status): void {
+  transition(managed: ManagedProcessRecord, next: typeof managed.status): void {
     if (managed.status === next) return;
     managed.status = next;
 
     if (next === "exited" || next === "killed") {
-      this.emit({ type: "process_ended", info: publicProcessInfo(managed) });
+      this.emit({ type: "process_ended", info: formatProcess(managed) });
     }
 
     this.ensureWatcherRunning();
@@ -141,9 +123,6 @@ export class ProcessRuntimeController {
           success: false,
           stdoutFile: "",
           stderrFile: "",
-          alertOnSuccess: false,
-          alertOnFailure: true,
-          alertOnKill: false,
         },
         reason: "not_found",
       };
@@ -152,10 +131,8 @@ export class ProcessRuntimeController {
     const signal = opts?.signal ?? "SIGTERM";
     const timeoutMs = opts?.timeoutMs ?? 3000;
 
-    managed.alertOnKill = false;
-
     if (!LIVE_STATUSES.has(managed.status)) {
-      return { ok: true, info: publicProcessInfo(managed) };
+      return { ok: true, info: formatProcess(managed) };
     }
 
     this.transition(managed, "terminating");
@@ -168,7 +145,7 @@ export class ProcessRuntimeController {
       if (err.code !== "EPERM") {
         return {
           ok: false,
-          info: publicProcessInfo(managed),
+          info: formatProcess(managed),
           reason: "error",
         };
       }
@@ -183,7 +160,7 @@ export class ProcessRuntimeController {
       this.transition(managed, "terminate_timeout");
       return {
         ok: false,
-        info: publicProcessInfo(managed),
+        info: formatProcess(managed),
         reason: "timeout",
       };
     }
@@ -197,7 +174,7 @@ export class ProcessRuntimeController {
     this.outputTracker.flushPendingLines(managed);
     this.outputNotifier.flush(id);
     this.transition(managed, "killed");
-    return { ok: true, info: publicProcessInfo(managed) };
+    return { ok: true, info: formatProcess(managed) };
   }
 
   killAll(): void {
@@ -255,34 +232,6 @@ export class ProcessRuntimeController {
     }
   }
 
-  addLogWatches(id: string, watches: LogWatch[]): AddLogWatchesResult {
-    const managed = this.registry.getRecord(id);
-    if (!managed) {
-      return {
-        ok: false,
-        reason: "not_found",
-      };
-    }
-
-    if (!LIVE_STATUSES.has(managed.status)) {
-      return {
-        ok: false,
-        reason: "process_exited",
-      };
-    }
-
-    const resolved = this.outputTracker.resolveLogWatches(
-      watches,
-      managed.watches.length,
-    );
-    managed.watches.push(...resolved);
-
-    return {
-      ok: true,
-      added: resolved.length,
-    };
-  }
-
   clearFinished(): number {
     let cleared = 0;
     for (const [id, managed] of this.registry.entries()) {
@@ -336,7 +285,7 @@ export class ProcessRuntimeController {
   }
 
   private wireStdioHandlers(
-    managed: ManagedProcess,
+    managed: ManagedProcessRecord,
     child: ChildProcess,
   ): void {
     child.stdout?.on("data", (data: Buffer) => {

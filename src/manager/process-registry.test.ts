@@ -1,6 +1,6 @@
 import { createMock, type PartialFuncReturn } from "@golevelup/ts-vitest";
 import { assert, describe, expect, it } from "vitest";
-import type { ManagedProcess } from "./internal-types";
+import type { ManagedProcessRecord } from "./internal-types";
 import { ProcessRegistry } from "./process-registry";
 
 const managedDefaults = {
@@ -17,17 +17,13 @@ const managedDefaults = {
   stdoutFile: "/tmp/stdout.log",
   stderrFile: "/tmp/stderr.log",
   combinedFile: "/tmp/combined.log",
-  alertOnSuccess: false,
-  alertOnFailure: true,
-  alertOnKill: false,
   stdin: null,
   stdinClosed: false,
   lastSignalSent: null,
   stdoutPendingLine: "",
   stderrPendingLine: "",
-  watches: [],
   appendedLines: [],
-} satisfies PartialFuncReturn<ManagedProcess>;
+} satisfies PartialFuncReturn<ManagedProcessRecord>;
 
 describe("ProcessRegistry", () => {
   it("generates sequential IDs", () => {
@@ -39,10 +35,9 @@ describe("ProcessRegistry", () => {
 
   it("add and getRecord", () => {
     using registry = new ProcessRegistry();
-    const managed = createMock<ManagedProcess>({
+    const managed = createMock<ManagedProcessRecord>({
       ...managedDefaults,
       id: "proc_1",
-      watches: [],
       appendedLines: [],
     });
     registry.add(managed);
@@ -54,12 +49,11 @@ describe("ProcessRegistry", () => {
   it("getPublicInfo returns ProcessInfo", () => {
     using registry = new ProcessRegistry();
     registry.add(
-      createMock<ManagedProcess>({
+      createMock<ManagedProcessRecord>({
         ...managedDefaults,
         id: "proc_1",
         name: "test",
         status: "running",
-        watches: [],
         appendedLines: [],
       }),
     );
@@ -83,10 +77,9 @@ describe("ProcessRegistry", () => {
   it("delete removes a process", () => {
     using registry = new ProcessRegistry();
     registry.add(
-      createMock<ManagedProcess>({
+      createMock<ManagedProcessRecord>({
         ...managedDefaults,
         id: "proc_1",
-        watches: [],
         appendedLines: [],
       }),
     );
@@ -100,32 +93,29 @@ describe("ProcessRegistry", () => {
   it("list returns processes in insertion order", () => {
     using registry = new ProcessRegistry();
     registry.add(
-      createMock<ManagedProcess>({
+      createMock<ManagedProcessRecord>({
         ...managedDefaults,
         id: "proc_1",
         name: "oldest",
         startTime: 100,
-        watches: [],
         appendedLines: [],
       }),
     );
     registry.add(
-      createMock<ManagedProcess>({
+      createMock<ManagedProcessRecord>({
         ...managedDefaults,
         id: "proc_2",
         name: "newest",
         startTime: 300,
-        watches: [],
         appendedLines: [],
       }),
     );
     registry.add(
-      createMock<ManagedProcess>({
+      createMock<ManagedProcessRecord>({
         ...managedDefaults,
         id: "proc_3",
         name: "middle",
         startTime: 200,
-        watches: [],
         appendedLines: [],
       }),
     );
@@ -140,22 +130,20 @@ describe("ProcessRegistry", () => {
   it("keeps insertion order when start times match", () => {
     using registry = new ProcessRegistry();
     registry.add(
-      createMock<ManagedProcess>({
+      createMock<ManagedProcessRecord>({
         ...managedDefaults,
         id: "proc_alpha",
         name: "first",
         startTime: 100,
-        watches: [],
         appendedLines: [],
       }),
     );
     registry.add(
-      createMock<ManagedProcess>({
+      createMock<ManagedProcessRecord>({
         ...managedDefaults,
         id: "proc_beta",
         name: "second",
         startTime: 100,
-        watches: [],
         appendedLines: [],
       }),
     );
@@ -166,10 +154,9 @@ describe("ProcessRegistry", () => {
   it("has checks for existence", () => {
     using registry = new ProcessRegistry();
     registry.add(
-      createMock<ManagedProcess>({
+      createMock<ManagedProcessRecord>({
         ...managedDefaults,
         id: "proc_1",
-        watches: [],
         appendedLines: [],
       }),
     );
@@ -181,11 +168,10 @@ describe("ProcessRegistry", () => {
   it("hasAliveishProcesses returns true when live processes exist", () => {
     using registry = new ProcessRegistry();
     registry.add(
-      createMock<ManagedProcess>({
+      createMock<ManagedProcessRecord>({
         ...managedDefaults,
         id: "proc_1",
         status: "running",
-        watches: [],
         appendedLines: [],
       }),
     );
@@ -196,20 +182,18 @@ describe("ProcessRegistry", () => {
   it("hasAliveishProcesses returns false when all are dead", () => {
     using registry = new ProcessRegistry();
     registry.add(
-      createMock<ManagedProcess>({
+      createMock<ManagedProcessRecord>({
         ...managedDefaults,
         id: "proc_1",
         status: "exited",
-        watches: [],
         appendedLines: [],
       }),
     );
     registry.add(
-      createMock<ManagedProcess>({
+      createMock<ManagedProcessRecord>({
         ...managedDefaults,
         id: "proc_2",
         status: "killed",
-        watches: [],
         appendedLines: [],
       }),
     );
@@ -225,29 +209,26 @@ describe("ProcessRegistry", () => {
   it("forEachAlive iterates only live processes", () => {
     using registry = new ProcessRegistry();
     registry.add(
-      createMock<ManagedProcess>({
+      createMock<ManagedProcessRecord>({
         ...managedDefaults,
         id: "proc_1",
         status: "running",
-        watches: [],
         appendedLines: [],
       }),
     );
     registry.add(
-      createMock<ManagedProcess>({
+      createMock<ManagedProcessRecord>({
         ...managedDefaults,
         id: "proc_2",
         status: "exited",
-        watches: [],
         appendedLines: [],
       }),
     );
     registry.add(
-      createMock<ManagedProcess>({
+      createMock<ManagedProcessRecord>({
         ...managedDefaults,
         id: "proc_3",
         status: "terminating",
-        watches: [],
         appendedLines: [],
       }),
     );
@@ -261,18 +242,16 @@ describe("ProcessRegistry", () => {
   it("values and entries iterate all processes", () => {
     using registry = new ProcessRegistry();
     registry.add(
-      createMock<ManagedProcess>({
+      createMock<ManagedProcessRecord>({
         ...managedDefaults,
         id: "proc_1",
-        watches: [],
         appendedLines: [],
       }),
     );
     registry.add(
-      createMock<ManagedProcess>({
+      createMock<ManagedProcessRecord>({
         ...managedDefaults,
         id: "proc_2",
-        watches: [],
         appendedLines: [],
       }),
     );

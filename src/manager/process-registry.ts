@@ -1,26 +1,26 @@
 import { LIVE_STATUSES, type ProcessInfo } from "../types";
-import type { ManagedProcess } from "./internal-types";
-import { publicProcessInfo } from "./internal-types";
+import type { ManagedProcessRecord } from "./internal-types";
+import { formatProcess } from "./internal-types";
 
 export class ProcessRegistry {
-  private processes: Map<string, ManagedProcess> = new Map();
+  private processes: Map<string, ManagedProcessRecord> = new Map();
   private counter = 0;
 
   nextId(): string {
     return `proc_${++this.counter}`;
   }
 
-  add(process: ManagedProcess): void {
+  add(process: ManagedProcessRecord): void {
     this.processes.set(process.id, process);
   }
 
-  getRecord(id: string): ManagedProcess | undefined {
+  getRecord(id: string): ManagedProcessRecord | undefined {
     return this.processes.get(id);
   }
 
   getPublicInfo(id: string): ProcessInfo | null {
     const managed = this.processes.get(id);
-    return managed ? publicProcessInfo(managed) : null;
+    return managed ? formatProcess(managed) : null;
   }
 
   delete(id: string): boolean {
@@ -28,14 +28,14 @@ export class ProcessRegistry {
   }
 
   list(): ProcessInfo[] {
-    return Array.from(this.processes.values()).map((p) => publicProcessInfo(p));
+    return Array.from(this.processes.values()).map((p) => formatProcess(p));
   }
 
-  values(): IterableIterator<ManagedProcess> {
+  values(): IterableIterator<ManagedProcessRecord> {
     return this.processes.values();
   }
 
-  entries(): IterableIterator<[string, ManagedProcess]> {
+  entries(): IterableIterator<[string, ManagedProcessRecord]> {
     return this.processes.entries();
   }
 
@@ -50,7 +50,9 @@ export class ProcessRegistry {
     return false;
   }
 
-  forEachAlive(callback: (id: string, managed: ManagedProcess) => void): void {
+  forEachAlive(
+    callback: (id: string, managed: ManagedProcessRecord) => void,
+  ): void {
     for (const [id, managed] of this.processes) {
       if (LIVE_STATUSES.has(managed.status)) {
         callback(id, managed);

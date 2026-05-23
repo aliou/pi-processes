@@ -7,6 +7,7 @@ import {
 import { type Component, Container, Text } from "@earendil-works/pi-tui";
 
 import type { ProcessManager } from "../../../src/manager";
+import type { NotificationRegistry } from "../notifications/registry";
 import { ToolLayout } from "./components";
 import { executeList, formatListDetails, type ListDetails } from "./list";
 import * as listRender from "./list/render";
@@ -21,6 +22,7 @@ type ProcessDetails = StartDetails | ListDetails | StopDetails;
 export function registerProcessTool(
   pi: ExtensionAPI,
   manager: ProcessManager,
+  _notifications: NotificationRegistry,
 ): void {
   pi.registerTool(
     defineTool({

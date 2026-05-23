@@ -242,9 +242,9 @@ export function createNotificationService(deps: NotificationServiceDeps): {
       case "turn":
         return { triggerTurn: true, deliverAs: "steer" };
       case "context":
-        return { triggerTurn: false, deliverAs: "nextTurn" };
+        return { triggerTurn: false, deliverAs: "steer" };
       case "ignore":
-        return { triggerTurn: false, deliverAs: "nextTurn" };
+        return { triggerTurn: false, deliverAs: "steer" };
     }
   }
 

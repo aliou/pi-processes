@@ -117,7 +117,7 @@ describe("NotificationService", () => {
     expect(fakePi.sendMessage).toHaveBeenCalledTimes(1);
     const [, options] = fakePi.sendMessage.mock.calls[0];
     expect(options.triggerTurn).toBe(false);
-    expect(options.deliverAs).toBe("nextTurn");
+    expect(options.deliverAs).toBe("steer");
 
     service.dispose();
   });
@@ -216,7 +216,7 @@ describe("NotificationService", () => {
     const [message, options] = fakePi.sendMessage.mock.calls[0];
     expect(message.display).toBe(true);
     expect(options.triggerTurn).toBe(false);
-    expect(options.deliverAs).toBe("nextTurn");
+    expect(options.deliverAs).toBe("steer");
     expect(message.details.kind).toBe("crash");
 
     service.dispose();
@@ -482,7 +482,7 @@ describe("NotificationService", () => {
     expect(fakePi.sendMessage).toHaveBeenCalledTimes(1);
     const [, options] = fakePi.sendMessage.mock.calls[0];
     expect(options.triggerTurn).toBe(false);
-    expect(options.deliverAs).toBe("nextTurn");
+    expect(options.deliverAs).toBe("steer");
 
     service.dispose();
   });

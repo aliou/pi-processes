@@ -664,7 +664,7 @@ High-level decisions:
 - Agent-facing `notify` config controls agent attention only: `"turn"`, `"context"`, or `"ignore"`.
 - Display is not agent-controlled. For the initial implementation, all emitted process notification messages use `display: true`.
 - Process notifications are persisted as Pi custom messages via `pi.sendMessage()`, not as widgets or `ctx.ui.notify()`, so resume/export still shows them.
-- Context-without-turn uses a custom message with `triggerTurn: false` and `deliverAs: "nextTurn"`; do not use the Pi `context` event for this.
+- Context-without-turn uses a custom message with `triggerTurn: false` and `deliverAs: "steer"`; do not use the Pi `context` event for this.
 - Notification message content should use an XML-like process-event envelope so the agent can distinguish process events from user messages.
 - `extensions/processes/message-renderer.ts` customizes TUI rendering for `ad-process:notification` messages.
 
@@ -874,7 +874,7 @@ After Phase 2B:
 1. Manager end-cause metadata is present on `ProcessInfo` and covered by tests.
 2. Start a process with `notify` attention config.
 3. Confirm failure defaults to `turn` and success defaults to `context`.
-4. Confirm context notifications create displayed custom messages with `triggerTurn: false` and `deliverAs: "nextTurn"`.
+4. Confirm context notifications create displayed custom messages with `triggerTurn: false` and `deliverAs: "steer"`.
 5. Confirm turn notifications create displayed custom messages with `triggerTurn: true` and `deliverAs: "steer"`.
 6. Confirm notification content uses the XML-like process-event envelope described in `docs/process-notifications-plan.md`.
 7. Confirm the custom message renderer displays `ad-process:notification` messages distinctly in the TUI.

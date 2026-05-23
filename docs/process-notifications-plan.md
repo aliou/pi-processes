@@ -111,7 +111,7 @@ Important fields:
 For this project:
 
 - Use `display: true` for all process notifications initially.
-- Use `display: true`, `triggerTurn: false`, `deliverAs: "nextTurn"` for context-only notifications. This persists the event, shows it in TUI, and makes it available to the agent later without triggering a turn.
+- Use `display: true`, `triggerTurn: false`, `deliverAs: "steer"` for context-only notifications. This persists the event, shows it in TUI, and makes it available to the agent later without triggering a turn.
 - Use `display: true`, `triggerTurn: true`, `deliverAs: "steer"` for turn notifications.
 
 ### Custom TUI rendering
@@ -458,9 +458,9 @@ export const MESSAGE_TYPE_PROCESS_NOTIFICATION = "ad-process:notification";
 flowchart TD
   E[Notification event] --> A{Attention}
   A -->|turn| T[sendMessage display true triggerTurn true deliverAs steer]
-  A -->|context| C[sendMessage display true triggerTurn false deliverAs nextTurn]
+  A -->|context| C[sendMessage display true triggerTurn false deliverAs steer]
   A -->|ignore| I{Forced display?}
-  I -->|yes| D[sendMessage display true triggerTurn false deliverAs nextTurn]
+  I -->|yes| D[sendMessage display true triggerTurn false deliverAs steer]
   I -->|no| Drop[Drop]
 ```
 
@@ -749,7 +749,7 @@ Scope:
 Validation:
 
 - Start with default notify, failing process sends displayed custom message and triggers turn.
-- Start with `notify.onSuccess = "context"`, successful process sends displayed custom message with no turn and `deliverAs: "nextTurn"`.
+- Start with `notify.onSuccess = "context"`, successful process sends displayed custom message with no turn and `deliverAs: "steer"`.
 - Start with log matcher, matching appended output sends displayed custom message and triggers turn by default.
 - Intentional stop suppresses killed notification.
 
@@ -771,7 +771,7 @@ Add scenario prompts for:
 - Manager exposes end cause and signal facts.
 - Custom messages are session entries and appear in exports/resume.
 - Turn notifications use `triggerTurn: true` and `deliverAs: "steer"`.
-- Context notifications use `triggerTurn: false` and `deliverAs: "nextTurn"`.
+- Context notifications use `triggerTurn: false` and `deliverAs: "steer"`.
 - All process notification messages use `display: true` for now.
 - TUI renderer makes custom process messages visually distinct.
 - XML-like content makes it clear to the agent that the entry is a process event, not user instruction.

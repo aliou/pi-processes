@@ -36,6 +36,8 @@
     "@aliou/pi-utils-settings": "^0.15.1",
     "@aliou/pi-utils-ui": "^0.4.1",
     "@aliou/sh": "^0.1.0",
+    "@earendil-works/pi-ai": "^0.75.3",
+    "@earendil-works/pi-tui": "^0.75.3",
     "typebox": "^1.1.38"
   },
   "peerDependencies": {
@@ -50,9 +52,7 @@
     "husky": "^9.1.7",
     "typescript": "^6.0.3",
     "vitest": "^4.1.7",
-    "@earendil-works/pi-ai": "^0.75.3",
-    "@earendil-works/pi-coding-agent": "^0.75.3",
-    "@earendil-works/pi-tui": "^0.75.3"
+    "@earendil-works/pi-coding-agent": "^0.75.3"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

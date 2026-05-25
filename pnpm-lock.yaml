@@ -17,8 +17,17 @@ importers:
       '@aliou/sh':
         specifier: ^0.1.0
         version: 0.1.0
+      '@earendil-works/pi-ai':
+        specifier: '*'
+        version: 0.75.3(ws@8.19.0)(zod@3.25.76)
+      '@earendil-works/pi-coding-agent':
+        specifier: '*'
+        version: 0.75.3(ws@8.19.0)(zod@3.25.76)
+      '@earendil-works/pi-tui':
+        specifier: '*'
+        version: 0.75.3
       typebox:
-        specifier: ^1.1.38
+        specifier: '*'
         version: 1.1.38
     devDependencies:
       '@aliou/biome-plugins':
@@ -30,15 +39,6 @@ importers:
       '@changesets/cli':
         specifier: ^2.31.0
         version: 2.31.0(@types/node@25.9.1)
-      '@earendil-works/pi-ai':
-        specifier: ^0.75.3
-        version: 0.75.3(ws@8.19.0)(zod@3.25.76)
-      '@earendil-works/pi-coding-agent':
-        specifier: ^0.75.3
-        version: 0.75.3(ws@8.19.0)(zod@3.25.76)
-      '@earendil-works/pi-tui':
-        specifier: ^0.75.3
-        version: 0.75.3
       '@types/node':
         specifier: ^25.9.1
         version: 25.9.1

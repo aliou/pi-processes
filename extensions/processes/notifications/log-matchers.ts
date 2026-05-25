@@ -13,8 +13,8 @@ export interface CompiledLogMatcher {
   lastMatchTime: number;
 }
 
-const MAX_MATCHERS_PER_PROCESS = 20;
-const MAX_PATTERN_LENGTH = 500;
+export const MAX_LOG_MATCHERS_PER_PROCESS = 20;
+export const MAX_LOG_MATCH_PATTERN_LENGTH = 500;
 const MAX_LINE_LENGTH = 10_000;
 const LOG_MATCH_COOLDOWN_MS = 5000;
 
@@ -24,10 +24,10 @@ export function compileLogMatchers(config: NotifyConfig): CompiledLogMatcher[] {
 
   const matchers: CompiledLogMatcher[] = [];
 
-  for (let i = 0; i < Math.min(raw.length, MAX_MATCHERS_PER_PROCESS); i++) {
+  for (let i = 0; i < Math.min(raw.length, MAX_LOG_MATCHERS_PER_PROCESS); i++) {
     const entry = raw[i];
 
-    if (entry.pattern.length > MAX_PATTERN_LENGTH) {
+    if (entry.pattern.length > MAX_LOG_MATCH_PATTERN_LENGTH) {
       continue;
     }
 

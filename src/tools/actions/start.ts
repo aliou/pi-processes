@@ -20,6 +20,7 @@ interface StartLogWatch {
 interface StartParams {
   name?: string;
   command?: string;
+  cwd?: string;
   alertOnSuccess?: boolean;
   alertOnFailure?: boolean;
   alertOnKill?: boolean;
@@ -160,7 +161,7 @@ export function executeStart(
 
   let proc: ReturnType<ProcessManager["start"]>;
   try {
-    proc = manager.start(params.name, params.command, ctx.cwd, {
+    proc = manager.start(params.name, params.command, params.cwd ?? ctx.cwd, {
       alertOnSuccess: params.alertOnSuccess,
       alertOnFailure: params.alertOnFailure,
       alertOnKill: params.alertOnKill,

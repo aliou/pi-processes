@@ -81,6 +81,12 @@ const ProcessesParams = Type.Object({
         "For action=debug_preview only: which rendered result variant to preview (default: start)",
     }),
   ),
+  cwd: Type.Optional(
+    Type.String({
+      description:
+        "Working directory for the command (for start action). Defaults to the session working directory. Prefer this over 'cd dir && command' shell wrappers.",
+    }),
+  ),
   logWatches: Type.Optional(
     Type.Array(
       Type.Object(
@@ -116,6 +122,7 @@ export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
     label: "Process",
     description: `Manage background processes. Actions:
 - start: Run command in background (requires 'name' and 'command')
+  - cwd (optional): Working directory for the command. Defaults to the session working directory. Use the cwd parameter instead of 'cd dir && command' shell wrappers.
   - alertOnSuccess (default: false): Get a turn to react when process completes successfully
   - alertOnFailure (default: true): Get a turn to react when process crashes/fails
   - alertOnKill (default: false): Get a turn to react if killed by external signal (killing via tool never triggers a turn)

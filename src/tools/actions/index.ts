@@ -30,6 +30,7 @@ interface ActionParams {
   id?: string;
   input?: string;
   end?: boolean;
+  cwd?: string;
   alertOnSuccess?: boolean;
   alertOnFailure?: boolean;
   alertOnKill?: boolean;

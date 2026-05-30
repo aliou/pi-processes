@@ -10,8 +10,8 @@ Read it before touching any UX or adding any command or tool action.
 | Actor | File | Role |
 |---|---|---|
 | **ProcessManager** | `src/manager.ts` | Source of truth for all processes. Spawns, tracks, and terminates child processes. Emits events. |
-| **DockStateManager** | `src/state/dock-state.ts` | Visibility/focus/follow state for the dock widget. Notifies subscribers on change. |
-| **widget.ts** | `src/hooks/widget.ts` | Glue layer. Subscribes to both ProcessManager and DockStateManager. Drives the two always-visible UI widgets. |
+| **DockActions / dockState** | `src/hooks/widget/setup.ts` | Visibility/focus/follow state for the dock widget. Held as a plain `dockState` object plus a `DockActions` API (no separate manager class). |
+| **setupProcessWidget** | `src/hooks/widget/setup.ts` | Glue layer. Subscribes to ProcessManager, owns dock state, and drives the two always-visible UI widgets. |
 | **LogDockComponent** | `src/components/log-dock-component.ts` | Renders the dock widget. Accepts keyboard input when the dock is open. |
 | **LogOverlayComponent** | `src/components/log-overlay-component.ts` | Tabbed floating log viewer. Only exists while `/ps:logs` is active. |
 | **ProcessesComponent** | `src/components/processes-component.ts` | Full-screen process manager panel. Only exists while `/ps` is active. |
@@ -114,7 +114,7 @@ LLM calls process(action: "write", id, input)
   → dockState.setFocus(processId)
       → visibility: hidden|collapsed → "open"
       → focusedProcessId = id
-      → DockStateManager notifies subscribers
+      → dockState change notifies subscribers
           → widget.ts: updateWidget()  [re-creates LogDockComponent with new focus]
 
 /ps:kill  [id or picker]
@@ -127,7 +127,7 @@ LLM calls process(action: "write", id, input)
 
 /ps:dock  [show | hide | toggle | (no arg)]
   → dockState.expand() / hide() / toggleVisibility()
-      → DockStateManager notifies subscribers
+      → dockState change notifies subscribers
           → widget.ts: updateWidget()
 ```
 
@@ -171,7 +171,7 @@ manager.clear() removes processes in terminal states → emits "processes_change
 ## Dock state machine
 
 ```
-DockStateManager.visibility:
+dockState.visibility (managed in src/hooks/widget/setup.ts):
 
       hidden ◄──── autoHide() ◄─── last running process ends (followEnabled)
         │
@@ -199,7 +199,7 @@ The dock widget is permanently mounted below the editor when visible. It is
 not a command — it just exists as long as `visibility !== "hidden"`.
 
 ```
-DockStateManager change  ─────────────────────────────────────┐
+dockState change  ─────────────────────────────────────────────┐
 ProcessManager event  ─────────────────────────────────────────┤
                                                                ▼
                                                      widget.ts.updateWidget()
@@ -290,19 +290,22 @@ Search mode (bottom line replaced):
 index.ts
   │
   ├─ configLoader.load()
-  ├─ new ProcessManager()
-  ├─ new DockStateManager()
+  ├─ new ProcessManager({ getConfiguredShellPath })
   │
-  ├─ setupProcessesHooks(pi, manager, config, dockState)
+  ├─ const { update, dockActions } = setupProcessesHooks(pi, manager, config)
   │     ├─ setupCleanupHook()       kills all processes on session end
   │     ├─ setupProcessEndHook()    sends LLM a turn when alertOnSuccess/Failure triggers
+  │     ├─ setupProcessWatchHook()  sends LLM a turn on logWatch matches
   │     ├─ setupBackgroundBlocker() intercepts shell commands (if configured)
-  │     ├─ setupProcessWidget()     ← subscribes to manager + dock state, drives widgets
+  │     ├─ setupProcessWidget()     ← creates dockState + dockActions, drives widgets
   │     └─ setupMessageRenderer()   renders LLM tool call results
   │
-  ├─ setupProcessesCommands(pi, manager, dockState)
+  ├─ setupProcessesCommands(pi, manager, dockActions)
   │     registers: /ps /ps:logs /ps:pin /ps:kill /ps:clear /ps:dock
   │
-  └─ setupProcessesTools(pi, manager)
-        registers: process tool (start/list/output/logs/kill/clear/write)
+  ├─ setupProcessesTools(pi, manager)
+  │     registers: process tool (start/list/output/logs/kill/clear/write)
+  │
+  └─ registerProcessesSettings(pi, () => update())
+        registers: /ps:settings
 ```

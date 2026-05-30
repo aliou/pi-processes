@@ -108,24 +108,25 @@ The seven actions (dispatched in `src/tools/index.ts` → `src/tools/actions/`):
 - `engines`: Node per the Pi peers (`>=22.19.0`).
 - Published as `@aliou/pi-processes` to the public npm registry.
 
-### Pi host peers are three minors behind
+### Pi host peers
 
-The `@earendil-works/pi-{ai,coding-agent,tui}` peers (declared optional `*`)
-resolve to **0.75.3** in the lockfile — three minors behind the current Pi
-monorepo **0.78.0**. The peer version, not the fork, is what's stale.
+The `@earendil-works/pi-{ai,coding-agent,tui}` peers are declared optional and
+relaxed (`*`) on purpose — a tight range here breaks installs against the wide
+spread of Pi versions users actually run. The lockfile currently resolves them
+to **0.78.0** (the current Pi monorepo release). Because the range is `*`,
+`pnpm update --latest` will *not* move auto-installed peers; refresh the lock by
+forcing the version (a temporary `pnpm.overrides` entry, install, then remove
+it) and re-running `typecheck` / `lint` / `test`.
 
-Every `ExtensionAPI` member this extension touches still exists in 0.78.0, so
-an upgrade is API-compatible: `registerTool`, `registerCommand`,
-`registerMessageRenderer`, `setWidget`, `sendMessage({ triggerTurn })`,
-`on("session_start" | "session_shutdown" | "tool_call")`, and
-`ctx.ui` / `hasUI` / `cwd`. Upgrade-relevant changes since 0.75.3:
+Every `ExtensionAPI` member this extension uses is present in 0.78.0:
+`registerTool`, `registerCommand`, `registerMessageRenderer`, `setWidget`,
+`sendMessage({ triggerTurn })`, `on("session_start" | "session_shutdown" |
+"tool_call")`, and `ctx.ui` / `hasUI` / `cwd`. Two behaviors worth knowing:
 
-- **0.77.0** — SIGTERM/SIGHUP now emit `session_shutdown` *before* terminal
-  writes. The cleanup hook (`src/hooks/cleanup.ts`) kills processes on
-  `session_shutdown`, so on 0.77+ background processes are reaped on signal
-  exits, not only clean ones — fewer orphans on Ctrl-C.
-- **0.77.0** — `--exclude-tools` lets users disable the `process` tool;
-  `InputEvent.streamingBehavior` distinguishes idle / mid-stream-steer / queued input.
+- The cleanup hook (`src/hooks/cleanup.ts`) kills all processes on
+  `session_shutdown`. Since Pi 0.77.0 that event also fires on SIGTERM/SIGHUP
+  (before terminal writes), so background processes are reaped on signal exits,
+  not only clean ones.
 - `sendMessage` accepts `deliverAs: "steer" | "followUp" | "nextTurn"`. The
   process-end / process-watch hooks currently pass only the bare `triggerTurn`
   flag — `deliverAs` is an available, unused lever for finer turn delivery.

@@ -50,7 +50,7 @@ Three notification controls on `start`:
 - `alertOnFailure` (**default true**) — get a turn when the process crashes/exits non-zero.
 - `alertOnSuccess` (default false) — get a turn on clean exit; use for builds/tests you must react to.
 - `alertOnKill` (default false) — get a turn if killed by an external signal (killing via the tool never triggers a turn).
-- `logWatches` — regex watches that alert *while the process is still running* (per match, not on exit). Each watch: `pattern`, `stream` (`stdout`/`stderr`/`both`, default both), `repeat` (default false = single-fire).
+- `logWatches` — regex watches that alert *while the process is still running* (per match, not on exit). Each watch: `pattern`, `stream` (`stdout`/`stderr`/`both`, default both), `repeat` (default false = single-fire). `repeat: true` watches are turn-throttled (one turn per 5s, `REPEAT_WATCH_TURN_COOLDOWN_MS`) so a chatty pattern can't spam turns.
 
 **logWatches coverage — silence is not success.** A watch that matches only the
 "ready" / success marker stays silent if the process instead crashes or hangs,
@@ -106,11 +106,31 @@ The seven actions (dispatched in `src/tools/index.ts` → `src/tools/actions/`):
 
 - TypeScript (strict, ESM), `pnpm@10.26.1`, Biome, Vitest, Changesets.
 - `engines`: Node per the Pi peers (`>=22.19.0`).
-- Pi peers are declared as `*` (optional) and currently resolve to
-  **0.75.3** in the lockfile. The live Pi monorepo is further ahead
-  (~0.78.0), so APIs verified here may lag upstream — confirm against the
-  installed peer version, not memory, before relying on a Pi API.
 - Published as `@aliou/pi-processes` to the public npm registry.
+
+### Pi host peers are three minors behind
+
+The `@earendil-works/pi-{ai,coding-agent,tui}` peers (declared optional `*`)
+resolve to **0.75.3** in the lockfile — three minors behind the current Pi
+monorepo **0.78.0**. The peer version, not the fork, is what's stale.
+
+Every `ExtensionAPI` member this extension touches still exists in 0.78.0, so
+an upgrade is API-compatible: `registerTool`, `registerCommand`,
+`registerMessageRenderer`, `setWidget`, `sendMessage({ triggerTurn })`,
+`on("session_start" | "session_shutdown" | "tool_call")`, and
+`ctx.ui` / `hasUI` / `cwd`. Upgrade-relevant changes since 0.75.3:
+
+- **0.77.0** — SIGTERM/SIGHUP now emit `session_shutdown` *before* terminal
+  writes. The cleanup hook (`src/hooks/cleanup.ts`) kills processes on
+  `session_shutdown`, so on 0.77+ background processes are reaped on signal
+  exits, not only clean ones — fewer orphans on Ctrl-C.
+- **0.77.0** — `--exclude-tools` lets users disable the `process` tool;
+  `InputEvent.streamingBehavior` distinguishes idle / mid-stream-steer / queued input.
+- `sendMessage` accepts `deliverAs: "steer" | "followUp" | "nextTurn"`. The
+  process-end / process-watch hooks currently pass only the bare `triggerTurn`
+  flag — `deliverAs` is an available, unused lever for finer turn delivery.
+
+Confirm any Pi API against the installed peer version, not memory.
 
 ## Scripts
 

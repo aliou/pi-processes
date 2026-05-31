@@ -74,7 +74,7 @@ Implemented and validated in Phase 2A:
 - Session shutdown cleanup kills and cleans up the extension-owned manager instance.
 - Manual scenario prompts live under `tests/scenarios/`.
 
-Phase 2B notification work is partially complete.
+Phase 2B notification work is complete through tool action integration. Scenario coverage remains.
 
 Implemented and validated in Phase 2B so far:
 - Manager end-cause metadata on `ProcessInfo`: `endReason`, `signal`, and `errorMessage`.
@@ -83,6 +83,10 @@ Implemented and validated in Phase 2B so far:
 - Notification registry and service with classifier, log matcher compilation/evaluation, intentional-stop state, and disposal handling.
 - `process start` tool schema accepts `notify` with attention-only lifecycle and log-match options.
 - Tool-side notify normalization validates defaults, matcher limits, and invalid regex before starting.
+- Start action registers normalized notify config with the notification registry.
+- Stop action marks intentional stops before kill and clears stale markers on immediate failures.
+- Notification service defers process-ended handling by one microtask so synchronous start-end events can observe newly registered config.
+- Process tool prompt guidelines describe lifecycle defaults and log matchers.
 
 Latest validation:
 - `pnpm typecheck` passes.
@@ -92,7 +96,7 @@ Latest validation:
 Current intentional gaps:
 - No settings/config loader yet.
 - No event bridge or request/command/subscription handlers yet.
-- Notification action integration is incomplete: start does not register notify config yet, stop does not mark intentional stops yet, and tool prompt guidelines are not updated yet.
+- Notification scenario/manual coverage is still pending.
 - No background command blocker yet.
 - No process-exit/SIGINT/SIGTERM manager registry yet.
 - No list/logs/dock UI extensions yet.
@@ -682,9 +686,9 @@ Phase 2B implementation slices:
 1. Complete: add manager end-cause metadata. See `docs/process-notifications-plan.md#manager-update-end-cause-metadata`.
 2. Complete: add notification message infrastructure: constants, notification sender, XML content builder, custom message renderer.
 3. Complete: add notification registry/service: classify process ends, compile/evaluate log matchers from `appendedText`, track intentional stops, and send custom messages.
-4. Partially complete: add `notify` to the `process start` tool schema with attention-only values. Schema and validation are done; start registration is still open.
-5. Next: update `process stop` to mark intentional stops before calling `manager.kill()`.
-6. Add tests/scenarios for end causes, lifecycle notifications, context notifications, log matches, invalid regex, and intentional-stop suppression.
+4. Complete: add `notify` to the `process start` tool schema with attention-only values, validation, and start registration.
+5. Complete: update `process stop` to mark intentional stops before calling `manager.kill()`.
+6. Next: add tests/scenarios for end causes, lifecycle notifications, context notifications, log matches, invalid regex, and intentional-stop suppression.
 
 ---
 

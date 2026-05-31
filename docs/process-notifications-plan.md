@@ -745,7 +745,7 @@ Implemented:
 - Wired service in the core extension.
 - Added unit coverage for classifier, log matching, service behavior, and disposal.
 
-### Phase 4: tool schema and action integration — partially complete
+### Phase 4: tool schema and action integration — complete
 
 Implemented:
 
@@ -754,14 +754,20 @@ Implemented:
 - Rejects invalid regex matchers before starting the process.
 - Enforces matcher count and pattern length limits.
 - Includes normalized notify config in start action details.
+- Registers notify config on successful start.
+- Marks intentional stops before calling `manager.kill()`.
+- Clears intentional-stop markers for immediate stop failures and already-finished processes.
+- Defers `process_ended` handling by one microtask so notify config registered immediately after `manager.start()` can be observed for synchronous end events.
+- Added process tool prompt guidelines for lifecycle defaults and log matchers.
 
-Remaining:
+Validated by unit tests for:
 
-- Register notify config on start.
-- Mark intentional stop on stop.
-- Add prompt guidelines.
+- Start registration and invalid notify behavior.
+- Stop intentional marker lifecycle.
+- Deferred process-ended notification handling and disposal.
+- Default failure/success notifications, forced display, custom attention, log matches, and intentional-stop suppression.
 
-Validation still needed after remaining wiring:
+Manual validation still needed:
 
 - Start with default notify, failing process sends displayed custom message and triggers turn.
 - Start with `notify.onSuccess = "context"`, successful process sends displayed custom message with no turn and `deliverAs: "steer"`.

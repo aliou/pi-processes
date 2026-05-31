@@ -2,7 +2,10 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import type { ProcessManager } from "../../../../src/manager";
 import type { ProcessInfo } from "../../../../src/types";
-import type { NotifyConfig } from "../../notifications/registry";
+import type {
+  NotificationRegistry,
+  NotifyConfig,
+} from "../../notifications/registry";
 import { normalizeNotifyConfig } from "../notify";
 import type { ProcessesParamsType } from "../schema";
 
@@ -16,6 +19,7 @@ export function executeStart(
   params: ProcessesParamsType,
   manager: ProcessManager,
   ctx: ExtensionContext,
+  notifications: NotificationRegistry,
 ): StartDetails {
   if (!params.name) {
     throw new Error("process start requires name");
@@ -27,9 +31,12 @@ export function executeStart(
 
   const notify = normalizeNotifyConfig(params.notify);
 
+  const process = manager.start(params.name, params.command, ctx.cwd);
+  notifications.register(process.id, notify);
+
   return {
     action: "start",
-    process: manager.start(params.name, params.command, ctx.cwd),
+    process,
     notify,
   };
 }

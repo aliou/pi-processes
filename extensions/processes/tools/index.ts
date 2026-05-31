@@ -22,7 +22,7 @@ type ProcessDetails = StartDetails | ListDetails | StopDetails;
 export function registerProcessTool(
   pi: ExtensionAPI,
   manager: ProcessManager,
-  _notifications: NotificationRegistry,
+  notifications: NotificationRegistry,
 ): void {
   pi.registerTool(
     defineTool({
@@ -35,10 +35,12 @@ export function registerProcessTool(
         "Use process start to start long-running background commands instead of shell background patterns like &, nohup, disown, or setsid.",
         "Use process list to inspect running background processes before starting duplicates; do not re-summarize the listed processes to the user because the tool output is already visible to them.",
         "Use process stop to stop a background process started with process start.",
+        "By default, process failures trigger an agent turn, successes add context only, and killed processes are ignored. Use notify to override.",
+        "Use notify.logMatches on start to get notified when output matches a readiness or error pattern. Log matchers control agent attention, not display.",
       ],
       parameters: ProcessesParams,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-        const details = await execute(params, manager, ctx);
+        const details = await execute(params, manager, ctx, notifications);
         return {
           content: [{ type: "text", text: formatDetails(details) }],
           details,
@@ -54,14 +56,15 @@ async function execute(
   params: ProcessesParamsType,
   manager: ProcessManager,
   ctx: ExtensionContext,
+  notifications: NotificationRegistry,
 ): Promise<ProcessDetails> {
   switch (params.action) {
     case "start":
-      return executeStart(params, manager, ctx);
+      return executeStart(params, manager, ctx, notifications);
     case "list":
       return executeList(manager, params);
     case "stop":
-      return executeStop(params, manager);
+      return executeStop(params, manager, notifications);
     default:
       throw new Error(`unsupported process action: ${String(params.action)}`);
   }

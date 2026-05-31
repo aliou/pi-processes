@@ -54,7 +54,13 @@ export function createNotificationService(deps: NotificationServiceDeps): {
     if (disposed) return;
 
     if (event.type === "process_ended") {
-      handleProcessEnded(event.info);
+      // Defer to a microtask so that tool code (e.g. executeStart) can
+      // register the notify config in the registry before we read it.
+      // manager.start() may synchronously emit process_ended for missing_pid.
+      queueMicrotask(() => {
+        if (disposed) return;
+        handleProcessEnded(event.info);
+      });
       return;
     }
 

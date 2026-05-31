@@ -74,15 +74,25 @@ Implemented and validated in Phase 2A:
 - Session shutdown cleanup kills and cleans up the extension-owned manager instance.
 - Manual scenario prompts live under `tests/scenarios/`.
 
+Phase 2B notification work is partially complete.
+
+Implemented and validated in Phase 2B so far:
+- Manager end-cause metadata on `ProcessInfo`: `endReason`, `signal`, and `errorMessage`.
+- Signal snapshot helper and runtime transition updates.
+- Process notification constants, sender, XML content builder, and custom message renderer.
+- Notification registry and service with classifier, log matcher compilation/evaluation, intentional-stop state, and disposal handling.
+- `process start` tool schema accepts `notify` with attention-only lifecycle and log-match options.
+- Tool-side notify normalization validates defaults, matcher limits, and invalid regex before starting.
+
 Latest validation:
 - `pnpm typecheck` passes.
 - `pnpm lint` passes.
-- `pnpm test` passes with 7 files and 87 tests.
+- `pnpm test` passes.
 
 Current intentional gaps:
 - No settings/config loader yet.
 - No event bridge or request/command/subscription handlers yet.
-- No process notification model, `pi.sendMessage()` hooks, or message renderer yet.
+- Notification action integration is incomplete: start does not register notify config yet, stop does not mark intentional stops yet, and tool prompt guidelines are not updated yet.
 - No background command blocker yet.
 - No process-exit/SIGINT/SIGTERM manager registry yet.
 - No list/logs/dock UI extensions yet.
@@ -648,7 +658,7 @@ Phase 2A intentionally does not include settings, event bridge, notifications, o
 
 ---
 
-### Phase 2B: Process notifications — next
+### Phase 2B: Process notifications — in progress
 
 Goal: introduce manager end-cause metadata and a core-extension notification model that reacts to neutral manager events. This replaces manager-level `alertOn*` flags and manager-level log watches.
 
@@ -669,11 +679,11 @@ High-level decisions:
 - `extensions/processes/message-renderer.ts` customizes TUI rendering for `ad-process:notification` messages.
 
 Phase 2B implementation slices:
-1. Add manager end-cause metadata. See `docs/process-notifications-plan.md#manager-update-end-cause-metadata`.
-2. Add notification message infrastructure: constants, normal notification sender, XML content builder, custom message renderer.
-3. Add notification registry/service: classify process ends, compile/evaluate log matchers from `appendedText`, track intentional stops, and send custom messages.
-4. Add `notify` to the `process start` tool schema with attention-only values.
-5. Update `process stop` to mark intentional stops before calling `manager.kill()`.
+1. Complete: add manager end-cause metadata. See `docs/process-notifications-plan.md#manager-update-end-cause-metadata`.
+2. Complete: add notification message infrastructure: constants, notification sender, XML content builder, custom message renderer.
+3. Complete: add notification registry/service: classify process ends, compile/evaluate log matchers from `appendedText`, track intentional stops, and send custom messages.
+4. Partially complete: add `notify` to the `process start` tool schema with attention-only values. Schema and validation are done; start registration is still open.
+5. Next: update `process stop` to mark intentional stops before calling `manager.kill()`.
 6. Add tests/scenarios for end causes, lifecycle notifications, context notifications, log matches, invalid regex, and intentional-stop suppression.
 
 ---

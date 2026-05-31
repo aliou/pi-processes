@@ -23,6 +23,20 @@ export type ProcessStatus =
   | "exited"
   | "killed";
 
+export type ProcessEndReason =
+  | "exit"
+  | "signal"
+  | "spawn_error"
+  | "missing_pid"
+  | "kill_timeout"
+  | "lost";
+
+export interface ProcessSignalInfo {
+  name: NodeJS.Signals;
+  number: number | null;
+  description: string;
+}
+
 export interface ProcessInfo {
   id: string;
   name: string;
@@ -36,6 +50,9 @@ export interface ProcessInfo {
   success: boolean | null;
   stdoutFile: string;
   stderrFile: string;
+  endReason: ProcessEndReason | null;
+  signal: ProcessSignalInfo | null;
+  errorMessage: string | null;
 }
 
 export type ManagerEvent =
@@ -689,14 +706,14 @@ All listeners must return disposers and be cleaned up on `session_shutdown`. Cle
 
 ## Phased implementation
 
-### Phase 1: manager end-cause metadata
+### Phase 1: manager end-cause metadata — complete
 
-Scope:
+Implemented:
 
-- Add neutral end-cause fields to `ProcessInfo`.
-- Add signal snapshot helper.
-- Update runtime transitions.
-- Update tests.
+- Added neutral end-cause fields to `ProcessInfo`.
+- Added signal snapshot helper.
+- Updated runtime transitions.
+- Updated tests.
 
 Validation:
 
@@ -706,47 +723,45 @@ pnpm test
 pnpm lint
 ```
 
-### Phase 2: notification message infrastructure
+### Phase 2: notification message infrastructure — complete
 
-Scope:
+Implemented:
 
-- Add constants.
-- Add `notification-sender.ts`.
-- Add XML content renderer.
-- Add TUI message renderer.
-- Add notification details types.
+- Added constants.
+- Added `notification-sender.ts`.
+- Added XML content renderer.
+- Added TUI message renderer.
+- Added notification details types.
+- Added unit coverage for notification sender and XML content generation.
 
-Validation:
+### Phase 3: notification registry and service — complete
 
-- Unit-test XML escaping/content generation.
-- Manually verify renderer via a small fake message if practical.
+Implemented:
 
-### Phase 3: notification registry and service
+- Added registry.
+- Added classifier.
+- Added log matcher compiler/evaluator.
+- Added service consuming manager events.
+- Wired service in the core extension.
+- Added unit coverage for classifier, log matching, service behavior, and disposal.
 
-Scope:
+### Phase 4: tool schema and action integration — partially complete
 
-- Add registry.
-- Add classifier.
-- Add log matcher compiler/evaluator.
-- Add service consuming manager events.
-- Wire service in extension.
+Implemented:
 
-Validation:
+- Added `notify` to the `process start` tool schema.
+- Added notify normalization and validation.
+- Rejects invalid regex matchers before starting the process.
+- Enforces matcher count and pattern length limits.
+- Includes normalized notify config in start action details.
 
-- Unit-test classifier.
-- Unit-test log matching.
-- Unit-test service with mocked `pi.sendMessage()` and fake manager events. Include disposal tests that prove no send happens after `dispose()`.
+Remaining:
 
-### Phase 4: tool schema and action integration
-
-Scope:
-
-- Add `notify` to tool schema.
 - Register notify config on start.
 - Mark intentional stop on stop.
 - Add prompt guidelines.
 
-Validation:
+Validation still needed after remaining wiring:
 
 - Start with default notify, failing process sends displayed custom message and triggers turn.
 - Start with `notify.onSuccess = "context"`, successful process sends displayed custom message with no turn and `deliverAs: "steer"`.

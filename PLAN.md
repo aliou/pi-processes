@@ -28,7 +28,7 @@ The rewrite preserves the intended user-facing behavior, but the LLM-facing `pro
 
 ```
 Phase 1 (src/) --> Phase 2A (minimal core tool) --> Phase 2B (extension notifications)
-                                                   --> Phase 2C (tool parity)
+                                                   ~~> Phase 2C (output tool) ~~ DONE
                                                    --> Phase 2E (event protocol)
                                                    --> Phase 2F (i18n bridge)
                                                    --> Phase 3 (list)
@@ -897,10 +897,10 @@ After Phase 2B:
 11. Confirm invalid regex input produces a useful tool error.
 
 After Phase 2C:
-1. Tool actions work: `start`, `list`, `stop`, `output`, `logs`, `clear`, `write`.
-2. `output` returns recent content.
-3. `logs` returns readable file paths.
-4. `write` can send stdin and optionally close stdin.
+1. Tool actions work: `start`, `list`, `stop`, `output`.
+2. `output` returns recent content with stream filtering and pattern matching.
+3. `logs` is redundant — `list` and `output` already return log file paths.
+4. `clear` and `write` are deferred.
 
 After Phase 2E:
 1. Core emits lifecycle/output/change events over `pi.events`.

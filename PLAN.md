@@ -662,13 +662,11 @@ Phase 2A intentionally does not include settings, event bridge, notifications, o
 
 ---
 
-### Phase 2B: Process notifications — in progress
+### Phase 2B: Process notifications — complete
 
 Goal: introduce manager end-cause metadata and a core-extension notification model that reacts to neutral manager events. This replaces manager-level `alertOn*` flags and manager-level log watches.
 
-The detailed implementation plan lives in [`docs/process-notifications-plan.md`](docs/process-notifications-plan.md). That document is authoritative for this phase.
-
-High-level decisions:
+Decisions:
 - `ProcessManager.start()` does not accept alert, notify, or watch options.
 - `ProcessInfo` does not contain notification preferences.
 - The manager does not match log patterns and does not emit `process_watch_matched`.
@@ -679,16 +677,19 @@ High-level decisions:
 - Display is not agent-controlled. For the initial implementation, all emitted process notification messages use `display: true`.
 - Process notifications are persisted as Pi custom messages via `pi.sendMessage()`, not as widgets or `ctx.ui.notify()`, so resume/export still shows them.
 - Context-without-turn uses a custom message with `triggerTurn: false` and `deliverAs: "steer"`; do not use the Pi `context` event for this.
-- Notification message content should use an XML-like process-event envelope so the agent can distinguish process events from user messages.
+- Notification message content uses an XML-like process-event envelope so the agent can distinguish process events from user messages.
 - `extensions/processes/message-renderer.ts` customizes TUI rendering for `ad-process:notification` messages.
+- Non-zero exits classify internally as `crash` for safety, but render as “failed”.
+- `onKilled` defaults to `ignore`; intentional stops dominate and external kills are rare.
+- Turn notifications use `deliverAs: "steer"` so failures and log matches can affect the active agent flow.
 
 Phase 2B implementation slices:
-1. Complete: add manager end-cause metadata. See `docs/process-notifications-plan.md#manager-update-end-cause-metadata`.
+1. Complete: add manager end-cause metadata.
 2. Complete: add notification message infrastructure: constants, notification sender, XML content builder, custom message renderer.
 3. Complete: add notification registry/service: classify process ends, compile/evaluate log matchers from `appendedText`, track intentional stops, and send custom messages.
 4. Complete: add `notify` to the `process start` tool schema with attention-only values, validation, and start registration.
 5. Complete: update `process stop` to mark intentional stops before calling `manager.kill()`.
-6. Next: add tests/scenarios for end causes, lifecycle notifications, context notifications, log matches, invalid regex, and intentional-stop suppression.
+6. Complete: add tests/scenarios for lifecycle notifications, context notifications, log matches, invalid regex, and intentional-stop suppression in `tests/scenarios/09-notifications/`.
 
 ---
 
@@ -890,7 +891,7 @@ After Phase 2B:
 3. Confirm failure defaults to `turn` and success defaults to `context`.
 4. Confirm context notifications create displayed custom messages with `triggerTurn: false` and `deliverAs: "steer"`.
 5. Confirm turn notifications create displayed custom messages with `triggerTurn: true` and `deliverAs: "steer"`.
-6. Confirm notification content uses the XML-like process-event envelope described in `docs/process-notifications-plan.md`.
+6. Confirm notification content uses the XML-like process-event envelope.
 7. Confirm the custom message renderer displays `ad-process:notification` messages distinctly in the TUI.
 8. Confirm intentional `process stop` suppresses the killed lifecycle notification.
 9. Confirm a matching stdout/stderr line from `appendedText` sends a log-match notification.

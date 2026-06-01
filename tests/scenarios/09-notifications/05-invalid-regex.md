@@ -1,0 +1,1 @@
+Try to start a background process named "notify-invalid-regex" with the process tool, and ask for a log-match notification using an invalid regular expression. Confirm that the tool reports a useful validation error and that no process is started.

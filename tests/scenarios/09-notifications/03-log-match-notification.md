@@ -1,0 +1,1 @@
+Start a background process named "notify-ready" that prints a readiness message after a short delay and then keeps running. Use the process tool and ask to be notified when the readiness message appears in the logs. Confirm that the log-match notification appears and triggers an agent turn.

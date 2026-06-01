@@ -1,0 +1,1 @@
+Start a short background process named "notify-success" that finishes successfully. Use the process tool and ask to be notified on success as context only. Confirm that a displayed process notification appears without triggering an agent turn.

@@ -1,0 +1,1 @@
+Start a short background process named "notify-failure" that prints a clear failure message and exits with an error. Use the process tool. Wait for the process notification and confirm that the failure notification triggers an agent turn.

@@ -367,8 +367,7 @@ export class ProcessRuntimeController {
     if (!this.watcher) return;
     if (this.registry.hasAliveishProcesses()) return;
 
-    clearInterval(this.watcher);
-    this.watcher = null;
+    this.stopWatcher();
   }
 
   private livenessTick(): void {

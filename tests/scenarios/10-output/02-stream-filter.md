@@ -1,0 +1,1 @@
+Start a background process named "mixed-output" that runs `bash ./tests/e2e/scripts/mixed-output.sh`. Use the process tool. Then use process output with stream set to stderr only to inspect just the error output.

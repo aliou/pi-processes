@@ -1,3 +1,4 @@
+import { compileLineMatcher } from "../../../src/utils/match-line";
 import type { NotifyConfig } from "./registry";
 import type { Attention } from "./types";
 
@@ -7,7 +8,7 @@ export interface CompiledLogMatcher {
   stream: "stdout" | "stderr" | "both";
   repeat: boolean;
   on: Attention;
-  regex: RegExp | null;
+  lineMatcher: ((line: string) => boolean) | null;
   matcherIndex: number;
   fired: boolean;
   lastMatchTime: number;
@@ -36,15 +37,17 @@ export function compileLogMatchers(config: NotifyConfig): CompiledLogMatcher[] {
     const repeat = entry.repeat ?? false;
     const on = entry.on ?? "turn";
 
-    let regex: RegExp | null = null;
+    let lineMatcher: ((line: string) => boolean) | null = null;
 
     if (mode === "regex") {
       try {
-        regex = new RegExp(entry.pattern);
+        lineMatcher = compileLineMatcher(entry.pattern, mode);
       } catch (_error) {
         void _error; // Invalid regex: skip this matcher
         continue;
       }
+    } else {
+      lineMatcher = compileLineMatcher(entry.pattern, mode);
     }
 
     matchers.push({
@@ -53,7 +56,7 @@ export function compileLogMatchers(config: NotifyConfig): CompiledLogMatcher[] {
       stream,
       repeat,
       on,
-      regex,
+      lineMatcher,
       matcherIndex: i,
       fired: false,
       lastMatchTime: 0,
@@ -96,10 +99,7 @@ export function evaluateLogMatchers(
       if (!streamMatches(matcher.stream, line.type)) continue;
       if (line.text.length > MAX_LINE_LENGTH) continue;
 
-      const matched =
-        matcher.mode === "literal"
-          ? line.text.includes(matcher.pattern)
-          : matcher.regex?.test(line.text);
+      const matched = matcher.lineMatcher?.(line.text);
 
       if (matched) {
         matcher.fired = true;

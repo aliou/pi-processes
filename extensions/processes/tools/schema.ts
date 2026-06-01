@@ -3,6 +3,18 @@ import { type Static, Type } from "typebox";
 
 import { MAX_NOTIFY_LOG_MATCHERS, MAX_NOTIFY_PATTERN_LENGTH } from "./notify";
 
+// --- Output action constants ---
+
+export const DEFAULT_OUTPUT_TAIL_LINES = 100;
+export const MAX_OUTPUT_TAIL_LINES = 2000;
+export const MAX_OUTPUT_SCAN_LINES = 5000;
+export const MAX_OUTPUT_BYTES = 50 * 1024;
+export const MAX_OUTPUT_PATTERN_LENGTH = MAX_NOTIFY_PATTERN_LENGTH;
+
+export const PROCESS_OUTPUT_STREAMS = ["stdout", "stderr", "both"] as const;
+
+export const PROCESS_OUTPUT_MATCH_MODES = ["literal", "regex"] as const;
+
 export const PROCESS_LIST_STATUS_FILTERS = [
   "all",
   "running",
@@ -87,7 +99,7 @@ const NotifyParams = Type.Object({
 });
 
 export const ProcessesParams = Type.Object({
-  action: StringEnum(["start", "list", "stop"] as const, {
+  action: StringEnum(["start", "list", "stop", "output"] as const, {
     description: "Action to perform.",
   }),
   name: Type.Optional(
@@ -98,7 +110,7 @@ export const ProcessesParams = Type.Object({
   ),
   notify: Type.Optional(NotifyParams),
   id: Type.Optional(
-    Type.String({ description: "Process id. Required for stop." }),
+    Type.String({ description: "Process id. Required for stop and output." }),
   ),
   limit: Type.Optional(
     Type.Number({ description: "Maximum number of processes to list." }),
@@ -114,6 +126,33 @@ export const ProcessesParams = Type.Object({
         "Process list status filters. Use all for no filtering; finished means exited successfully; failed means exited unsuccessfully or terminate_timeout.",
     }),
   ),
+  stream: Type.Optional(
+    StringEnum(PROCESS_OUTPUT_STREAMS, {
+      description:
+        "Output stream to return. Defaults to both. Only for output action.",
+    }),
+  ),
+  tailLines: Type.Optional(
+    Type.Integer({
+      minimum: 1,
+      maximum: MAX_OUTPUT_TAIL_LINES,
+      description:
+        "Maximum matching lines to return per selected stream. Defaults to 100. Only for output action.",
+    }),
+  ),
+  pattern: Type.Optional(
+    Type.String({
+      maxLength: MAX_OUTPUT_PATTERN_LENGTH,
+      description:
+        "Optional output filter. Literal by default; regex only when mode is regex. Only for output action.",
+    }),
+  ),
+  mode: Type.Optional(
+    StringEnum(PROCESS_OUTPUT_MATCH_MODES, {
+      description:
+        "Pattern matching mode for output filter. Defaults to literal. Only for output action.",
+    }),
+  ),
 });
 
 export type ProcessesParamsType = Static<typeof ProcessesParams>;
@@ -127,3 +166,7 @@ export type ProcessNotifyLogMatchMode =
   (typeof PROCESS_NOTIFY_LOG_MATCH_MODES)[number];
 export type ProcessNotifyLogMatchStream =
   (typeof PROCESS_NOTIFY_LOG_MATCH_STREAMS)[number];
+
+export type ProcessOutputStream = (typeof PROCESS_OUTPUT_STREAMS)[number];
+export type ProcessOutputMatchMode =
+  (typeof PROCESS_OUTPUT_MATCH_MODES)[number];

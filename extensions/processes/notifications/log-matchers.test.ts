@@ -20,7 +20,7 @@ describe("compileLogMatchers", () => {
       stream: "both",
       repeat: false,
       on: "turn",
-      regex: null,
+      lineMatcher: expect.any(Function),
       matcherIndex: 0,
       fired: false,
       lastMatchTime: 0,
@@ -34,7 +34,7 @@ describe("compileLogMatchers", () => {
 
     expect(matchers).toHaveLength(1);
     expect(matchers[0].mode).toBe("regex");
-    expect(matchers[0].regex).toBeInstanceOf(RegExp);
+    expect(matchers[0].lineMatcher).toBeTypeOf("function");
   });
 
   it("skips invalid regex patterns", () => {

@@ -1,0 +1,1 @@
+Start a background process named "http-server" that runs `bash ./tests/e2e/scripts/http-server.sh`. Use the process tool. Then use process output with a regex pattern to show only lines matching HTTP 4xx or 5xx status codes. Use regex mode.

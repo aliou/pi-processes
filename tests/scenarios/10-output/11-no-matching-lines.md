@@ -1,0 +1,1 @@
+Start a background process named "continuous" that runs `bash ./tests/e2e/scripts/continuous-output.sh`. Use the process tool. Then use process output with a pattern filter for a string that matches no lines, such as "NONEXISTENT_PATTERN_XYZ". Confirm the tool returns a "No matching lines found" message.

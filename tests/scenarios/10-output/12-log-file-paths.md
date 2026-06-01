@@ -1,0 +1,1 @@
+Start a background process named "log-file-access" that runs `bash ./tests/e2e/scripts/continuous-output.sh`. Use the process tool. Use process output to get recent lines. Then use the read tool on the log file paths shown in the list or output to read the full logs directly. Confirm the file paths are valid and readable.

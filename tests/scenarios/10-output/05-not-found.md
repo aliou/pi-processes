@@ -1,0 +1,1 @@
+Start a background process named "logger" that runs `bash ./tests/e2e/scripts/numbered-lines.sh`. Use the process tool. Then try to use process output on a different process ID that does not exist (e.g. "proc_nonexistent"). Confirm the tool returns a clear error message.

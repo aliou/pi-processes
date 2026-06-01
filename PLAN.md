@@ -66,7 +66,7 @@ Implemented and validated in Phase 2A:
 - Minimal core extension at `extensions/processes/index.ts`.
 - `package.json` points Pi at `./extensions/processes/index.ts` and includes `extensions` in package files.
 - Minimal `process` tool registered from `extensions/processes/tools/index.ts`.
-- Tool actions implemented: `start`, `list`, `stop`.
+- Tool actions implemented: `start`, `list`, `stop`, `output`.
 - `stop` is the LLM-facing name; internally it maps to `ProcessManager.kill()`.
 - `list` supports display-layer sorting, status filtering, and limiting. The manager/registry returns insertion order and does not apply UI sorting.
 - Tool rendering uses per-action render modules and reusable components under `extensions/processes/tools/components/`.
@@ -100,7 +100,7 @@ Current intentional gaps:
 - No background command blocker yet.
 - No process-exit/SIGINT/SIGTERM manager registry yet.
 - No list/logs/dock UI extensions yet.
-- Tool parity is incomplete: `output`, `logs`, `clear`, and `write` are not implemented yet.
+- `logs`, `clear`, and `write` tool actions are deferred. The agent can `read` log file paths returned by `list` or `output` for full-log access.
 - `package.json` still references `./skills/pi-processes`, but the local `skills/` directory is absent. Either restore the skill later or remove the `pi.skills`/`files` entries during cleanup.
 - `debug-preview` is intentionally removed from the plan.
 
@@ -144,6 +144,9 @@ extensions/
         index.ts
         render.ts
       stop/
+        index.ts
+        render.ts
+      output/
         index.ts
         render.ts
     utils/
@@ -693,64 +696,59 @@ Phase 2B implementation slices:
 
 ---
 
-### Phase 2C: Tool parity
+### Phase 2C: `output` tool action — complete
 
-Goal: restore the useful LLM-facing tool actions without adding the UI extensions yet.
+Goal: add the `output` tool action for inspecting recent process stdout/stderr with stream filtering and pattern matching.
 
-Actions to add:
+Decisions:
+- Only `output` is implemented. `logs` is redundant because `list` already returns `stdoutFile`/`stderrFile` on each `ProcessInfo` and `formatListDetails` includes them in the LLM text output. The agent can `read` log files directly.
+- `clear` and `write` are deferred until explicitly needed.
+- `debug-preview` is intentionally removed from the plan.
 
-#### `output`
+Schema:
+```
+id:          string                        (required)
+stream?:     "stdout" | "stderr" | "both"  (default: "both")
+tailLines?:  integer [1..2000]              (default: 100)
+pattern?:    string  maxLength 500           (optional filter)
+mode?:       "literal" | "regex"            (default: "literal")
+```
 
-Purpose: return recent process output directly in the tool result.
+Processing pipeline:
+1. Validate: `id` required, invalid regex -> tool error.
+2. Determine scan window: if `pattern` present, read last 5000 lines per stream; otherwise read `tailLines`.
+3. Apply stream filter (select stdout and/or stderr arrays).
+4. Apply pattern filter using `compileLineMatcher(pattern, mode)` (filter first, then tail).
+5. Tail to `tailLines` per stream.
+6. Truncate text content at 50KB / 2000 lines; append file paths and truncation notice.
+7. Return details + formatted text.
 
-Manager API:
-- `manager.getOutput(id, tailLines)` returns `{ stdout, stderr, status } | null`.
+Constants (aligned with Pi's read tool):
+- `DEFAULT_OUTPUT_TAIL_LINES = 100`
+- `MAX_OUTPUT_TAIL_LINES = 2000` (matches Pi's `DEFAULT_MAX_LINES`)
+- `MAX_OUTPUT_SCAN_LINES = 5000` (bounded scan window for pattern filter)
+- `MAX_OUTPUT_BYTES = 50 * 1024` (matches Pi's `DEFAULT_MAX_BYTES`)
 
-Use when:
-- The agent needs a quick recent stdout/stderr snapshot.
-- The output is small enough to render directly.
+Shared refactoring:
+- Extracted `compileLineMatcher(pattern, mode)` to `src/utils/match-line.ts` (pi-agnostic).
+- Refactored `notifications/log-matchers.ts` to use `compileLineMatcher` internally instead of duplicating regex compilation. Replaced `regex: RegExp | null` field with `lineMatcher: ((line: string) => boolean) | null` on `CompiledLogMatcher`.
+- `output` action reuses the same `mode` and `stream` enums from the notify schema.
+- Invalid regex in notifications silently skips the matcher; invalid regex in `output` throws a clear tool error.
 
-#### `logs`
+Implemented files:
+- `src/utils/match-line.ts` — shared `compileLineMatcher`
+- `src/utils/match-line.test.ts` — tests
+- `extensions/processes/tools/output/index.ts` — execute + format
+- `extensions/processes/tools/output/render.ts` — TUI render
+- `extensions/processes/tools/output/index.test.ts` — unit tests
+- `extensions/processes/tools/schema.ts` — added `output` to action enum, output params
+- `extensions/processes/tools/index.ts` — wired `output` into execute/render/format dispatch
 
-Purpose: return log file paths for large/full-log access.
-
-Manager API:
-- `manager.getLogFiles(id)` returns `{ stdoutFile, stderrFile, combinedFile } | null`.
-
-Use when:
-- The agent needs to inspect a large log with the `read` tool.
-- The agent needs complete logs rather than a small tail.
-
-Important distinction:
-- `output` returns output content.
-- `logs` returns file paths.
-- The future `/ps:logs` UI should not depend on the `logs` tool. It should use the request/subscription protocol from Phase 2E.
-
-#### `clear`
-
-Purpose: remove finished process records and delete their log files.
-
-Manager API:
-- `manager.clearFinished()` returns the number cleared.
-
-Recommendation:
-- Keep `clear` in the core command protocol and `/ps:clear` UI.
-- Add the LLM-facing `clear` tool action if it is useful for long sessions, but it is lower priority than `output`, `logs`, and log matchers.
-
-#### `write`
-
-Purpose: write data to a running process's stdin.
-
-Manager API:
-- `manager.writeToStdin(id, data, { end })`.
-
-Recommendation:
-- Keep and expose it eventually. The manager already supports it and tests cover it.
-- Useful for REPLs, prompts, interactive scripts, and commands waiting for confirmation.
-- It is lower priority than log matchers and output/log readback.
-
-Not planned:
-- `debug-preview`. This action is intentionally removed from the plan.
+Deferred:
+- `logs` tool action (redundant — `list` returns file paths)
+- `clear` tool action (lower priority)
+- `write` tool action (lower priority)
+- Config/settings integration for default tail lines (Phase 2F)
 
 ---
 

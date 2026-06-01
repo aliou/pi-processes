@@ -11,13 +11,19 @@ import type { NotificationRegistry } from "../notifications/registry";
 import { ToolLayout } from "./components";
 import { executeList, formatListDetails, type ListDetails } from "./list";
 import * as listRender from "./list/render";
+import {
+  executeOutput,
+  formatOutputDetails,
+  type OutputDetails,
+} from "./output";
+import * as outputRender from "./output/render";
 import { ProcessesParams, type ProcessesParamsType } from "./schema";
 import { executeStart, formatStartDetails, type StartDetails } from "./start";
 import * as startRender from "./start/render";
 import { executeStop, formatStopDetails, type StopDetails } from "./stop";
 import * as stopRender from "./stop/render";
 
-type ProcessDetails = StartDetails | ListDetails | StopDetails;
+type ProcessDetails = StartDetails | ListDetails | StopDetails | OutputDetails;
 
 export function registerProcessTool(
   pi: ExtensionAPI,
@@ -28,13 +34,16 @@ export function registerProcessTool(
     defineTool({
       name: "process",
       label: "Process",
-      description: "Start, list, and stop long-running background processes.",
-      promptSnippet: "Start, list, and stop long-running background processes.",
+      description:
+        "Start, list, stop, and inspect output of long-running background processes.",
+      promptSnippet:
+        "Start, list, stop, and inspect output of long-running background processes.",
       promptGuidelines: [
         "Use process when a command should keep running while the conversation continues, such as a dev server, watcher, or log tail.",
         "Use process start to start long-running background commands instead of shell background patterns like &, nohup, disown, or setsid.",
         "Use process list to inspect running background processes before starting duplicates; do not re-summarize the listed processes to the user because the tool output is already visible to them.",
         "Use process stop to stop a background process started with process start.",
+        "Use process output to inspect recent stdout/stderr of a background process. Use pattern and mode to filter for specific lines, such as errors or readiness signals.",
         "By default, process failures trigger an agent turn, successes add context only, and killed processes are ignored. Use notify to override.",
         "Use notify.logMatches on start to get notified when output matches a readiness or error pattern. Log matchers control agent attention, not display.",
       ],
@@ -65,6 +74,8 @@ async function execute(
       return executeList(manager, params);
     case "stop":
       return executeStop(params, manager, notifications);
+    case "output":
+      return executeOutput(params, manager);
     default:
       throw new Error(`unsupported process action: ${String(params.action)}`);
   }
@@ -85,6 +96,10 @@ function renderProcessCall(
     case "stop":
       return new ToolLayout().setHeader(
         stopRender.buildHeader(args, theme, context),
+      );
+    case "output":
+      return new ToolLayout().setHeader(
+        outputRender.buildHeader(args, theme, context),
       );
     default:
       return fallbackContainer(theme);
@@ -125,6 +140,12 @@ function buildBody(
       : listRender.buildCollapsed(details, theme);
   }
 
+  if (details.action === "output") {
+    return options.expanded
+      ? outputRender.buildExpanded(details, theme)
+      : outputRender.buildCollapsed(details, theme);
+  }
+
   return options.expanded
     ? stopRender.buildExpanded(details, theme)
     : stopRender.buildCollapsed(details, theme);
@@ -142,6 +163,8 @@ function buildFooter(
       return listRender.buildFooter(details, options, theme);
     case "stop":
       return stopRender.buildFooter(details, options, theme);
+    case "output":
+      return outputRender.buildFooter(details, options, theme);
   }
 }
 
@@ -153,6 +176,8 @@ function formatDetails(details: ProcessDetails): string {
       return formatListDetails(details);
     case "stop":
       return formatStopDetails(details);
+    case "output":
+      return formatOutputDetails(details);
   }
 }
 

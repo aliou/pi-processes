@@ -1,0 +1,1 @@
+Start a background process named "combo" that runs `bash ./tests/e2e/scripts/combo-output.sh`. Use the process tool. Then use process output with stream set to stdout and a pattern filter to find lines containing "stdout:". Then repeat with stream set to stderr and a pattern filter for "stderr:". Confirm that combining stream and pattern filters works correctly.

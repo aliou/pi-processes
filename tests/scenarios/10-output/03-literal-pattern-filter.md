@@ -1,0 +1,1 @@
+Start a background process named "error-log" that runs `bash ./tests/e2e/scripts/error-log.sh`. Use the process tool. Then use process output with a pattern filter to show only lines containing "error". Use literal mode.

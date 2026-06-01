@@ -54,7 +54,7 @@ export function formatListDetails(details: ListDetails): string {
   return details.processes
     .map(
       (process) =>
-        `${process.id}\t${process.status}\t${process.name}\t${process.command}`,
+        `${process.id}\t${process.status}\t${process.name}\t${process.command}\t${process.stdoutFile}\t${process.stderrFile}`,
     )
     .join("\n");
 }

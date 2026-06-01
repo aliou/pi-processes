@@ -5,10 +5,21 @@ import type {
   ProcessListSort,
   ProcessListStatusFilter,
 } from "../schema";
+import { formatProcessRuntime } from "../utils";
+
+/**
+ * A process plus its duration computed when the list was produced.
+ *
+ * For stopped processes this is the actual run duration (endTime - startTime).
+ * For running processes it is measured against the list call's reference time.
+ */
+export interface ListProcess extends ProcessInfo {
+  duration: string;
+}
 
 export interface ListDetails {
   action: "list";
-  processes: ProcessInfo[];
+  processes: ListProcess[];
   filters: {
     limit: number | null;
     sortBy: ProcessListSort;
@@ -35,8 +46,16 @@ export function executeList(
     .filter((process) => matchesStatusFilter(process, filters.statuses))
     .sort((a, b) => compareProcesses(a, b, filters.sortBy));
 
-  const processes =
+  const limited =
     filters.limit === null ? filtered : filtered.slice(0, filters.limit);
+
+  // Capture the reference time after listing so every process in `limited`
+  // has startTime <= now (avoids negative durations for just-spawned ones).
+  const now = Date.now();
+  const processes: ListProcess[] = limited.map((process) => ({
+    ...process,
+    duration: formatProcessRuntime(process, now),
+  }));
 
   return {
     action: "list",

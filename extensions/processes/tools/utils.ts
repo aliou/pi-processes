@@ -52,7 +52,7 @@ export function buildProcessDetails(
   container.addChild(buildField("pid", process.pid, theme));
   if (options?.runtime !== false) {
     container.addChild(
-      buildField("runtime", formatProcessRuntime(process), theme),
+      buildField("duration", formatProcessRuntime(process), theme),
     );
   }
   container.addChild(
@@ -88,9 +88,12 @@ export function buildCompactProcessLine(
   return buildField("process", `${process.id} / pid ${process.pid}`, theme);
 }
 
-export function formatProcessRuntime(process: ProcessInfo): string {
+export function formatProcessRuntime(
+  process: ProcessInfo,
+  now?: number,
+): string {
   if (process.startTime <= 0) return "-";
-  return formatRuntime(process.startTime, process.endTime);
+  return formatRuntime(process.startTime, process.endTime, now);
 }
 
 export function formatColoredProcessStatus(

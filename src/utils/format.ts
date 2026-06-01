@@ -7,9 +7,10 @@ import type { ProcessStatus } from "../types";
 export function formatRuntime(
   startTime: number,
   endTime: number | null,
+  now: number = Date.now(),
 ): string {
-  const end = endTime ?? Date.now();
-  const ms = end - startTime;
+  const end = endTime ?? now;
+  const ms = Math.max(0, end - startTime);
   const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);

@@ -1,6 +1,5 @@
 import { getMarkdownTheme, type Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Markdown, Text } from "@earendil-works/pi-tui";
-import type { ProcessInfo } from "../../../../src/types";
 import { ProcessActionTitle } from "../components";
 import type {
   ProcessesParamsType,
@@ -11,9 +10,8 @@ import {
   buildProcessSummaryRow,
   formatColoredProcessStatus,
   formatCount,
-  formatProcessRuntime,
 } from "../utils";
-import type { ListDetails, ProcessListCounts } from ".";
+import type { ListDetails, ListProcess, ProcessListCounts } from ".";
 
 type CountStatusItem = {
   filter: ProcessListStatusFilter;
@@ -161,7 +159,7 @@ function formatCounts(details: ListDetails, theme: Theme): string {
     .join(theme.fg("dim", " / "));
 }
 
-function formatProcessTable(processes: ProcessInfo[], theme: Theme): string {
+function formatProcessTable(processes: ListProcess[], theme: Theme): string {
   if (processes.length === 0) {
     return "No matching background processes.";
   }
@@ -172,13 +170,13 @@ function formatProcessTable(processes: ProcessInfo[], theme: Theme): string {
       process.id,
       String(process.pid),
       formatColoredProcessStatus(process, theme),
-      formatProcessRuntime(process),
+      process.duration,
       escapeTableCell(process.command),
     ].join(" | "),
   );
 
   return [
-    "| Name | ID | PID | Status | Runtime | Command |",
+    "| Name | ID | PID | Status | Duration | Command |",
     "| --- | --- | ---: | --- | --- | --- |",
     ...rows.map((row) => `| ${row} |`),
   ].join("\n");

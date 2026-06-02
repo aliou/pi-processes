@@ -1,10 +1,11 @@
+import { basename } from "node:path";
 import { ToolBody, ToolCallHeader } from "@aliou/pi-utils-ui";
 import type {
   AgentToolResult,
   Theme,
   ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
+import { hyperlink, Text } from "@earendil-works/pi-tui";
 import { configLoader } from "../../config";
 import type { ExecuteResult, ProcessesDetails } from "../../constants";
 import type { ProcessManager } from "../../manager";
@@ -89,11 +90,20 @@ export function renderOutputResult(
   }
 
   if (details.logFiles) {
+    const stdoutLink = hyperlink(
+      basename(details.logFiles.stdoutFile),
+      `file://${details.logFiles.stdoutFile}`,
+    );
+    const stderrLink = hyperlink(
+      basename(details.logFiles.stderrFile),
+      `file://${details.logFiles.stderrFile}`,
+    );
+
     lines.push(
       "",
       theme.fg("success", "Log files:"),
-      `  stdout: ${theme.fg("accent", details.logFiles.stdoutFile)}`,
-      `  stderr: ${theme.fg("accent", details.logFiles.stderrFile)}`,
+      `  stdout: ${theme.fg("accent", stdoutLink)}`,
+      `  stderr: ${theme.fg("accent", stderrLink)}`,
     );
   }
 

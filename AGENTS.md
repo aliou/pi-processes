@@ -62,6 +62,16 @@ same coverage trap Claude Code's Monitor tool documents; pi-processes differs by
 defaulting `alertOnFailure` on, so the exit path is covered even when a watch
 is not.)
 
+**Stall watchdog (opt-in).** When `config.stall.enabled` is true, a per-process
+silence timer fires after `config.stall.silenceSeconds` (default 45) of no
+output from a running process. The wake is delivered as `steer` with
+`triggerTurn: true` so the agent reacts mid-turn — the message includes
+actionable guidance (inspect output, write to stdin, or kill). After a stall
+alert, the timer resets only when new output arrives, so a single silent process
+triggers exactly one alert per silence window (no spam). Stall state is cleaned
+up on process end, clear, and session shutdown. Implementation:
+`src/hooks/process-stall.ts`; tests: `src/hooks/process-stall.test.ts`.
+
 The seven actions (dispatched in `src/tools/index.ts` → `src/tools/actions/`):
 
 | Action | Use |

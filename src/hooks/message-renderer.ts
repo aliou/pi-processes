@@ -32,10 +32,21 @@ interface ProcessWatchMatchDetails {
   };
 }
 
+interface ProcessStallDetails {
+  kind: "stalled";
+  processId: string;
+  processName: string;
+  command: string;
+  silenceSeconds: number;
+}
+
 interface ProcessUpdateMessage {
   customType: string;
   content: string | Array<{ type: string; text?: string }>;
-  details?: ProcessLifecycleDetails | ProcessWatchMatchDetails;
+  details?:
+    | ProcessLifecycleDetails
+    | ProcessWatchMatchDetails
+    | ProcessStallDetails;
 }
 
 function getContentText(
@@ -52,7 +63,7 @@ function getContentText(
 
 export function setupMessageRenderer(pi: ExtensionAPI) {
   pi.registerMessageRenderer<
-    ProcessLifecycleDetails | ProcessWatchMatchDetails
+    ProcessLifecycleDetails | ProcessWatchMatchDetails | ProcessStallDetails
   >(
     MESSAGE_TYPE_PROCESS_UPDATE,
     (
@@ -76,6 +87,17 @@ export function setupMessageRenderer(pi: ExtensionAPI) {
           theme.fg("muted", `/${details.watch.pattern}/ `) +
           theme.fg(streamColor, `[${details.source}]`) +
           theme.fg("muted", ` ${details.line}`);
+
+        return new Text(text, 0, 0);
+      }
+
+      if (details.kind === "stalled") {
+        const text =
+          theme.fg("warning", "\u25b2 ") +
+          theme.fg("accent", `"${details.processName}"`) +
+          theme.fg("muted", ` (${details.processId}) `) +
+          theme.fg("warning", "stalled") +
+          theme.fg("muted", ` \u2014 no output for ${details.silenceSeconds}s`);
 
         return new Text(text, 0, 0);
       }

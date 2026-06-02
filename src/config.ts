@@ -55,6 +55,19 @@ export interface ProcessesConfig {
     /** Suppress consecutive matches with an identical matched line by default. */
     dedupeConsecutive?: boolean;
   };
+  stall?: {
+    /**
+     * Enable the silence-based stall detector. When a running process
+     * produces no output for `silenceSeconds`, a steering wake alerts the
+     * agent. Off by default (opt-in) to stay behavior-preserving.
+     */
+    enabled?: boolean;
+    /**
+     * Seconds of silence before a running process is considered stalled.
+     * Only meaningful when `enabled` is true. Default 45.
+     */
+    silenceSeconds?: number;
+  };
 }
 
 export interface ResolvedProcessesConfig {
@@ -86,6 +99,10 @@ export interface ResolvedProcessesConfig {
     maxWakesPerWatch: number;
     dedupeConsecutive: boolean;
   };
+  stall: {
+    enabled: boolean;
+    silenceSeconds: number;
+  };
 }
 
 const DEFAULT_CONFIG: ResolvedProcessesConfig = {
@@ -114,6 +131,10 @@ const DEFAULT_CONFIG: ResolvedProcessesConfig = {
   watch: {
     maxWakesPerWatch: 20,
     dedupeConsecutive: false,
+  },
+  stall: {
+    enabled: false,
+    silenceSeconds: 45,
   },
 };
 

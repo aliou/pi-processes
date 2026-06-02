@@ -40,12 +40,16 @@ Grounded in CC source audits (`collection-claude-code-source-code`,
 CC native process architecture:
 
 - **BashTool** with `run_in_background` parameter.
-- **MonitorTool** (stream-only) — feature-gated, **stripped/dead-code-eliminated
-  from published npm bundle**; only present in leaked source.
-- **TaskOutputTool** (deprecated), **TaskStopTool**, **AgentTool**.
+- **Monitor tool** (stream-only) — **real and shipped**, behind
+  `feature('MONITOR_TOOL')` (enabled on recent Opus models). Modules are
+  dead-code-eliminated from decompiled mirrors, but the tool description is
+  shipped and the contract is fully documented in
+  [`cc-monitor-tool-contract.md`](./cc-monitor-tool-contract.md).
+- **TaskOutputTool** (deprecated), **TaskStop**, **AgentTool**.
 
-pi-processes ≈ BashTool backgrounding + MonitorTool collapsed into one `process`
-tool.
+pi-processes ≈ BashTool backgrounding + Monitor tool collapsed into one
+`process` tool. Full Monitor contract:
+[`cc-monitor-tool-contract.md`](./cc-monitor-tool-contract.md).
 
 Patterns pi-processes mirrors or could adopt (tracked as VSH-117 in
 `pi-ecosystem-plan.md`):

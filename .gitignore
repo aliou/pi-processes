@@ -33,9 +33,6 @@ pnpm-debug.log*
 result
 result-*
 
-# Husky
-.husky/_
-
 # Pi
 .pi/
 .agents/plans/*.md

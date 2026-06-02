@@ -1,0 +1,4 @@
+# pnpm 10 reads settings here (no longer from the package.json "pnpm" field).
+# Allow lefthook to run its postinstall build script (git-hook binary setup).
+onlyBuiltDependencies:
+  - lefthook

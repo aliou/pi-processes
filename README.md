@@ -1,5 +1,3 @@
-![banner](https://assets.aliou.me/github/aliou/pi-processes/banner.png)
-
 # pi-processes
 
 Manage background processes from Pi without blocking the conversation.
@@ -23,16 +21,17 @@ You can then inspect, pin, or stop those processes from the UI.
 
 ## Installation
 
-From npm:
+From GitHub Packages (map the `@victor-software-house` scope to
+`https://npm.pkg.github.com` in your `.npmrc` first):
 
 ```bash
-pi install npm:@aliou/pi-processes
+pi install npm:@victor-software-house/pi-processes
 ```
 
 From git:
 
 ```bash
-pi install git:github.com/aliou/pi-processes
+pi install git:github.com/victor-software-house/pi-processes
 ```
 
 ## Open the process panel

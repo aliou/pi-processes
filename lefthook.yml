@@ -1,0 +1,29 @@
+# Lefthook hook layout. Inline pnpm commands (this repo is not mise-based).
+# Mirror of the CI gate in .github/workflows/ci.yml — keep them in sync.
+
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      glob: "**/*.{ts,tsx,js,jsx,json,jsonc,md,yml,yaml}"
+      run: pnpm exec biome check --write --no-errors-on-unmatched {staged_files}
+      stage_fixed: true
+    typecheck:
+      run: pnpm typecheck
+
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm exec commitlint --edit {1}
+
+pre-push:
+  parallel: true
+  commands:
+    lockfile-sync:
+      run: pnpm run lockfile:sync
+    typecheck:
+      run: pnpm typecheck
+    lint:
+      run: pnpm lint
+    test:
+      run: pnpm test

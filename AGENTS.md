@@ -106,7 +106,10 @@ The seven actions (dispatched in `src/tools/index.ts` → `src/tools/actions/`):
 
 - TypeScript (strict, ESM), `pnpm@10.26.1`, Biome, Vitest, Changesets.
 - `engines`: Node per the Pi peers (`>=22.19.0`).
-- Published as `@aliou/pi-processes` to the public npm registry.
+- Published as `@victor-software-house/pi-processes` to **GitHub Packages**
+  (`npm.pkg.github.com`, `access: restricted`). This is a VSH fork of
+  `@aliou/pi-processes`; the runtime `@aliou/*` deps still resolve from public
+  npm.
 
 ### Pi host peers
 
@@ -141,6 +144,20 @@ Confirm any Pi API against the installed peer version, not memory.
 - `pnpm lint` / `pnpm format` — Biome check / `--write`
 - `pnpm test` — Vitest (`*.test.ts`: manager, components, utils)
 - `pnpm changeset` — add a release changeset
+- `pnpm lockfile:sync` — `pnpm install --frozen-lockfile --ignore-scripts` (CI/pre-push parity)
+
+## Git hooks & release
+
+Hooks run via **lefthook** (`lefthook.yml`, installed by the `prepare` script):
+pre-commit (Biome on staged + typecheck), commit-msg (commitlint, Conventional
+Commits via `commitlint.config.mjs`), pre-push (lockfile-sync + typecheck + lint
++ test). Mirrored server-side in `.github/workflows/ci.yml`.
+
+Releases are Changesets-driven (`.github/workflows/release.yml`): a push to
+`main` with pending `.changeset/*.md` opens a "Version Packages" PR; merging it
+publishes to GitHub Packages with `NODE_AUTH_TOKEN` (`GH_PACKAGES_TOKEN` or the
+fallback `github.token`) and creates the matching `v*` tag + GitHub release.
+Every functional change ships with a changeset.
 
 ## Debug flags
 

@@ -1,5 +1,5 @@
 ---
-"@aliou/pi-processes": minor
+"@victor-software-house/pi-processes": minor
 ---
 
 Refine background-process notification semantics:

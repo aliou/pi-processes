@@ -1,5 +1,5 @@
 {
-  "name": "@aliou/pi-processes",
+  "name": "@victor-software-house/pi-processes",
   "version": "0.9.4",
   "license": "MIT",
   "type": "module",
@@ -12,7 +12,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/aliou/pi-processes"
+    "url": "https://github.com/victor-software-house/pi-processes"
   },
   "pi": {
     "extensions": [
@@ -24,7 +24,8 @@
     "video": "https://assets.aliou.me/github/aliou/pi-processes/demo.mp4"
   },
   "publishConfig": {
-    "access": "public"
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
   },
   "files": [
     "src",
@@ -46,9 +47,12 @@
   "devDependencies": {
     "@aliou/biome-plugins": "^0.8.1",
     "@biomejs/biome": "^2.4.15",
+    "@changesets/changelog-github": "^0.7.0",
     "@changesets/cli": "^2.31.0",
+    "@commitlint/cli": "^21.0.2",
+    "@commitlint/config-conventional": "^21.0.2",
     "@types/node": "^25.9.1",
-    "husky": "^9.1.7",
+    "lefthook": "^2.1.9",
     "typescript": "^6.0.3",
     "vitest": "^4.1.7"
   },
@@ -56,12 +60,13 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check",
     "format": "biome check --write",
-    "check:lockfile": "pnpm install --frozen-lockfile --ignore-scripts",
-    "prepare": "[ -d .git ] && husky || true",
+    "lockfile:sync": "pnpm install --frozen-lockfile --ignore-scripts",
+    "commitlint": "commitlint",
+    "prepare": "lefthook install || true",
     "changeset": "changeset",
     "version": "changeset version",
     "test": "vitest run",
-    "release": "pnpm changeset publish"
+    "release": "changeset publish"
   },
   "packageManager": "pnpm@10.26.1",
   "peerDependenciesMeta": {

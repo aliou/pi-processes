@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "pnpm"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@victor-software-house"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || github.token }}
+
+      - name: Pre-publish gates
+        run: |
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+          pnpm pack --dry-run
+
+      - name: Create release PR or publish
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          version: pnpm run version
+          publish: pnpm run release
+          commit: "chore(release): version packages"
+          title: "chore(release): version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || github.token }}
+
+      - name: Create GitHub releases for published tags
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISHED_PACKAGES: ${{ steps.changesets.outputs.publishedPackages }}
+        run: |
+          node <<'NODE'
+          const { execSync } = require("node:child_process");
+
+          const published = JSON.parse(process.env.PUBLISHED_PACKAGES || "[]");
+
+          for (const pkg of published) {
+            const tag = `v${pkg.version}`;
+
+            const existing = execSync(`git tag --list ${tag}`, { encoding: "utf8" }).trim();
+            if (!existing) {
+              execSync(`git tag ${tag}`);
+              execSync(`git push origin ${tag}`);
+            }
+
+            let hasRelease = false;
+            try {
+              const output = execSync(`gh release view ${tag} --json tagName --jq .tagName`, {
+                stdio: ["ignore", "pipe", "ignore"],
+              }).toString().trim();
+              hasRelease = output.length > 0;
+            } catch {
+              hasRelease = false;
+            }
+
+            if (!hasRelease) {
+              execSync(`gh release create ${tag} --title ${tag} --notes "Release ${tag}"`, {
+                stdio: "inherit",
+              });
+            }
+          }
+          NODE

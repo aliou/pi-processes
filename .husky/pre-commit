@@ -1,3 +1,0 @@
-pnpm install --frozen-lockfile --silent
-pnpm typecheck
-pnpm lint

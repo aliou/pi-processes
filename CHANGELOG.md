@@ -1,5 +1,33 @@
 # @aliou/pi-processes
 
+## 0.10.0
+
+### Minor Changes
+
+- [`50baedb`](https://github.com/victor-software-house/pi-processes/commit/50baedb5f5cd543ab02960852a089c20d66cc859) Thanks [@any-victor](https://github.com/any-victor)! - Add opt-in silence-based stall watchdog (`config.stall.enabled`, default off).
+
+  When enabled, a per-process timer fires after `config.stall.silenceSeconds`
+  (default 45) of no output from a running process. The wake is delivered as
+  `steer` with `triggerTurn: true`, alerting the agent that a process may be
+  waiting for input or hung. The timer resets on new output, so a single
+  stalled process triggers exactly one alert per silence window.
+
+- [`cdc20d1`](https://github.com/victor-software-house/pi-processes/commit/cdc20d1f1bdcaa2b6385635b9618f8662876da7f) Thanks [@any-victor](https://github.com/any-victor)! - Refine background-process notification semantics:
+
+  - **Delivery split**: output-pattern watch wakes are now delivered as `steer`
+    (mid-turn, so the agent reacts while still working) and lifecycle completions
+    as `followUp` (delivered only once the agent has no more tool calls, so a
+    finishing process no longer interrupts an in-progress tool sequence).
+  - **Per-watch wake budget**: a noisy watch now stops waking after a budget
+    (default 20 per watch; configurable via `watch.maxWakesPerWatch` or per-watch
+    `maxWakes`, with `0` = unlimited), emitting a single budget-reached notice.
+    The full log stays reachable via the `output`/`logs` actions. This bounds
+    context flooding from chatty repeat watches; single-fire watches are
+    unaffected.
+  - **Consecutive-duplicate dedupe**: optional suppression of consecutive
+    identical matched lines via `watch.dedupeConsecutive` (config) or per-watch
+    `dedupe` (default off).
+
 ## 0.9.4
 
 ### Patch Changes

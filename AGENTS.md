@@ -50,7 +50,7 @@ Three notification controls on `start`:
 - `alertOnFailure` (**default true**) — get a turn when the process crashes/exits non-zero.
 - `alertOnSuccess` (default false) — get a turn on clean exit; use for builds/tests you must react to.
 - `alertOnKill` (default false) — get a turn if killed by an external signal (killing via the tool never triggers a turn).
-- `logWatches` — regex watches that alert *while the process is still running* (per match, not on exit). Each watch: `pattern`, `stream` (`stdout`/`stderr`/`both`, default both), `repeat` (default false = single-fire). `repeat: true` watches are turn-throttled (one turn per 5s, `REPEAT_WATCH_TURN_COOLDOWN_MS`) so a chatty pattern can't spam turns.
+- `logWatches` — regex watches that alert *while the process is still running* (per match, not on exit). Each watch: `pattern`, `stream` (`stdout`/`stderr`/`both`, default both), `repeat` (default false = single-fire), `maxWakes` (per-watch wake budget, default 20, `0` = unlimited), `dedupe` (suppress consecutive identical matched lines, default false). `repeat: true` watches are turn-throttled (one turn per 5s, `REPEAT_WATCH_TURN_COOLDOWN_MS`) so a chatty pattern can't spam turns; beyond the throttle, a watch stops waking entirely after `maxWakes` and emits one budget-reached notice (defaults via `config.watch.maxWakesPerWatch` / `dedupeConsecutive`).
 
 **logWatches coverage — silence is not success.** A watch that matches only the
 "ready" / success marker stays silent if the process instead crashes or hangs,
@@ -128,8 +128,10 @@ Every `ExtensionAPI` member this extension uses is present in 0.78.0:
   (before terminal writes), so background processes are reaped on signal exits,
   not only clean ones.
 - `sendMessage` accepts `deliverAs: "steer" | "followUp" | "nextTurn"`. The
-  process-end / process-watch hooks currently pass only the bare `triggerTurn`
-  flag — `deliverAs` is an available, unused lever for finer turn delivery.
+  hooks use it deliberately: `process-watch` output wakes deliver as `steer`
+  (react mid-turn, after the current tool calls), while `process-end` lifecycle
+  wakes deliver as `followUp` (wait until the agent has no pending tool calls,
+  so a finishing process never interrupts an in-progress sequence).
 
 Confirm any Pi API against the installed peer version, not memory.
 

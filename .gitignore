@@ -39,3 +39,6 @@ result-*
 # Pi
 .pi/
 .agents/plans/*.md
+
+# Agent worktrees / local state (also keeps biome from scanning nested checkouts)
+.claude/

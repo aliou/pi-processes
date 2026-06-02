@@ -32,6 +32,8 @@ interface ResolvedWatch {
   stream: LogWatchStream;
   repeat: boolean;
   fired: boolean;
+  maxWakes?: number;
+  dedupe?: boolean;
 }
 
 interface ManagedProcess extends ProcessInfo {
@@ -616,6 +618,20 @@ export class ProcessManager {
         );
       }
 
+      let maxWakes: number | undefined;
+      if (watch.maxWakes !== undefined) {
+        if (
+          typeof watch.maxWakes !== "number" ||
+          !Number.isInteger(watch.maxWakes) ||
+          watch.maxWakes < 0
+        ) {
+          throw new Error(
+            `Invalid logWatches[${index}].maxWakes: expected a non-negative integer`,
+          );
+        }
+        maxWakes = watch.maxWakes;
+      }
+
       return {
         index,
         pattern,
@@ -623,6 +639,8 @@ export class ProcessManager {
         stream,
         repeat: watch.repeat ?? false,
         fired: false,
+        maxWakes,
+        dedupe: watch.dedupe ?? undefined,
       };
     });
   }
@@ -708,6 +726,8 @@ export class ProcessManager {
               pattern: watch.pattern,
               stream: watch.stream,
               repeat: watch.repeat,
+              maxWakes: watch.maxWakes,
+              dedupe: watch.dedupe,
             },
           },
         });

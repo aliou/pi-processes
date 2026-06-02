@@ -30,6 +30,19 @@ export interface LogWatch {
   pattern: string;
   stream?: LogWatchStream;
   repeat?: boolean;
+  /**
+   * Max number of alert wakes this watch may emit before further matches are
+   * suppressed (one budget-reached notice is sent). 0 = unlimited. When
+   * undefined, the configured per-watch default applies. Mainly relevant for
+   * repeat watches; single-fire watches wake at most once anyway.
+   */
+  maxWakes?: number;
+  /**
+   * Suppress consecutive matches whose matched line is identical to the
+   * previous emitted one. Defaults to the configured value. Useful when the
+   * same line repeats in a tight loop.
+   */
+  dedupe?: boolean;
 }
 
 export interface ProcessInfo {
@@ -61,6 +74,8 @@ export interface LogWatchMatchEvent {
     pattern: string;
     stream: LogWatchStream;
     repeat: boolean;
+    maxWakes?: number;
+    dedupe?: boolean;
   };
 }
 

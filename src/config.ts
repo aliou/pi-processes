@@ -45,6 +45,16 @@ export interface ProcessesConfig {
     /** Block background bash commands (&, nohup, disown, setsid) and guide the model to use the process tool. */
     blockBackgroundCommands?: boolean;
   };
+  watch?: {
+    /**
+     * Default per-watch wake budget: after this many alert wakes, further
+     * matches for that watch are suppressed and a single budget-reached notice
+     * is sent. 0 = unlimited. Overridable per watch via LogWatch.maxWakes.
+     */
+    maxWakesPerWatch?: number;
+    /** Suppress consecutive matches with an identical matched line by default. */
+    dedupeConsecutive?: boolean;
+  };
 }
 
 export interface ResolvedProcessesConfig {
@@ -72,6 +82,10 @@ export interface ResolvedProcessesConfig {
   interception: {
     blockBackgroundCommands: boolean;
   };
+  watch: {
+    maxWakesPerWatch: number;
+    dedupeConsecutive: boolean;
+  };
 }
 
 const DEFAULT_CONFIG: ResolvedProcessesConfig = {
@@ -96,6 +110,10 @@ const DEFAULT_CONFIG: ResolvedProcessesConfig = {
   keybindings: DEFAULT_KEYBINDINGS,
   interception: {
     blockBackgroundCommands: false,
+  },
+  watch: {
+    maxWakesPerWatch: 20,
+    dedupeConsecutive: false,
   },
 };
 

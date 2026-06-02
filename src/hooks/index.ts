@@ -17,7 +17,7 @@ export function setupProcessesHooks(
 ): { update: () => void; dockActions: DockActions } {
   setupCleanupHook(pi, manager);
   setupProcessEndHook(pi, manager);
-  setupProcessWatchHook(pi, manager);
+  setupProcessWatchHook(pi, manager, config);
 
   if (config.interception.blockBackgroundCommands) {
     setupBackgroundBlocker(pi);

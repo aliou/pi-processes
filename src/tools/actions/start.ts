@@ -15,6 +15,8 @@ interface StartLogWatch {
   pattern: string;
   stream?: WatchStream;
   repeat?: boolean;
+  maxWakes?: number;
+  dedupe?: boolean;
 }
 
 interface StartParams {
@@ -238,6 +240,19 @@ function validateLogWatches(watches?: StartLogWatch[]): string | null {
 
     if (watch.repeat !== undefined && typeof watch.repeat !== "boolean") {
       return `Invalid logWatches[${index}].repeat: expected boolean`;
+    }
+
+    if (
+      watch.maxWakes !== undefined &&
+      (typeof watch.maxWakes !== "number" ||
+        !Number.isInteger(watch.maxWakes) ||
+        watch.maxWakes < 0)
+    ) {
+      return `Invalid logWatches[${index}].maxWakes: expected a non-negative integer`;
+    }
+
+    if (watch.dedupe !== undefined && typeof watch.dedupe !== "boolean") {
+      return `Invalid logWatches[${index}].dedupe: expected boolean`;
     }
   }
 

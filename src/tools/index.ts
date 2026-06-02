@@ -107,6 +107,19 @@ const ProcessesParams = Type.Object({
                 "Trigger every time this pattern matches (default: false, one-time)",
             }),
           ),
+          maxWakes: Type.Optional(
+            Type.Integer({
+              minimum: 0,
+              description:
+                "Max alert wakes for this watch before further matches are suppressed (one budget-reached notice is sent). Default: 20. Set 0 for unlimited. Mainly relevant with repeat:true.",
+            }),
+          ),
+          dedupe: Type.Optional(
+            Type.Boolean({
+              description:
+                "Suppress consecutive matches with an identical matched line (default: false). Useful when the same line repeats in a tight loop.",
+            }),
+          ),
         },
         { additionalProperties: false },
       ),
@@ -130,6 +143,8 @@ export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
     - pattern: regex string to match per output line
     - stream: stdout | stderr | both (default both)
     - repeat: false by default (single-fire). Set true for repeat alerts
+    - maxWakes: per-watch wake budget (default 20, 0=unlimited); noisy repeat watches stop after the budget with one notice
+    - dedupe: suppress consecutive identical matched lines (default false)
 - list: Show all managed processes with their IDs and names
 - output: Get recent stdout/stderr (requires 'id')
 - logs: Get log file paths to inspect with read tool (requires 'id')

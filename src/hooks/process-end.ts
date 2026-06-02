@@ -55,6 +55,10 @@ export function setupProcessEndHook(pi: ExtensionAPI, manager: ProcessManager) {
       runtime,
     };
 
+    // Lifecycle completion is a follow-up event, not a steering one: a process
+    // ending should not interrupt an in-progress tool sequence. "followUp"
+    // waits until the agent has no more tool calls, then delivers the
+    // completion so the agent can react (check results, restart, fix).
     safeSendMessage(
       pi,
       {
@@ -63,7 +67,7 @@ export function setupProcessEndHook(pi: ExtensionAPI, manager: ProcessManager) {
         display: true,
         details,
       },
-      { triggerTurn: triggerAgentTurn },
+      { triggerTurn: triggerAgentTurn, deliverAs: "followUp" },
     );
   });
 }

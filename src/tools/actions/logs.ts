@@ -1,10 +1,11 @@
+import { basename } from "node:path";
 import { ToolBody, ToolCallHeader } from "@aliou/pi-utils-ui";
 import type {
   AgentToolResult,
   Theme,
   ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
+import { hyperlink, Text } from "@earendil-works/pi-tui";
 import type { ExecuteResult, ProcessesDetails } from "../../constants";
 import type { ProcessManager } from "../../manager";
 
@@ -46,21 +47,29 @@ export function renderLogsResult(
     );
   }
 
-  const fields: Array<
-    { label: string; value: string; showCollapsed?: boolean } | Text
-  > = [
-    new Text(
-      [
-        theme.fg("success", "Log files:"),
-        `  stdout: ${theme.fg("accent", details.logFiles.stdoutFile)}`,
-        `  stderr: ${theme.fg("accent", details.logFiles.stderrFile)}`,
-      ].join("\n"),
-      0,
-      0,
-    ),
-  ];
+  const stdoutLink = hyperlink(
+    basename(details.logFiles.stdoutFile),
+    `file://${details.logFiles.stdoutFile}`,
+  );
+  const stderrLink = hyperlink(
+    basename(details.logFiles.stderrFile),
+    `file://${details.logFiles.stderrFile}`,
+  );
 
-  return new ToolBody({ fields }, options, theme);
+  const text =
+    theme.fg("muted", "stdout: ") +
+    theme.fg("accent", stdoutLink) +
+    "\n" +
+    theme.fg("muted", "stderr: ") +
+    theme.fg("accent", stderrLink);
+
+  return new ToolBody(
+    {
+      fields: [new Text(text, 0, 0)],
+    },
+    options,
+    theme,
+  );
 }
 
 export function executeLogs(

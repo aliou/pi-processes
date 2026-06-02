@@ -1,3 +1,4 @@
+import { basename } from "node:path";
 import { ToolBody, ToolCallHeader } from "@aliou/pi-utils-ui";
 import type {
   AgentToolResult,
@@ -5,7 +6,7 @@ import type {
   Theme,
   ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
+import { hyperlink, Text } from "@earendil-works/pi-tui";
 import type { ExecuteResult, ProcessesDetails } from "../../constants";
 import type { ProcessManager } from "../../manager";
 
@@ -94,33 +95,33 @@ export function renderStartResult(
     );
   }
 
-  const fields: Array<
-    { label: string; value: string; showCollapsed?: boolean } | Text
-  > = [
-    new Text(
-      [
-        theme.fg("success", "Started process"),
-        `  name: ${theme.fg("accent", process.name)}`,
-        `  command: ${process.command}`,
-        `  id: ${theme.fg("accent", process.id)}`,
-        `  pid: ${String(process.pid)}`,
-        "  Log files:",
-        `    - stdout: ${theme.fg("accent", process.stdoutFile)}`,
-        `    - stderr: ${theme.fg("accent", process.stderrFile)}`,
-      ].join("\n"),
-      0,
-      0,
-    ),
-    {
-      label: "Status",
-      value:
-        theme.fg("success", "Started") +
-        ` ${theme.fg("accent", `"${process.name}"`)} (${process.id}, PID: ${process.pid})`,
-      showCollapsed: true,
-    },
-  ];
+  const stdoutLink = hyperlink(
+    basename(process.stdoutFile),
+    `file://${process.stdoutFile}`,
+  );
+  const stderrLink = hyperlink(
+    basename(process.stderrFile),
+    `file://${process.stderrFile}`,
+  );
 
-  return new ToolBody({ fields }, options, theme);
+  const text =
+    theme.fg("success", "\u2713 ") +
+    theme.fg("accent", `"${process.name}"`) +
+    " started" +
+    theme.fg("muted", ` (${process.id}, PID: ${process.pid})`) +
+    "\n" +
+    theme.fg("muted", "  logs: ") +
+    theme.fg("accent", stdoutLink) +
+    theme.fg("muted", "  ") +
+    theme.fg("accent", stderrLink);
+
+  return new ToolBody(
+    {
+      fields: [new Text(text, 0, 0)],
+    },
+    options,
+    theme,
+  );
 }
 
 export function executeStart(

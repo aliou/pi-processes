@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.10.2
+
+### Patch Changes
+
+- Use compact OSC 8 hyperlinks for log file paths in process output renderer
+
 ## 0.10.1
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # @aliou/pi-processes
 
+## 0.10.1
+
+### Patch Changes
+
+- [`07bc0ac`](https://github.com/victor-software-house/pi-processes/commit/07bc0ac8e89667cfa07c865b1cffe595307a64f9) Thanks [@any-victor](https://github.com/any-victor)! - Compact the start and logs tool result renderers: replace verbose multi-line
+  output with a two-line status + clickable OSC 8 hyperlinks for log filenames.
+
 ## 0.10.0
 
 ### Minor Changes

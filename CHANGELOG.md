@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.11.0
+
+### Minor Changes
+
+- [`98d99a6`](https://github.com/victor-software-house/pi-processes/commit/98d99a60f8d27650fad3eb07fb4140ccc58f7d0b) Thanks [@any-victor](https://github.com/any-victor)! - Process output rendering now uses pi-render-core bash factories when available — Shiki syntax highlighting, boxed panel with exit status, elapsed timer, and width-aware visual truncation identical to Pi's native bash tool. Falls back to a themed Container-based renderer (toolOutput colors, truncateToVisualLines, expand hint) when pi-render-core is absent.
+
 ## 0.10.2
 
 ### Patch Changes

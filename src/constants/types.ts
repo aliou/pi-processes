@@ -111,6 +111,7 @@ export interface ProcessesDetails {
   process?: ProcessInfo;
   processes?: ProcessInfo[];
   output?: { stdout: string[]; stderr: string[]; status: string };
+  outputMeta?: { command: string; exitCode: number | null };
   logFiles?: { stdoutFile: string; stderrFile: string };
   cleared?: number;
 }

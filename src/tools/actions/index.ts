@@ -107,6 +107,7 @@ export function renderActionResult(
   result: AgentToolResult<ProcessesDetails>,
   options: ToolRenderResultOptions,
   theme: Theme,
+  context?: unknown,
 ): Component {
   const { details } = result;
 
@@ -132,7 +133,7 @@ export function renderActionResult(
     case "list":
       return renderListResult(result, options, theme);
     case "output":
-      return renderOutputResult(result, options, theme);
+      return renderOutputResult(result, options, theme, context);
     case "logs":
       return renderLogsResult(result, options, theme);
     case "kill":

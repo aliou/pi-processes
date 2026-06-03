@@ -18,9 +18,24 @@ import { formatStatus, hasAnsi, stripAnsi } from "../../utils";
 const MAX_BYTES = 50 * 1024; // 50KB
 const OUTPUT_PREVIEW_LINES = 5;
 
+// ---------------------------------------------------------------------------
+// Optional pi-render-core bash factory (lazy-loaded, async)
+// ---------------------------------------------------------------------------
+// biome-ignore lint/suspicious/noExplicitAny: pi-render-core's RenderResultFn is runtime-shaped
+type RenderFn = (result: any, options: any, theme: any, ctx: any) => any;
+let bashRenderFn: RenderFn | null | undefined;
+
 interface OutputParams {
   id?: string;
 }
+
+import("@victor-software-house/pi-render-core/bash")
+  .then(({ createBashRenderResult }) => {
+    bashRenderFn = createBashRenderResult({ cachePrefix: "process_output" });
+  })
+  .catch(() => {
+    bashRenderFn = null;
+  });
 
 export function renderOutputCall(
   args: OutputParams,
@@ -40,19 +55,90 @@ export function renderOutputResult(
   result: AgentToolResult<ProcessesDetails>,
   options: ToolRenderResultOptions,
   theme: Theme,
+  context?: unknown,
 ): Container {
   const { details } = result;
 
   if (!details.output) {
-    const c = new OutputResultComponent();
+    const c = new Container();
     c.addChild(new Text(theme.fg("error", "Missing output details"), 0, 0));
     return c;
   }
 
+  // When pi-render-core is available and we have a render context, delegate
+  // to the bash render factory for Shiki-highlighted, boxed output.
+  if (bashRenderFn && context) {
+    return renderWithBashFactory(
+      bashRenderFn,
+      result,
+      details,
+      options,
+      theme,
+      context,
+    );
+  }
+
+  // Fallback: Container-based render without pi-render-core
   const component = new OutputResultComponent();
   rebuildOutputComponent(component, details, options, theme);
   return component;
 }
+
+// ---------------------------------------------------------------------------
+// pi-render-core path: bash-style boxed + Shiki-highlighted output
+// ---------------------------------------------------------------------------
+function renderWithBashFactory(
+  renderFn: RenderFn,
+  result: AgentToolResult<ProcessesDetails>,
+  details: ProcessesDetails,
+  options: ToolRenderResultOptions,
+  theme: Theme,
+  context: unknown,
+): Container {
+  const output = details.output;
+  if (!output) return new Container();
+  const meta = details.outputMeta;
+
+  // Combine stdout + stderr into a single text blob for the bash renderer
+  const parts: string[] = [];
+  if (output.stdout.length > 0) parts.push(...output.stdout.map(stripAnsi));
+  if (output.stderr.length > 0) {
+    if (parts.length > 0) parts.push("");
+    parts.push(...output.stderr.map(stripAnsi));
+  }
+  const combinedText = parts.join("\n");
+
+  // Shape result as bashResult for pi-render-core's coerceBashDetails
+  const shapedResult = {
+    ...result,
+    content: [{ type: "text" as const, text: combinedText }],
+    details: {
+      ...details,
+      _type: "bashResult",
+      text: combinedText,
+      exitCode: meta?.exitCode ?? null,
+      command: meta?.command ?? "",
+    },
+  };
+
+  const container = new Container();
+
+  // 1. Process header
+  container.addChild(new Text(theme.fg("muted", details.message), 0, 0));
+
+  // 2. Bash-rendered output (Shiki highlight, boxed panel, elapsed timer)
+  const bashComponent = renderFn(shapedResult, options, theme, context);
+  container.addChild(bashComponent);
+
+  // 3. Log file links
+  appendLogFileLinks(container, details, theme);
+
+  return container;
+}
+
+// ---------------------------------------------------------------------------
+// Fallback path: Container-based render (no pi-render-core)
+// ---------------------------------------------------------------------------
 
 class OutputResultComponent extends Container {
   state: {
@@ -135,30 +221,8 @@ function rebuildOutputComponent(
     }
   }
 
-  // Log file links
-  if (details.logFiles) {
-    const stdoutLink = hyperlink(
-      basename(details.logFiles.stdoutFile),
-      `file://${details.logFiles.stdoutFile}`,
-    );
-    const stderrLink = hyperlink(
-      basename(details.logFiles.stderrFile),
-      `file://${details.logFiles.stderrFile}`,
-    );
-
-    component.addChild(
-      new Text(
-        [
-          "",
-          theme.fg("success", "Log files:"),
-          `  stdout: ${theme.fg("accent", stdoutLink)}`,
-          `  stderr: ${theme.fg("accent", stderrLink)}`,
-        ].join("\n"),
-        0,
-        0,
-      ),
-    );
-  }
+  // Log file links + ANSI notice
+  appendLogFileLinks(component, details, theme);
 
   if (hadAnsi) {
     component.addChild(
@@ -169,6 +233,39 @@ function rebuildOutputComponent(
       ),
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Shared: log file links
+// ---------------------------------------------------------------------------
+function appendLogFileLinks(
+  container: Container,
+  details: ProcessesDetails,
+  theme: Theme,
+): void {
+  if (!details.logFiles) return;
+
+  const stdoutLink = hyperlink(
+    basename(details.logFiles.stdoutFile),
+    `file://${details.logFiles.stdoutFile}`,
+  );
+  const stderrLink = hyperlink(
+    basename(details.logFiles.stderrFile),
+    `file://${details.logFiles.stderrFile}`,
+  );
+
+  container.addChild(
+    new Text(
+      [
+        "",
+        theme.fg("success", "Log files:"),
+        `  stdout: ${theme.fg("accent", stdoutLink)}`,
+        `  stderr: ${theme.fg("accent", stderrLink)}`,
+      ].join("\n"),
+      0,
+      0,
+    ),
+  );
 }
 
 export function executeOutput(
@@ -241,6 +338,7 @@ export function executeOutput(
       success: true,
       message,
       output,
+      outputMeta: { command: proc.command, exitCode: proc.exitCode },
       logFiles: logFiles
         ? {
             stdoutFile: logFiles.stdoutFile,

@@ -42,6 +42,7 @@
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
     "@earendil-works/pi-tui": "*",
+    "@victor-software-house/pi-render-core": ">=0.7.0",
     "typebox": "*"
   },
   "devDependencies": {
@@ -52,6 +53,7 @@
     "@commitlint/cli": "^21.0.2",
     "@commitlint/config-conventional": "^21.0.2",
     "@types/node": "^25.9.1",
+    "@victor-software-house/pi-render-core": "^0.7.12",
     "lefthook": "^2.1.9",
     "typescript": "^6.0.3",
     "vitest": "^4.1.7"
@@ -80,6 +82,9 @@
       "optional": true
     },
     "typebox": {
+      "optional": true
+    },
+    "@victor-software-house/pi-render-core": {
       "optional": true
     }
   }

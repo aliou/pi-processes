@@ -216,7 +216,7 @@ Note: User always sees process updates in the UI. The notify flags control wheth
         );
       }
 
-      return renderActionResult(result, options, theme);
+      return renderActionResult(result, options, theme, _context);
     },
   });
 }

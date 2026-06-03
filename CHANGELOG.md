@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.11.1
+
+### Patch Changes
+
+- [`17b7b39`](https://github.com/victor-software-house/pi-processes/commit/17b7b39445f57bd6cbc20c8c7092d657b46335b4) Thanks [@any-victor](https://github.com/any-victor)! - Fix false crash reports for processes that exit successfully. The liveness poll could race with the Node.js close event and discard the real exit code, reporting success=false for exit code 0.
+
 ## 0.11.0
 
 ### Minor Changes

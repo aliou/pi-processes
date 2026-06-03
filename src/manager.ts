@@ -45,6 +45,8 @@ interface ManagedProcess extends ProcessInfo {
   stdoutPendingLine: string;
   stderrPendingLine: string;
   watches: ResolvedWatch[];
+  /** Timestamp when livenessTick first detected the PID was gone (defers transition to let close event fire). */
+  polledDeadAt: number | null;
 }
 
 interface ProcessManagerOptions {
@@ -162,8 +164,32 @@ export class ProcessManager {
       if (!managed.pid || managed.pid <= 0) continue;
 
       const alive = isProcessGroupAlive(managed.pid);
-      if (alive) continue;
+      if (alive) {
+        managed.polledDeadAt = null;
+        continue;
+      }
 
+      // Signal-killed: transition immediately — we know the outcome.
+      if (managed.lastSignalSent) {
+        if (!managed.endTime) {
+          managed.endTime = Date.now();
+        }
+        this.flushPendingOutputChanged(managed.id);
+        this.flushPendingLines(managed);
+        managed.success = false;
+        managed.exitCode = null;
+        this.transition(managed, "killed");
+        continue;
+      }
+
+      // Natural exit: defer one tick to let child.on("close") deliver
+      // the real exit code before we force-transition with exitCode=null.
+      if (!managed.polledDeadAt) {
+        managed.polledDeadAt = Date.now();
+        continue;
+      }
+
+      // Second tick — close event never fired; force-transition as fallback.
       if (!managed.endTime) {
         managed.endTime = Date.now();
       }
@@ -171,15 +197,9 @@ export class ProcessManager {
       this.flushPendingOutputChanged(managed.id);
       this.flushPendingLines(managed);
 
-      if (managed.lastSignalSent) {
-        managed.success = false;
-        managed.exitCode = null;
-        this.transition(managed, "killed");
-      } else {
-        managed.success = false;
-        managed.exitCode = null;
-        this.transition(managed, "exited");
-      }
+      managed.success = false;
+      managed.exitCode = null;
+      this.transition(managed, "exited");
     }
   }
 
@@ -227,6 +247,7 @@ export class ProcessManager {
       stdoutPendingLine: "",
       stderrPendingLine: "",
       watches: resolvedWatches,
+      polledDeadAt: null,
     };
 
     this.processes.set(id, managed);
@@ -271,20 +292,29 @@ export class ProcessManager {
     });
 
     child.on("close", (code, signal) => {
-      if (managed.endTime) return;
+      // The close event carries the authoritative exit code.
+      // Always apply it — even if livenessTick already set endTime
+      // (race). Only skip the transition if already transitioned.
+      const alreadyTransitioned = !LIVE_STATUSES.has(managed.status);
 
       managed.exitCode = code;
-      managed.endTime = Date.now();
+      managed.endTime ??= Date.now();
       managed.success = code === 0;
+      managed.polledDeadAt = null;
 
       this.flushPendingOutputChanged(id);
       this.flushPendingLines(managed);
 
-      if (signal) {
-        this.transition(managed, "killed");
-      } else {
-        this.transition(managed, "exited");
+      if (!alreadyTransitioned) {
+        if (signal) {
+          this.transition(managed, "killed");
+        } else {
+          this.transition(managed, "exited");
+        }
       }
+      // If already transitioned by livenessTick fallback, metadata is
+      // now corrected silently. Subsequent get() calls return the real
+      // exit code. We don't re-emit process_ended to avoid double alerts.
     });
 
     child.on("error", (err) => {
@@ -426,7 +456,9 @@ export class ProcessManager {
       managed.lastSignalSent = signal;
     } catch (error) {
       const err = error as NodeJS.ErrnoException;
-      if (err.code !== "EPERM") {
+      // ESRCH: process already dead (e.g. during deferred-dead window).
+      // Treat as successful kill — fall through to the alive check below.
+      if (err.code !== "EPERM" && err.code !== "ESRCH") {
         return {
           ok: false,
           info: this.toProcessInfo(managed),

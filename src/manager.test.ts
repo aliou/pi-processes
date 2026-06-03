@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ManagerEvent } from "./constants";
 import { ProcessManager } from "./manager";
 
@@ -327,5 +327,144 @@ describe("process_watch_matched", () => {
         logWatches: [{ pattern: "(" }],
       }),
     ).toThrowError(/Invalid log watch pattern/);
+  });
+});
+
+describe("exit code fidelity", () => {
+  let manager: ProcessManager;
+
+  afterEach(() => {
+    manager.cleanup();
+  });
+
+  it("reports success=true and exitCode=0 for a zero-exit process", async () => {
+    manager = new ProcessManager();
+    const info = manager.start("ok", "true", "/tmp");
+    await waitForEnd(manager, info.id);
+
+    const snap = manager.get(info.id);
+    expect(snap?.success).toBe(true);
+    expect(snap?.exitCode).toBe(0);
+    expect(snap?.status).toBe("exited");
+  });
+
+  it("reports success=false and exitCode=1 for a failing process", async () => {
+    manager = new ProcessManager();
+    const info = manager.start("fail", "false", "/tmp");
+    await waitForEnd(manager, info.id);
+
+    const snap = manager.get(info.id);
+    expect(snap?.success).toBe(false);
+    expect(snap?.exitCode).toBe(1);
+    expect(snap?.status).toBe("exited");
+  });
+
+  it("preserves non-zero exit codes", async () => {
+    manager = new ProcessManager();
+    const info = manager.start("exit42", "exit 42", "/tmp");
+    await waitForEnd(manager, info.id);
+
+    const snap = manager.get(info.id);
+    expect(snap?.success).toBe(false);
+    expect(snap?.exitCode).toBe(42);
+  });
+
+  it("emits exactly one process_ended event per process", async () => {
+    manager = new ProcessManager();
+    const events = collectEvents(manager);
+
+    const info = manager.start("once", "echo hi", "/tmp");
+    await waitForEnd(manager, info.id);
+    // Wait extra to catch any stale re-emits
+    await new Promise((r) => setTimeout(r, 200));
+
+    const endEvents = events.filter(
+      (e): e is Extract<ManagerEvent, { type: "process_ended" }> =>
+        e.type === "process_ended" && e.info.id === info.id,
+    );
+    expect(endEvents).toHaveLength(1);
+    expect(endEvents[0].info.success).toBe(true);
+    expect(endEvents[0].info.exitCode).toBe(0);
+  });
+});
+
+describe("livenessTick race condition", () => {
+  let manager: ProcessManager;
+
+  afterEach(() => {
+    manager.cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("close handler overrides endTime guard with real exit code", async () => {
+    manager = new ProcessManager();
+    const events = collectEvents(manager);
+
+    // Process that exits cleanly after brief work
+    const info = manager.start("race", "sleep 0.1 && echo ok", "/tmp");
+    await waitForEnd(manager, info.id);
+
+    const snap = manager.get(info.id);
+    // close handler must always deliver the real exit code
+    expect(snap?.exitCode).toBe(0);
+    expect(snap?.success).toBe(true);
+    expect(snap?.status).toBe("exited");
+
+    // Exactly one process_ended event
+    const endEvents = events.filter(
+      (e): e is Extract<ManagerEvent, { type: "process_ended" }> =>
+        e.type === "process_ended" && e.info.id === info.id,
+    );
+    expect(endEvents).toHaveLength(1);
+    expect(endEvents[0].info.success).toBe(true);
+    expect(endEvents[0].info.exitCode).toBe(0);
+  });
+
+  it("fast exit delivers correct code despite liveness polling", async () => {
+    // Regression test for the original bug:
+    // git push exits 0 but process tool reports "crashed"
+    manager = new ProcessManager();
+    const events = collectEvents(manager);
+
+    // Process that does real work then exits 0
+    const info = manager.start(
+      "git-push-sim",
+      "echo 'To github.com:org/repo.git' && echo '  main -> main'",
+      "/tmp",
+    );
+
+    await waitForEnd(manager, info.id);
+    // Wait for any deferred livenessTick to settle
+    await new Promise((r) => setTimeout(r, 300));
+
+    const snap = manager.get(info.id);
+    expect(snap?.success).toBe(true);
+    expect(snap?.exitCode).toBe(0);
+
+    const endEvents = events.filter(
+      (e): e is Extract<ManagerEvent, { type: "process_ended" }> =>
+        e.type === "process_ended" && e.info.id === info.id,
+    );
+    expect(endEvents).toHaveLength(1);
+    expect(endEvents[0].info.success).toBe(true);
+  });
+
+  it("non-zero exit is preserved through the same path", async () => {
+    manager = new ProcessManager();
+    const events = collectEvents(manager);
+
+    const info = manager.start("fail-race", "sleep 0.1 && exit 7", "/tmp");
+    await waitForEnd(manager, info.id);
+
+    const snap = manager.get(info.id);
+    expect(snap?.exitCode).toBe(7);
+    expect(snap?.success).toBe(false);
+
+    const endEvents = events.filter(
+      (e): e is Extract<ManagerEvent, { type: "process_ended" }> =>
+        e.type === "process_ended" && e.info.id === info.id,
+    );
+    expect(endEvents).toHaveLength(1);
+    expect(endEvents[0].info.exitCode).toBe(7);
   });
 });

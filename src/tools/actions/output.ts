@@ -1,17 +1,22 @@
 import { basename } from "node:path";
-import { ToolBody, ToolCallHeader } from "@aliou/pi-utils-ui";
+import { ToolCallHeader } from "@aliou/pi-utils-ui";
 import type {
   AgentToolResult,
   Theme,
   ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
-import { hyperlink, Text } from "@earendil-works/pi-tui";
+import {
+  keyHint,
+  truncateToVisualLines,
+} from "@earendil-works/pi-coding-agent";
+import { Container, hyperlink, Text } from "@earendil-works/pi-tui";
 import { configLoader } from "../../config";
 import type { ExecuteResult, ProcessesDetails } from "../../constants";
 import type { ProcessManager } from "../../manager";
 import { formatStatus, hasAnsi, stripAnsi } from "../../utils";
 
 const MAX_BYTES = 50 * 1024; // 50KB
+const OUTPUT_PREVIEW_LINES = 5;
 
 interface OutputParams {
   id?: string;
@@ -35,60 +40,102 @@ export function renderOutputResult(
   result: AgentToolResult<ProcessesDetails>,
   options: ToolRenderResultOptions,
   theme: Theme,
-): ToolBody {
+): Container {
   const { details } = result;
 
   if (!details.output) {
-    return new ToolBody(
-      {
-        fields: [
-          {
-            label: "Error",
-            value: "Missing output details",
-            showCollapsed: true,
-          },
-        ],
-      },
-      options,
-      theme,
-    );
+    const c = new OutputResultComponent();
+    c.addChild(new Text(theme.fg("error", "Missing output details"), 0, 0));
+    return c;
   }
 
-  const lines: string[] = [theme.fg("muted", details.message)];
+  const component = new OutputResultComponent();
+  rebuildOutputComponent(component, details, options, theme);
+  return component;
+}
+
+class OutputResultComponent extends Container {
+  state: {
+    cachedWidth: number | undefined;
+    cachedLines: string[] | undefined;
+    cachedSkipped: number | undefined;
+  } = {
+    cachedWidth: undefined,
+    cachedLines: undefined,
+    cachedSkipped: undefined,
+  };
+}
+
+function rebuildOutputComponent(
+  component: OutputResultComponent,
+  details: ProcessesDetails,
+  options: ToolRenderResultOptions,
+  theme: Theme,
+): void {
+  const state = component.state;
+  component.clear();
+
+  // Header line: process name, id, status, line counts
+  component.addChild(new Text(theme.fg("muted", details.message), 0, 0));
+
+  // Build styled output text (stdout then stderr)
+  const outputLines: string[] = [];
   let hadAnsi = false;
 
-  if (details.output.stdout.length > 0) {
-    lines.push("", theme.fg("accent", "stdout:"));
-    for (const line of details.output.stdout.slice(-20)) {
+  if (details.output && details.output.stdout.length > 0) {
+    outputLines.push(theme.fg("accent", "stdout:"));
+    for (const line of details.output.stdout) {
       if (!hadAnsi && hasAnsi(line)) hadAnsi = true;
-      lines.push(stripAnsi(line));
-    }
-    if (details.output.stdout.length > 20) {
-      lines.push(
-        theme.fg(
-          "muted",
-          `... (${details.output.stdout.length - 20} more lines)`,
-        ),
-      );
+      outputLines.push(theme.fg("toolOutput", stripAnsi(line)));
     }
   }
 
-  if (details.output.stderr.length > 0) {
-    lines.push("", theme.fg("warning", "stderr:"));
-    for (const line of details.output.stderr.slice(-10)) {
+  if (details.output && details.output.stderr.length > 0) {
+    if (outputLines.length > 0) outputLines.push("");
+    outputLines.push(theme.fg("warning", "stderr:"));
+    for (const line of details.output.stderr) {
       if (!hadAnsi && hasAnsi(line)) hadAnsi = true;
-      lines.push(theme.fg("warning", stripAnsi(line)));
-    }
-    if (details.output.stderr.length > 10) {
-      lines.push(
-        theme.fg(
-          "muted",
-          `... (${details.output.stderr.length - 10} more lines)`,
-        ),
-      );
+      outputLines.push(theme.fg("warning", stripAnsi(line)));
     }
   }
 
+  if (outputLines.length > 0) {
+    const styledOutput = outputLines.join("\n");
+
+    if (options.expanded) {
+      component.addChild(new Text(`\n${styledOutput}`, 0, 0));
+    } else {
+      component.addChild({
+        render: (width: number) => {
+          if (state.cachedLines === undefined || state.cachedWidth !== width) {
+            const preview = truncateToVisualLines(
+              styledOutput,
+              OUTPUT_PREVIEW_LINES,
+              width,
+            );
+            state.cachedLines = preview.visualLines;
+            state.cachedSkipped = preview.skippedCount;
+            state.cachedWidth = width;
+          }
+
+          if (state.cachedSkipped && state.cachedSkipped > 0) {
+            const hint =
+              theme.fg("muted", `... (${state.cachedSkipped} earlier lines,`) +
+              ` ${keyHint("app.tools.expand", "to expand")})`;
+            return ["", hint, ...(state.cachedLines ?? [])];
+          }
+          return ["", ...(state.cachedLines ?? [])];
+        },
+        invalidate: () => {
+          state.cachedWidth = undefined;
+          state.cachedLines = undefined;
+          state.cachedSkipped = undefined;
+        },
+      });
+    }
+  }
+
+  // Log file links
   if (details.logFiles) {
     const stdoutLink = hyperlink(
       basename(details.logFiles.stdoutFile),
@@ -99,43 +146,29 @@ export function renderOutputResult(
       `file://${details.logFiles.stderrFile}`,
     );
 
-    lines.push(
-      "",
-      theme.fg("success", "Log files:"),
-      `  stdout: ${theme.fg("accent", stdoutLink)}`,
-      `  stderr: ${theme.fg("accent", stderrLink)}`,
+    component.addChild(
+      new Text(
+        [
+          "",
+          theme.fg("success", "Log files:"),
+          `  stdout: ${theme.fg("accent", stdoutLink)}`,
+          `  stderr: ${theme.fg("accent", stderrLink)}`,
+        ].join("\n"),
+        0,
+        0,
+      ),
     );
   }
 
   if (hadAnsi) {
-    lines.push(
-      "",
-      theme.fg("muted", "ANSI escape codes were stripped from output"),
+    component.addChild(
+      new Text(
+        `\n${theme.fg("muted", "ANSI escape codes were stripped from output")}`,
+        0,
+        0,
+      ),
     );
   }
-
-  const fields: Array<
-    { label: string; value: string; showCollapsed?: boolean } | Text
-  > = [new Text(lines.join("\n"), 0, 0)];
-
-  // Collapsed summary
-  const previewSource =
-    details.output.stdout.length > 0
-      ? details.output.stdout
-      : details.output.stderr;
-  const preview = previewSource
-    .slice(-2)
-    .map((l) => stripAnsi(l))
-    .join("\n");
-  fields.push({
-    label: "Output",
-    value: preview
-      ? `${theme.fg("muted", preview)}`
-      : theme.fg("muted", "(empty)"),
-    showCollapsed: true,
-  });
-
-  return new ToolBody({ fields }, options, theme);
 }
 
 export function executeOutput(

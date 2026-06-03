@@ -12,6 +12,7 @@ concurrency:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   check:
@@ -25,9 +26,13 @@ jobs:
         with:
           node-version: "24"
           cache: "pnpm"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@victor-software-house"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || github.token }}
 
       - name: Lint
         run: pnpm lint
@@ -55,9 +60,13 @@ jobs:
         with:
           node-version: "24"
           cache: "pnpm"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@victor-software-house"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || github.token }}
 
       - name: commitlint (PR)
         if: github.event_name == 'pull_request'

@@ -29,7 +29,7 @@ The rewrite preserves the intended user-facing behavior, but the LLM-facing `pro
 ```
 Phase 1 (src/) --> Phase 2A (minimal core tool) --> Phase 2B (extension notifications)
                                                    ~~> Phase 2C (output tool) ~~ DONE
-                                                   --> Phase 2E (event protocol)
+                                                   ~~> Phase 2E (event protocol) ~~ DONE
                                                    --> Phase 2F (i18n bridge)
                                                    --> Phase 3 (list)
                                                    --> Phase 4 (logs)
@@ -88,6 +88,16 @@ Implemented and validated in Phase 2B so far:
 - Notification service defers process-ended handling by one microtask so synchronous start-end events can observe newly registered config.
 - Process tool prompt guidelines describe lifecycle defaults and log matchers.
 
+Phase 2E event protocol and subscription work is complete.
+
+Implemented and validated in Phase 2E:
+- Core event bridge emits lifecycle, output, and changed events over `pi.events`.
+- Request handlers synchronously expose list/get/output/combined output/log files/file size/config.
+- Command handlers expose kill and clear over `pi.events`.
+- `/ps:kill` protocol kills are treated as intentional stops by reusing the same shared helper as `process stop`.
+- Log subscriptions return initial combined output and fan out live appended chunks to matching subscribers.
+- Session shutdown disposes protocol listeners and subscriptions before killing and cleaning up the manager.
+
 Latest validation:
 - `pnpm typecheck` passes.
 - `pnpm lint` passes.
@@ -95,7 +105,6 @@ Latest validation:
 
 Current intentional gaps:
 - No settings/config loader yet.
-- No event bridge or request/command/subscription handlers yet.
 - Notification scenario/manual coverage is still pending.
 - No background command blocker yet.
 - No process-exit/SIGINT/SIGTERM manager registry yet.
@@ -752,7 +761,7 @@ Deferred:
 
 ---
 
-### Phase 2E: Core event protocol and subscriptions
+### Phase 2E: Core event protocol and subscriptions — complete
 
 Goal: expose the manager to UI extensions without letting those extensions import `ProcessManager` or `getManager()`.
 
@@ -1353,6 +1362,140 @@ If `skills/pi-processes/SKILL.md` is restored, update it after the final command
 5. Reload cycle test (start processes, reload, verify expected behavior)
 
 ---
+
+## Phase 7: Cleanup Hooks (post-rewrite, not part of current rewrite)
+
+### Goal
+
+Add a generic cleanup lifecycle hook for managed processes whose main command does not fully represent the work that needs to be cleaned up.
+
+This is intentionally post-rewrite work. Do not implement it during the current multi-extension rewrite. The current rewrite should finish first, then this phase can be planned and implemented against the final tool/UI architecture.
+
+This feature is generic. It is not a remote-runner feature, not a port-management feature, and not specific to web servers. It covers any command where stopping the managed process may not clean up everything the command started, controlled, tailed, or connected to.
+
+Examples that the future skill/docs can explain:
+- a command starts a daemon and tails its logs
+- a command starts a service through another tool and then exits or tails output
+- a command controls a background worker managed elsewhere
+- a command runs through a wrapper where the wrapper lifecycle differs from the underlying workload
+
+### Non-goals
+
+- No remote runner abstraction.
+- No port-specific data model or port cleanup behavior.
+- No automatic destructive cleanup inferred from command text.
+- No special-case handling for one transport, framework, or service type.
+- No tmux/session abstraction in this feature.
+
+### Final Tool Data Model
+
+The `process start` action should accept an optional `cleanup` object.
+
+```ts
+cleanup?: {
+  command: string;
+  timeoutMs?: number;
+}
+```
+
+Rules:
+- `cleanup` is optional.
+- If `cleanup` is present, `cleanup.command` is required.
+- `cleanup.timeoutMs` is optional. The default timeout should be decided during implementation.
+- Cleanup commands run with the same working directory as the original process by default.
+- Cleanup output is stored in the same process logs, with clear cleanup start/end markers.
+- There is no `onFailure` setting. Cleanup failure is always reported.
+
+### Stop Semantics
+
+When a process has a cleanup config, `process stop` and `/ps:kill` should use a shared stop helper with this sequence:
+
+1. Stop the managed process group using the existing manager stop/kill behavior.
+2. Run the cleanup command if one is registered.
+3. Append cleanup stdout/stderr to the same process logs.
+4. Return success only if both the managed process stop and cleanup command succeed.
+
+If the cleanup command exits non-zero or times out, the stop tool call/command result should be a failure. The result copy should say only that the cleanup command failed or timed out. Do not claim that external resources may still be running, because the extension does not know what the cleanup command was meant to clean.
+
+Example result copy:
+
+```text
+Stopped frontend (proc_3).
+Cleanup command failed with exit code 1.
+```
+
+or:
+
+```text
+Stopped frontend (proc_3).
+Cleanup command timed out after 10000ms.
+```
+
+### Registry and Ownership
+
+The cleanup config should be stored by process id in the core extension layer, similarly to notification config. Keep the `src/` manager pi-agnostic and focused on process lifecycle.
+
+Likely files:
+
+```text
+extensions/processes/cleanup/
+  registry.ts
+  run-cleanup.ts
+  stop-with-cleanup.ts
+```
+
+The shared helper should be used by:
+- `process stop`
+- `/ps:kill` via the core command protocol
+- any future UI stop action
+
+### Updating Cleanup After Start
+
+A later part of this phase should add a way to update a running process with cleanup metadata after it has already started.
+
+Reason: the future command-nudging feature may detect that a running command probably needs cleanup and tell the agent or user to attach a cleanup command after the fact.
+
+Potential model:
+
+```ts
+process update {
+  id: string;
+  cleanup?: {
+    command: string;
+    timeoutMs?: number;
+  } | null;
+}
+```
+
+Open UI/product question:
+- Should there be a slash command that lets the user attach or replace a cleanup command for an existing process?
+
+### Command Nudging (separate follow-up feature)
+
+After cleanup hooks exist, add a separate feature that detects command patterns that might need cleanup and nudges the agent/user.
+
+This should be detection-only. It must not run inferred cleanup.
+
+Potential suspicious patterns:
+- shell backgrounding or daemonization patterns
+- commands that start services through other tools
+- wrapper/client commands whose lifecycle may differ from the underlying workload
+
+When such a command starts without cleanup, the tool result should include an LLM-visible warning and the UI should show a user-visible warning. The warning should explain that the process may need cleanup and that cleanup can be attached through the cleanup config/update flow.
+
+Do not implement command nudging as part of the initial cleanup hook implementation. Keep it as a separate follow-up after the explicit cleanup lifecycle exists.
+
+### Open Questions
+
+1. Should cleanup run on session shutdown/reload, or only on explicit `process stop` and `/ps:kill`?
+2. What should the default `cleanup.timeoutMs` be?
+3. Should cleanup be allowed for already-finished processes, or only live/terminating processes?
+4. Should cleanup updates be allowed to remove cleanup metadata by passing `cleanup: null`?
+5. Should cleanup command output be included in notification messages when stop fails due to cleanup failure?
+
+### Documentation
+
+Design notes live in `docs/future-cleanup-hooks.md` until this phase is ready to implement.
 
 ## Appendix A: Things That Change for Users
 

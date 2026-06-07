@@ -74,7 +74,7 @@ export function createNotificationService(deps: NotificationServiceDeps): {
     const isIntentionalStop = registry.consumeIntentionalStop(info.id);
     const kind = classifyProcessEnd(info);
 
-    if (isIntentionalStop && kind === "killed") {
+    if (isIntentionalStop) {
       cleanupMatcherState(info.id);
       registry.unregister(info.id);
       return;

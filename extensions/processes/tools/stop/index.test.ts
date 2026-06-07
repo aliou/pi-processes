@@ -37,7 +37,7 @@ describe("executeStop", () => {
 
     await executeStop({ action: "stop", id: "proc_1" }, manager, registry);
 
-    expect(kill).toHaveBeenCalledWith("proc_1");
+    expect(kill).toHaveBeenCalledWith("proc_1", undefined);
   });
 
   it("marks intentional stop in registry before manager.kill is called", async () => {

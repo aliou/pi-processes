@@ -39,6 +39,8 @@ export type ProcessesChangedPayload = {
 };
 
 // --- Request payloads (UI emits, core listens and calls reply synchronously) ---
+// Reply callbacks make this an in-process protocol, not serializable IPC/RPC.
+// Callers that need robustness should wrap requests with their own timeout.
 
 export interface RequestListPayload {
   reply: (processes: ProcessInfo[]) => void;
@@ -103,6 +105,7 @@ export interface CommandClearPayload {
 export interface LogsSubscribePayload {
   subscriberId: string;
   processId: string;
+  tailLines?: number;
   reply: (
     result:
       | {

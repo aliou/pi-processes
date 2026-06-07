@@ -95,13 +95,17 @@ Implemented and validated in Phase 2E:
 - Request handlers synchronously expose list/get/output/combined output/log files/file size/config.
 - Command handlers expose kill and clear over `pi.events`.
 - `/ps:kill` protocol kills are treated as intentional stops by reusing the same shared helper as `process stop`.
+- Intentional stops suppress all lifecycle notifications, even when the process exits cleanly after a signal.
 - Log subscriptions return initial combined output and fan out live appended chunks to matching subscribers.
+- Log subscriptions purge stale subscribers when a process ends or is removed by a clear operation.
+- Protocol handlers ignore malformed payloads instead of throwing from shared event-bus listeners.
+- Request/command reply callbacks are documented as an in-process protocol, not serializable IPC/RPC.
 - Session shutdown disposes protocol listeners and subscriptions before killing and cleaning up the manager.
 
 Latest validation:
-- `pnpm typecheck` passes.
 - `pnpm lint` passes.
-- `pnpm test` passes.
+- `pnpm typecheck` passes.
+- `pnpm test` passes with 213 tests.
 
 Current intentional gaps:
 - No settings/config loader yet.

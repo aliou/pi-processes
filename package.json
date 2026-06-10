@@ -34,7 +34,7 @@
     "CONTRIBUTING.md"
   ],
   "dependencies": {
-    "@aliou/pi-utils-settings": "^0.15.1",
+    "@aliou/pi-utils-settings": "^0.16.0",
     "@aliou/pi-utils-ui": "^0.4.1",
     "@aliou/sh": "^0.1.0",
     "typebox": "^1.0.0"

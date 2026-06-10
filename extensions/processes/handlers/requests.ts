@@ -1,5 +1,4 @@
 import type { EventBus } from "@earendil-works/pi-coding-agent";
-
 import type { ProcessManager } from "../../../src/manager";
 import {
   CHANNELS,
@@ -11,10 +10,12 @@ import {
   type RequestLogFilesPayload,
   type RequestOutputPayload,
 } from "../../../src/protocol";
+import type { ResolvedProcessConfig } from "../config";
 
 export function registerRequestHandlers(
   events: EventBus,
   manager: ProcessManager,
+  getConfig: () => ResolvedProcessConfig,
 ): () => void {
   const disposers = [
     events.on(CHANNELS.REQUEST_LIST, (payload) => {
@@ -57,8 +58,7 @@ export function registerRequestHandlers(
       const request = payload as RequestConfigPayload;
       if (!isRequestConfigPayload(request)) return;
 
-      // TODO(Phase 2F): return loaded process settings.
-      request.reply({});
+      request.reply(getConfig());
     }),
   ];
 

@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { ProcessManager } from "../../../src/manager";
 import { CHANNELS } from "../../../src/protocol";
 import type { ProcessInfo } from "../../../src/types";
+import type { ResolvedProcessConfig } from "../config";
+import { DEFAULT_CONFIG } from "../config";
 import { registerRequestHandlers } from "./requests";
 
 function makeInfo(overrides: Partial<ProcessInfo> = {}): ProcessInfo {
@@ -27,6 +29,8 @@ function makeInfo(overrides: Partial<ProcessInfo> = {}): ProcessInfo {
   };
 }
 
+const getConfig = () => DEFAULT_CONFIG;
+
 describe("registerRequestHandlers", () => {
   it("replies to manager read requests", () => {
     const events = createEventBus();
@@ -48,7 +52,7 @@ describe("registerRequestHandlers", () => {
       getFileSize: vi.fn(() => ({ stdout: 1, stderr: 2 })),
     } as unknown as ProcessManager;
 
-    registerRequestHandlers(events, manager);
+    registerRequestHandlers(events, manager, getConfig);
 
     const listReply = vi.fn();
     events.emit(CHANNELS.REQUEST_LIST, { reply: listReply });
@@ -101,15 +105,19 @@ describe("registerRequestHandlers", () => {
     expect(sizeReply).toHaveBeenCalledWith({ stdout: 1, stderr: 2 });
   });
 
-  it("replies with temporary empty config", () => {
+  it("replies with loaded config", () => {
     const events = createEventBus();
     const manager = {} as ProcessManager;
+    const config: ResolvedProcessConfig = {
+      ...DEFAULT_CONFIG,
+      execution: { shellPath: "/bin/bash" },
+    };
     const reply = vi.fn();
 
-    registerRequestHandlers(events, manager);
+    registerRequestHandlers(events, manager, () => config);
     events.emit(CHANNELS.REQUEST_CONFIG, { reply });
 
-    expect(reply).toHaveBeenCalledWith({});
+    expect(reply).toHaveBeenCalledWith(config);
   });
 
   it("ignores malformed request payloads", () => {
@@ -123,7 +131,7 @@ describe("registerRequestHandlers", () => {
       getFileSize: vi.fn(() => null),
     } as unknown as ProcessManager;
 
-    registerRequestHandlers(events, manager);
+    registerRequestHandlers(events, manager, getConfig);
     events.emit(CHANNELS.REQUEST_LIST, null);
     events.emit(CHANNELS.REQUEST_LIST, {});
     events.emit(CHANNELS.REQUEST_GET, { id: 123, reply: vi.fn() });
@@ -154,7 +162,7 @@ describe("registerRequestHandlers", () => {
     const manager = { list: vi.fn(() => []) } as unknown as ProcessManager;
     const reply = vi.fn();
 
-    const dispose = registerRequestHandlers(events, manager);
+    const dispose = registerRequestHandlers(events, manager, getConfig);
     dispose();
     events.emit(CHANNELS.REQUEST_LIST, { reply });
 

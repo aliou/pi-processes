@@ -20,7 +20,7 @@ The rewrite preserves the intended user-facing behavior, but the LLM-facing `pro
 4. Inter-extension communication uses `pi.events` exclusively. UI extensions never import `ProcessManager` or `getManager()`.
 5. Query/response uses synchronous callback payloads on named event channels.
 6. All `pi.events` listeners are tracked and explicitly unsubscribed on `session_shutdown` to prevent leaks (the EventBus is never cleared by Pi).
-7. Config and keybindings live in the core extension, not in `src/`.
+7. Config lives in the core extension, not in `src/`. Keybindings are managed by Pi's built-in KeybindingsManager.
 
 ---
 
@@ -30,7 +30,7 @@ The rewrite preserves the intended user-facing behavior, but the LLM-facing `pro
 Phase 1 (src/) --> Phase 2A (minimal core tool) --> Phase 2B (extension notifications)
                                                    ~~> Phase 2C (output tool) ~~ DONE
                                                    ~~> Phase 2E (event protocol) ~~ DONE
-                                                   --> Phase 2F (i18n bridge)
+                                                                                                   --> Phase 2F (settings, background blocker, i18n bridge) ~~ DONE
                                                    --> Phase 3 (list)
                                                    --> Phase 4 (logs)
                                                    --> Phase 5 (dock)
@@ -105,14 +105,28 @@ Implemented and validated in Phase 2E:
 Latest validation:
 - `pnpm lint` passes.
 - `pnpm typecheck` passes.
-- `pnpm test` passes with 217 tests.
+- `pnpm test` passes with 234 tests.
+
+Phase 2F settings, background blocker, and i18n bridge is complete.
+
+Implemented and validated in Phase 2F:
+- Config loader using `@aliou/pi-utils-settings` `ConfigLoader` with global/local/memory scopes.
+- Config types: `ProcessConfig` (user-facing, all optional) and `ResolvedProcessConfig` (internal, all required with defaults).
+- `/ps:settings` command via `registerSettingsCommand` with sectioned settings UI.
+- `buildSections` produces Execution and Interception sections (more sections added in Phases 3-5).
+- `applySettingChange` converts display values ("on"/"off", numbers, enums) to storage types.
+- `REQUEST_CONFIG` handler returns loaded config instead of `{}`.
+- Background blocker registered on `pi.on("tool_call")` when `interception.blockBackgroundCommands` is enabled.
+- Blocker uses `@aliou/sh` to parse commands into an AST and walks SimpleCommand nodes to detect `&` (Statement.background), `nohup`, `disown`, `setsid` as actual command names (not arguments). Falls back to trailing-`&` regex on parse errors.
+- Cleanup is handled by Pi's `session_shutdown` event, not manual `process.once` exit handlers.
+- i18n bridge with `createTranslator(overrides?)` and English fallbacks for status, list, stop, and blocker copy.
+- Protocol payloads remain structured and language-neutral; localized text is display-only.
+- Unit tests for config, build-sections, apply-setting-change, background-blocker, and i18n.
 
 Current intentional gaps:
-- No settings/config loader yet.
 - Notification scenario/manual coverage is still pending.
-- No background command blocker yet.
-- No process-exit/SIGINT/SIGTERM manager registry yet.
 - No list/logs/dock UI extensions yet.
+- Keybindings are managed by Pi's built-in KeybindingsManager; not in extension config.
 - `logs`, `clear`, and `write` tool actions are deferred. The agent can `read` log file paths returned by `list` or `output` for full-log access.
 - `package.json` still references `./skills/pi-processes`, but the local `skills/` directory is absent. Either restore the skill later or remove the `pi.skills`/`files` entries during cleanup.
 - `debug-preview` is intentionally removed from the plan.
@@ -139,8 +153,16 @@ Current implemented extension structure:
 extensions/
   processes/
     index.ts
-    hooks/
-      cleanup.ts
+    config/
+      index.ts
+      types.ts
+      defaults.ts
+      loader.ts
+    i18n/
+      index.ts
+      messages.ts
+      translator.ts
+    notification-sender.ts
     tools/
       index.ts
       schema.ts
@@ -154,6 +176,45 @@ extensions/
         index.ts
         render.ts
       list/
+        index.ts
+        render.ts
+      stop/
+        index.ts
+        render.ts
+      output/
+        index.ts
+        render.ts
+      notify.test.ts
+      notify.ts
+    utils/
+      truncate.ts
+    hooks/
+      cleanup.ts
+      event-bridge.ts
+      background-blocker.ts
+    handlers/
+      requests.ts
+      commands.ts
+      kill-process.ts
+      subscriptions.ts
+    message-renderer.ts
+    notifications/
+      classify.ts
+      classify.test.ts
+      log-matchers.ts
+      log-matchers.test.ts
+      registry.ts
+      render-content.ts
+      render-content.test.ts
+      service.ts
+      service.test.ts
+      types.ts
+    settings/
+      index.ts
+      build-sections.ts
+      apply-setting-change.ts
+    constants.ts
+```
         index.ts
         render.ts
       stop/
@@ -216,8 +277,15 @@ docs/
 extensions/
   processes/
     index.ts
-    config.ts
-    i18n.ts
+    config/
+      index.ts
+      types.ts
+      defaults.ts
+      loader.ts
+    i18n/
+      index.ts
+      messages.ts
+      translator.ts
     notification-sender.ts
     tools/
       index.ts
@@ -233,7 +301,6 @@ extensions/
       write/
     hooks/
       cleanup.ts
-      exit.ts
       process-notifications.ts
       background-blocker.ts
       event-bridge.ts
@@ -804,32 +871,35 @@ Log subscription protocol:
 
 Session shutdown ordering:
 1. Mark this extension instance as shutting down so duplicate shutdown events are ignored.
-2. Call all disposers to remove pi.events listeners, manager.onEvent listeners, log subscribers, and process-exit registry entries.
+2. Call all disposers to remove pi.events listeners, manager.onEvent listeners, and log subscribers.
 3. Call `manager.killAll()`.
 4. Call `manager.cleanup()`.
 
 ---
 
-### Phase 2F: Settings, background blocker, exit hooks, and i18n bridge
+### Phase 2F: Settings, background blocker, and i18n bridge
 
 This phase can be split further if it grows.
 
 #### Settings/config
 
 Add:
-- `extensions/processes/config.ts`
+- `extensions/processes/config/` (types.ts, defaults.ts, loader.ts, index.ts)
 - `extensions/processes/settings/index.ts`
 - `extensions/processes/settings/build-sections.ts`
 - `extensions/processes/settings/apply-setting-change.ts`
 
-Config sections:
-- `processList` -- maxVisibleProcesses, maxPreviewLines
-- `output` -- defaultTailLines, maxOutputLines
+Config sections (Phase 2F):
 - `execution` -- shellPath
-- `widget` -- showStatusWidget, dockDefaultState, dockHeight
-- `follow` -- enabledByDefault, autoHideOnFinish
-- `keybindings` -- keybinding overrides
 - `interception` -- blockBackgroundCommands
+
+Config sections added in later phases:
+- `processList` (maxVisibleProcesses, maxPreviewLines) -- Phase 3 (list)
+- `output` (defaultTailLines, maxOutputLines) -- Phase 4 (logs)
+- `widget` (showStatusWidget, dockDefaultState, dockHeight) -- Phase 5 (dock)
+- `follow` (enabledByDefault, autoHideOnFinish) -- Phase 4 (logs)
+
+Note: keybindings are handled by Pi's built-in KeybindingsManager, not by extension config.
 
 #### Background blocker
 
@@ -837,19 +907,19 @@ Add `extensions/processes/hooks/background-blocker.ts`.
 
 Behavior:
 - Listen for bash tool calls.
-- Detect background shell patterns such as `&`, `nohup`, `disown`, and `setsid`.
+- Use `@aliou/sh` to parse commands into an AST.
+- Walk SimpleCommand nodes to detect: `Statement.background` (trailing &), or command name matching `nohup`, `disown`, `setsid`.
+- This correctly distinguishes `nohup` as a command from `nohup` as an argument (e.g., `echo nohup`).
+- Fall back to a trailing-`&` regex when the command cannot be parsed.
 - Return a blocking reason that tells the agent to use the `process` tool instead.
 - Register only when `config.interception.blockBackgroundCommands` is enabled.
 
-#### Exit hooks
+#### Exit/cleanup
 
-Add `extensions/processes/hooks/exit.ts`.
-
-Behavior:
-- Keep a global set of live extension-owned managers.
-- Attach one-time handlers for `exit`, `SIGINT`, and `SIGTERM`.
-- On process exit, kill all registered live managers.
-- Return an unregister function for session cleanup.
+No custom exit hooks needed. Pi handles process lifecycle:
+- `session_shutdown` event fires before the extension runtime is torn down.
+- Pi registers its own SIGTERM/SIGHUP handlers that trigger graceful shutdown.
+- The cleanup hook in `hooks/cleanup.ts` subscribes to `session_shutdown` and kills all live managers.
 
 #### i18n bridge
 
@@ -857,7 +927,7 @@ This is inspired by GitHub PR #34, which proposed a small localization bridge fo
 
 Recommendation:
 - Keep i18n out of `src/`.
-- Add `extensions/processes/i18n.ts` for Pi-facing text only.
+- Add `extensions/processes/i18n/` (messages.ts, translator.ts, index.ts) for Pi-facing text only.
 - Keep protocol payloads structured and language-neutral.
 - Renderers/components call a translator function with stable keys and params.
 - Provide English fallbacks in the package.
@@ -1296,7 +1366,7 @@ The initial rewrite already removed the old Pi-aware `src/` tree. At cleanup tim
 
 Remove if present:
 - `src/index.ts` (old entry point)
-- `src/config.ts` (moved to `extensions/processes/config.ts`)
+- `src/config.ts` (moved to `extensions/processes/config/`)
 - `src/tools/` (moved to `extensions/processes/tools/`)
 - `src/hooks/` (moved to `extensions/processes/hooks/`)
 - `src/commands/` (moved to list/logs/dock extensions)
@@ -1523,9 +1593,9 @@ Cross-session persistence is not implemented in Phase 1. `ProcessManager` is a p
 
 `get-manager.ts` is a small factory. The core extension owns the returned manager in its closure and must shut it down on `session_shutdown`.
 
-Session shutdown is instance-owned: dispose the current extension instance's listeners, unregister that manager from process-exit cleanup, then call `manager.killAll()` and `manager.cleanup()` on the same manager object.
+Session shutdown is instance-owned: dispose the current extension instance's listeners, kill all processes managed by that instance, then call `manager.killAll()` and `manager.cleanup()` on the same manager object.
 
-Actual Node process exit is registry-owned: `hooks/exit.ts` keeps a global `Set<ProcessManager>` of currently live extension-owned managers and one guarded set of process exit handlers. The handlers iterate the current set and call `killAll()` on each manager.
+The cleanup hook subscribes to Pi's `session_shutdown` event. Pi handles SIGTERM/SIGHUP and emits `session_shutdown` before tearing down the extension runtime. No custom `process.once` exit handlers are needed.
 
 The skill file and prompt guidelines do not need persistence-specific behavior.
 
@@ -1535,7 +1605,7 @@ The skill file and prompt guidelines do not need persistence-specific behavior.
 
 2. **Stale Pi context**: After `/new`/`/fork`/`/resume`, the old `pi` proxy throws on any method call. Do not solve this by swallowing stale-proxy errors. Prevent stale calls through lifecycle ownership: notification services must be extension-instance scoped, expose `dispose()`, set a disposed flag before cleanup, unsubscribe manager/pi event listeners, and never send after disposal.
 
-3. **Exit hook duplication**: The `process.once("exit", ...)` handler in `hooks/exit.ts` must be guarded by a globalThis flag. Without this, each extension reload would add another exit handler. The guarded handler must iterate a global manager set, not close over one manager from the first extension load.
+3. **Exit hook duplication**: No longer relevant. Cleanup is handled by Pi's `session_shutdown` event rather than custom `process.once` handlers. Pi manages its own signal handlers and emits `session_shutdown` before tearing down extensions.
 
 4. **Manager construction options**: `getManager()` creates a new manager for the extension instance. The `getConfiguredShellPath` callback is a closure that reads from `configLoader.getConfig()`, so config changes are picked up automatically without needing to reconstruct the manager.
 

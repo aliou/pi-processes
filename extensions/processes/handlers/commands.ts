@@ -23,15 +23,16 @@ export function registerCommandHandlers(
       void killIntentionally(manager, notifications, command.id, {
         signal: command.signal,
         timeoutMs: command.timeoutMs,
-      }).then(command.reply, () => {
-        command.reply(createKillErrorResult(command.id));
-      });
+      }).then(
+        (result) => safeReply(command.reply, result),
+        () => safeReply(command.reply, createKillErrorResult(command.id)),
+      );
     }),
     events.on(CHANNELS.COMMAND_CLEAR, (payload) => {
       const command = payload as CommandClearPayload;
       if (!isCommandClearPayload(command)) return;
 
-      command.reply(manager.clearFinished());
+      safeReply(command.reply, manager.clearFinished());
     }),
   ];
 
@@ -44,7 +45,11 @@ function isCommandKillPayload(
   payload: CommandKillPayload,
 ): payload is CommandKillPayload {
   return (
-    isRecord(payload) && typeof payload.id === "string" && isReply(payload)
+    isRecord(payload) &&
+    typeof payload.id === "string" &&
+    isOptionalSignal(payload.signal) &&
+    isOptionalNumber(payload.timeoutMs) &&
+    isReply(payload)
   );
 }
 
@@ -60,8 +65,30 @@ function isReply(
   return isRecord(payload) && typeof payload.reply === "function";
 }
 
+function isOptionalSignal(
+  signal: unknown,
+): signal is NodeJS.Signals | undefined {
+  return signal === undefined || typeof signal === "string";
+}
+
+function isOptionalNumber(value: unknown): value is number | undefined {
+  return (
+    value === undefined || (typeof value === "number" && Number.isFinite(value))
+  );
+}
+
 function isRecord(payload: unknown): payload is Record<string, unknown> {
   return typeof payload === "object" && payload !== null;
+}
+
+function safeReply<T>(reply: (result: T) => void, result: T): void {
+  try {
+    reply(result);
+  } catch {
+    // Reply callbacks are owned by the requester. Never let a bad requester
+    // break shared command listeners or create unhandled promise rejections.
+    return;
+  }
 }
 
 function createKillErrorResult(id: string): KillResult {

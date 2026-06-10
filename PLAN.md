@@ -105,7 +105,7 @@ Implemented and validated in Phase 2E:
 Latest validation:
 - `pnpm lint` passes.
 - `pnpm typecheck` passes.
-- `pnpm test` passes with 213 tests.
+- `pnpm test` passes with 217 tests.
 
 Current intentional gaps:
 - No settings/config loader yet.

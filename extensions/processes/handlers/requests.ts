@@ -93,7 +93,10 @@ function isIdRequest(
   | RequestLogFilesPayload
   | RequestFileSizePayload {
   return (
-    isRecord(payload) && typeof payload.id === "string" && isReply(payload)
+    isRecord(payload) &&
+    typeof payload.id === "string" &&
+    isOptionalNumber(payload.tailLines) &&
+    isReply(payload)
   );
 }
 
@@ -101,6 +104,12 @@ function isReply(
   payload: unknown,
 ): payload is { reply: (...args: never[]) => void } {
   return isRecord(payload) && typeof payload.reply === "function";
+}
+
+function isOptionalNumber(value: unknown): value is number | undefined {
+  return (
+    value === undefined || (typeof value === "number" && Number.isFinite(value))
+  );
 }
 
 function isRecord(payload: unknown): payload is Record<string, unknown> {

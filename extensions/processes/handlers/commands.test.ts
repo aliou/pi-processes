@@ -101,6 +101,58 @@ describe("registerCommandHandlers", () => {
     expect(reply).toHaveBeenCalledWith(2);
   });
 
+  it("ignores malformed command payloads", async () => {
+    const events = createEventBus();
+    const registry = createNotificationRegistry();
+    const manager = {
+      kill: vi.fn(async () => ({ ok: true, info: makeInfo() }) as KillResult),
+      clearFinished: vi.fn(() => 1),
+    } as unknown as ProcessManager;
+
+    registerCommandHandlers(events, manager, registry);
+    events.emit(CHANNELS.COMMAND_KILL, null);
+    events.emit(CHANNELS.COMMAND_KILL, { id: "proc_1" });
+    events.emit(CHANNELS.COMMAND_KILL, {
+      id: "proc_1",
+      signal: 123,
+      reply: vi.fn(),
+    });
+    events.emit(CHANNELS.COMMAND_KILL, {
+      id: "proc_1",
+      timeoutMs: Number.NaN,
+      reply: vi.fn(),
+    });
+    events.emit(CHANNELS.COMMAND_CLEAR, null);
+    events.emit(CHANNELS.COMMAND_CLEAR, {});
+    await flushPromises();
+
+    expect(manager.kill).not.toHaveBeenCalled();
+    expect(manager.clearFinished).not.toHaveBeenCalled();
+  });
+
+  it("swallows requester reply errors", async () => {
+    const events = createEventBus();
+    const registry = createNotificationRegistry();
+    const manager = {
+      kill: vi.fn(async () => ({ ok: true, info: makeInfo() }) as KillResult),
+      clearFinished: vi.fn(() => 1),
+    } as unknown as ProcessManager;
+    const throwingReply = vi.fn(() => {
+      throw new Error("bad requester");
+    });
+
+    registerCommandHandlers(events, manager, registry);
+
+    expect(() => {
+      events.emit(CHANNELS.COMMAND_CLEAR, { reply: throwingReply });
+    }).not.toThrow();
+
+    events.emit(CHANNELS.COMMAND_KILL, { id: "proc_1", reply: throwingReply });
+    await flushPromises();
+
+    expect(throwingReply).toHaveBeenCalledTimes(2);
+  });
+
   it("disposes event listeners", async () => {
     const events = createEventBus();
     const registry = createNotificationRegistry();

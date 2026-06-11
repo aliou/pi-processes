@@ -2,13 +2,14 @@
 
 ## Overview
 
-Rewrite `@aliou/pi-processes` from a single extension into a package exposing 4 extensions:
-1. **processes** (core) -- owns the ProcessManager, tool, settings, hooks, event bridge, request/command handlers, message renderer
-2. **processes-list** -- owns `/ps`, `/ps:kill`, `/ps:clear` and their TUI components
-3. **processes-logs** -- owns `/ps:logs` and the log overlay/file viewer
-4. **processes-dock** -- owns `/ps:dock`, `/ps:pin`, dock widget, status widget
+Rewrite `@aliou/pi-processes` from a single extension into a package exposing 3 extensions:
+1. **processes** (core) -- owns the ProcessManager, LLM tool, notifications, event protocol, settings, and `/ps:settings`
+2. **processes-logs** -- owns `/ps:logs` and `/ps` (alias). Process list + log overlay with inline kill/clear actions.
+3. **processes-dock** -- owns `/ps:dock`, `/ps:pin`, dock widget, status widget. Positioned as a reference extension showing how to build custom process UIs using core events.
 
-The rewrite preserves the intended user-facing behavior, but the LLM-facing `process` tool is being restored incrementally. The current minimal tool supports `start`, `list`, and `stop`; later Phase 2 slices add log matchers, output/log access, clearing, and stdin writes.
+The core extension does not register `/ps`. That command belongs to the logs extension. If the logs extension is not loaded, there is no `/ps` command — the user still has the LLM tool and `/ps:settings`.
+
+The rewrite preserves the intended user-facing behavior. The LLM-facing `process` tool supports `start`, `list`, `stop`, `output`, and `update`. The `update` action allows renaming processes and mutating log watches on running processes.
 
 ---
 
@@ -27,18 +28,15 @@ The rewrite preserves the intended user-facing behavior, but the LLM-facing `pro
 ## Phase Dependencies
 
 ```
-Phase 1 (src/) --> Phase 2A (minimal core tool) --> Phase 2B (extension notifications)
-                                                   ~~> Phase 2C (output tool) ~~ DONE
-                                                   ~~> Phase 2E (event protocol) ~~ DONE
-                                                                                                   --> Phase 2F (settings, background blocker, i18n bridge) ~~ DONE
-                                                   --> Phase 3 (list)
-                                                   --> Phase 4 (logs)
-                                                   --> Phase 5 (dock)
-                                                               |
-                                                     Phase 6 (cleanup)
+Phase 1 (src/) --> Phase 2 (core extension) ~~ DONE
+                        |
+                        +--> Phase 3 (logs extension)
+                        +--> Phase 4 (dock extension)
+                        |
+                        Phase 5 (cleanup + steering guidance)
 ```
 
-Phases 3, 4, and 5 depend on Phase 2E because they communicate with the core extension through `pi.events`. Phase 4 and Phase 5 also depend on the log subscription protocol from Phase 2E. Phase 2F can happen any time after Phase 2A, but doing it before broad UI work avoids duplicating display copy.
+Phases 3 and 4 depend on Phase 2E (event protocol) because they communicate with the core extension through `pi.events`. Phase 3 also depends on the log subscription protocol from Phase 2E. Phase 4 can be built independently from Phase 3.
 
 ---
 
@@ -105,7 +103,21 @@ Implemented and validated in Phase 2E:
 Latest validation:
 - `pnpm lint` passes.
 - `pnpm typecheck` passes.
-- `pnpm test` passes with 234 tests.
+- `pnpm test` passes with 281 tests.
+
+Phase 2G update tool action is complete.
+
+Implemented and validated in Phase 2G:
+- `process update` action: rename a running process, mutate log watches (append/replace/remove/clear).
+- Rejects updates on non-running processes with `ok: false` + error message.
+- Separate `WatchUpdateItemParams` schema with optional `index` and `pattern` for remove-mode items.
+- `NotificationRegistry` watch mutation methods with revision/generation tracking.
+- Notification service sync: recompiles matchers on revision change, preserves `fired` state on same-generation updates, resets on generation bump.
+- `normalizeLogMatch` and `normalizeLogMatchItems` exported from `notify.ts` with configurable error context.
+- `ProcessManager.rename()` emits `processes_changed`.
+- `UpdateDetails` returns `ok`/`error` for TUI error rendering; expanded render shows only changes.
+- 43 unit tests across update action, registry watch methods, and formatting.
+- 10 test scenarios in `tests/scenarios/11-update/`.
 
 Phase 2F settings, background blocker, and i18n bridge is complete.
 
@@ -124,12 +136,12 @@ Implemented and validated in Phase 2F:
 - Unit tests for config, build-sections, apply-setting-change, background-blocker, and i18n.
 
 Current intentional gaps:
-- Notification scenario/manual coverage is still pending.
-- No list/logs/dock UI extensions yet.
+- No logs/dock UI extensions yet.
 - Keybindings are managed by Pi's built-in KeybindingsManager; not in extension config.
-- `logs`, `clear`, and `write` tool actions are deferred. The agent can `read` log file paths returned by `list` or `output` for full-log access.
+- `clear` and `write` tool actions are deferred. The agent can `read` log file paths returned by `list` or `output` for full-log access.
 - `package.json` still references `./skills/pi-processes`, but the local `skills/` directory is absent. Either restore the skill later or remove the `pi.skills`/`files` entries during cleanup.
 - `debug-preview` is intentionally removed from the plan.
+- Agent steering guidance (promptGuidelines rewrite, skill, steering text in tool output) is deferred to Phase 5.
 
 Integrated decisions:
 1. Cross-session persistence is deferred. It is not a `ProcessManager` option, not a process field, and not a tool parameter.
@@ -184,6 +196,10 @@ extensions/
       output/
         index.ts
         render.ts
+      update/
+        index.ts
+        index.test.ts
+        render.ts
       notify.test.ts
       notify.ts
     utils/
@@ -204,6 +220,7 @@ extensions/
       log-matchers.ts
       log-matchers.test.ts
       registry.ts
+      registry-watch.test.ts
       render-content.ts
       render-content.test.ts
       service.ts
@@ -314,19 +331,6 @@ extensions/
       build-sections.ts
       apply-setting-change.ts
 
-  processes-list/
-    index.ts
-    commands/
-      ps.ts
-      kill.ts
-      clear.ts
-    components/
-      processes-component.ts
-      process-picker-component.ts
-      status-format.ts
-    completions.ts
-    helpers.ts
-
   processes-logs/
     index.ts
     commands/
@@ -334,6 +338,9 @@ extensions/
     components/
       log-overlay-component.ts
       log-file-viewer.ts
+      process-picker-component.ts
+      status-format.ts
+    completions.ts
     logs-client.ts
 
   processes-dock/
@@ -592,7 +599,7 @@ Exports:
 - `truncateCmd(cmd: string, max?: number): string`
 - `formatTimestamp(ts: number | null): string` -- ISO timestamp or "-"
 
-`formatStatusTag` (which uses Theme) moves to `extensions/processes-list/components/status-format.ts`.
+`formatStatusTag` (which uses Theme) Moved to `extensions/processes-logs/components/status-format.ts`.
 
 #### `src/utils/index.ts`
 
@@ -733,13 +740,16 @@ Implemented behavior:
 8. Keep manager/registry list ordering as insertion order; UI/tool code owns sorting.
 
 Current `process` tool schema:
-- `action`: `"start" | "list" | "stop"`
-- `name`: required for `start`
+- `action`: `"start" | "list" | "stop" | "output" | "update"`
+- `name`: optional for `start` (required) and `update` (new name)
 - `command`: required for `start`
-- `id`: required for `stop`
+- `notify`: optional for `start` with attention + log-match options
+- `id`: required for `stop`, `output`, and `update`
 - `limit`: optional for `list`
 - `sortBy`: optional for `list`
 - `statuses`: optional for `list`
+- `stream`, `tailLines`, `pattern`, `mode`: optional for `output`
+- `watches`: optional for `update` with mode (append/replace/remove/clear) and items
 
 Phase 2A intentionally does not include settings, event bridge, notifications, output/log actions, clear, write, or UI commands.
 
@@ -1000,153 +1010,68 @@ After Phase 2F:
 
 ---
 
-## Phase 3: List Extension (`extensions/processes-list/`)
+
+## Phase 3: Logs Extension (`extensions/processes-logs/`)
 
 ### Goal
 
-Own the process list TUI (`/ps`), kill command (`/ps:kill`), and clear command (`/ps:clear`).
+Own `/ps:logs` and its alias `/ps`. The logs extension is the primary user-facing interface for process management. It provides a log overlay for viewing process output, with integrated kill and clear actions accessible from within the overlay. No standalone `/ps:kill` or `/ps:clear` commands — those are keyboard actions inside the overlay.
 
-### Files
+If this extension is not loaded, there is no `/ps` command. The user still has the LLM `process` tool and `/ps:settings`.
 
-#### `extensions/processes-list/index.ts`
+### Design decisions
 
-Entry point. Registers three commands.
+- `/ps` is an alias for `/ps:logs`, registered by this extension. The core extension does not register `/ps`.
+- Kill and clear are keyboard actions inside the overlay, not standalone slash commands.
+- Uses the log subscription protocol for live output streaming.
+- Uses `pi.events` exclusively to talk to the core extension. No `ProcessManager` imports.
+- Config values (output defaults, follow settings) are obtained via `CHANNELS.REQUEST_CONFIG`.
 
-```ts
-export default function(pi: ExtensionAPI): void
-```
+### Config additions
 
-Registers:
-- `/ps` command -> `commands/ps.ts`
-- `/ps:kill` command -> `commands/kill.ts`
-- `/ps:clear` command -> `commands/clear.ts`
+When this extension is loaded, the core config gains:
+- `processList` section: `maxVisibleProcesses`, `maxPreviewLines`
+- `output` section: `defaultTailLines`, `maxOutputLines`
+- `follow` section: `enabledByDefault`, `autoHideOnFinish`
 
-Subscribes to pi.events lifecycle events to keep internal state fresh (if components need it).
-
-Tracks disposers, cleans up on session_shutdown.
-
-#### `extensions/processes-list/commands/ps.ts`
-
-The `/ps` command handler. Opens the ProcessesComponent as a custom UI.
-
-When the user selects a process and presses Enter, it returns the process ID. The current implementation uses this to set dock focus via `dockActions.setFocus(processId)`. In the new architecture, the list extension should emit an event or let the dock extension handle this. Options:
-- Emit a `processes:dock:focus` event that the dock extension listens for.
-- Or simply return the selected process ID and let the caller decide.
-
-For simplicity, the `/ps` command can emit `processes:dock:focus` when a process is selected. The dock extension listens for this. If the dock extension is not loaded, the event is simply ignored.
-
-#### `extensions/processes-list/commands/kill.ts`
-
-The `/ps:kill` command handler.
-
-Flow:
-1. If arg provided, resolve process ID.
-2. If no arg and only one running process, use that.
-3. If no arg and multiple running, show ProcessPickerComponent.
-4. Emit `CHANNELS.COMMAND_KILL` with `{ id, reply }`.
-5. On success, optionally emit dock focus clear.
-
-To get the process list for completions and picker, emits `CHANNELS.REQUEST_LIST`.
-
-For kill of a `terminate_timeout` process, uses SIGKILL instead of SIGTERM.
-
-#### `extensions/processes-list/commands/clear.ts`
-
-The `/ps:clear` command handler.
-
-Emits `CHANNELS.COMMAND_CLEAR` with `{ reply }`.
-
-#### `extensions/processes-list/components/processes-component.ts`
-
-Rewrite of current `src/components/processes-component.ts`.
-
-Changes:
-- Instead of `this.manager.list()`, emits `CHANNELS.REQUEST_LIST` and uses the reply.
-- Instead of `this.manager.getOutput()`, emits `CHANNELS.REQUEST_OUTPUT`.
-- Instead of `this.manager.getFileSize()`, emits `CHANNELS.REQUEST_FILE_SIZE`.
-- Instead of `this.manager.onEvent()`, listens on pi.events for `CHANNELS.CHANGED`, `CHANNELS.OUTPUT_CHANGED`, etc.
-- Instead of `this.manager.kill()`, emits `CHANNELS.COMMAND_KILL`.
-- Instead of `this.manager.clearFinished()`, emits `CHANNELS.COMMAND_CLEAR`.
-
-The component receives `pi.events` (the EventBus) instead of the ProcessManager.
-
-Config values (maxVisibleProcesses, maxPreviewLines) are obtained via `CHANNELS.REQUEST_CONFIG`.
-
-#### `extensions/processes-list/components/process-picker-component.ts`
-
-Rewrite of current `src/components/process-picker-component.ts`.
-
-Same pattern: uses pi.events instead of direct manager access.
-
-#### `extensions/processes-list/components/status-format.ts`
-
-Moved from `src/components/status-format.ts`. Contains:
-- `statusLabel(proc: ProcessInfo): string`
-- `statusIcon(status: ProcessStatus, success: boolean | null): string`
-
-Also contains `formatStatusTag(proc, theme): string` which was previously in `src/utils/format.ts` but uses Theme, so it belongs here.
-
-#### `extensions/processes-list/completions.ts`
-
-Provides argument completions for commands that take a process ID.
-
-Emits `CHANNELS.REQUEST_LIST` to get the current process list, then filters.
-
-Exports:
-- `runningProcessCompletions(events: EventBus): (prefix: string) => AutocompleteItem[]`
-- `allProcessCompletions(events: EventBus): (prefix: string) => AutocompleteItem[]`
-
-#### `extensions/processes-list/helpers.ts`
-
-Shared helpers for this extension. E.g., `pickProcess()` function that opens the picker component.
-
-### Phase 3 Verification
-
-1. `/ps` shows process list, updates in real time.
-2. `/ps:kill` kills processes. Handles single-running and multi-running cases.
-3. `/ps:clear` clears finished processes.
-4. No direct `ProcessManager` imports anywhere in this extension.
-5. Autocomplete works for process IDs.
-
----
-
-## Phase 4: Logs Extension (`extensions/processes-logs/`)
-
-### Goal
-
-Own the log viewer overlay (`/ps:logs`).
+These config fields are added to `extensions/processes/config/types.ts` and `build-sections.ts` so they appear in `/ps:settings`.
 
 ### Files
 
 #### `extensions/processes-logs/index.ts`
 
-Entry point. Registers `/ps:logs`.
+Entry point. Registers:
+- `/ps:logs` command -> `commands/logs.ts`
+- `/ps` as alias for `/ps:logs`
 
-Tracks disposers, cleans up on session_shutdown.
+Subscribes to `pi.events` for lifecycle events to keep internal state fresh.
+Tracks disposers, cleans up on `session_shutdown`.
 
 #### `extensions/processes-logs/commands/logs.ts`
 
 The `/ps:logs` command handler. Opens the LogOverlayComponent as a custom overlay UI.
 
-If an argument is provided, pre-selects that process. Uses `CHANNELS.REQUEST_GET` to validate the process exists.
+If an argument is provided, pre-selects that process. Uses `CHANNELS.REQUEST_GET` to validate it exists.
+If no argument is provided, shows the process list/tab bar from which the user can select.
 
-For argument completions, uses `CHANNELS.REQUEST_LIST` (same pattern as list extension).
+For argument completions, uses `CHANNELS.REQUEST_LIST`.
 
 #### `extensions/processes-logs/components/log-overlay-component.ts`
 
 Rewrite of current `src/components/log-overlay-component.ts`.
 
-Major change: instead of directly calling `manager.getLogFiles()` and reading files with LogFileViewer, it uses the log subscription protocol:
-
-1. On tab select (process selected), emit `CHANNELS.LOGS_SUBSCRIBE` with a new subscriberId.
+Uses the log subscription protocol instead of direct file reads:
+1. On tab select, emit `CHANNELS.LOGS_SUBSCRIBE` with a new subscriberId.
 2. Receive initial lines in the reply callback.
 3. Listen for `CHANNELS.LOGS_CHUNK` events, filter by subscriberId.
-4. On tab switch, emit `CHANNELS.LOGS_UNSUBSCRIBE` for the old subscription, create new one.
+4. On tab switch, emit `CHANNELS.LOGS_UNSUBSCRIBE` for the old subscription, create a new one.
 5. On close, emit `CHANNELS.LOGS_UNSUBSCRIBE`.
 
-The overlay still needs `CHANNELS.REQUEST_LIST` to get the process list for tabs.
+Uses `CHANNELS.REQUEST_LIST` to get the process list for the tab bar.
+Listens to `CHANNELS.CHANGED` to detect new/removed processes.
 
-It listens to `CHANNELS.CHANGED` to detect new/removed processes and update the tab bar.
+Kill action (e.g. `x` key on selected process): emits `CHANNELS.COMMAND_KILL`.
+Clear action (e.g. `c` key): emits `CHANNELS.COMMAND_CLEAR`.
 
 Features to preserve:
 - Tabbed view with tab bar
@@ -1155,24 +1080,40 @@ Features to preserve:
 - Follow mode (f to toggle)
 - Scroll (j/k, g/G)
 - Keyboard navigation (Tab/Shift+Tab for tab switching)
+- Inline kill and clear actions
 - Auto-close when all processes cleared
 
 #### `extensions/processes-logs/components/log-file-viewer.ts`
 
 Rewrite of current `src/components/log-file-viewer.ts`.
 
-This component needs to change significantly. Currently it reads a log file directly. In the new architecture, it receives lines from the subscription protocol instead.
-
-New interface:
+Receives lines from the subscription protocol instead of reading from disk:
 - Receives initial lines on creation
 - Has an `appendLines(lines)` method called when new chunks arrive
-- Retains all current rendering/scrolling/search/follow logic but operates on an in-memory line buffer instead of reading from disk
+- Retains all current rendering/scrolling/search/follow logic but operates on an in-memory line buffer
 
-If the overlay needs to re-read the full file (e.g., for stream filter changes), it can unsubscribe, change filter, and re-subscribe.
+**Recommended approach:** Log subscriptions always send combined-format lines (with type: "stdout" | "stderr"). The viewer maintains an in-memory buffer and applies stream filtering locally.
 
-Alternatively, the log subscription can always send combined-format lines and the viewer filters locally. This is simpler and matches current behavior where the viewer reads the combined file and filters by stream. Decide during implementation.
+#### `extensions/processes-logs/components/process-picker-component.ts`
 
-**Recommended approach:** Log subscriptions always send combined-format lines (with type: "stdout" | "stderr"). The viewer maintains an in-memory buffer and applies stream filtering locally. This matches current behavior and avoids needing separate subscriptions per stream filter.
+Minimal process picker for when `/ps:logs` is called without an argument. Uses `CHANNELS.REQUEST_LIST`.
+
+#### `extensions/processes-logs/components/status-format.ts`
+
+Moved from `src/components/status-format.ts`. Contains:
+- `statusLabel(proc: ProcessInfo): string`
+- `statusIcon(status: ProcessStatus, success: boolean | null): string`
+- `formatStatusTag(proc, theme): string` (uses Theme, so it belongs here, not in `src/`)
+
+#### `extensions/processes-logs/completions.ts`
+
+Provides argument completions for `/ps:logs` (and `/ps`).
+
+Emits `CHANNELS.REQUEST_LIST` to get the current process list, then filters.
+
+Exports:
+- `runningProcessCompletions(events: EventBus): (prefix: string) => AutocompleteItem[]`
+- `allProcessCompletions(events: EventBus): (prefix: string) => AutocompleteItem[]`
 
 #### `extensions/processes-logs/logs-client.ts`
 
@@ -1189,30 +1130,48 @@ function connectToProcessLogs(
   events: EventBus,
   processId: string,
   opts?: { tailLines?: number }
-): Promise<LogsConnection>
+): LogsConnection
 ```
 
-This is used by both the logs overlay and potentially the dock component. If the dock extension needs the same pattern, it can have its own copy or this can be extracted to a shared location later.
-
-### Phase 4 Verification
+### Phase 3 Verification
 
 1. `/ps:logs` opens the overlay with tabs.
-2. Selecting a tab shows that process's logs.
-3. New output streams in live.
-4. Switching tabs properly unsubscribes/resubscribes.
-5. Search works (/, n, N).
-6. Stream filter works (s to cycle).
-7. Follow mode works (f).
-8. Closing the overlay unsubscribes.
-9. No direct ProcessManager imports.
+2. `/ps` is an alias for `/ps:logs`.
+3. Selecting a tab shows that process's logs.
+4. New output streams in live.
+5. Switching tabs properly unsubscribes/resubscribes.
+6. Kill action works (keyboard shortcut in the overlay).
+7. Clear action works (keyboard shortcut in the overlay).
+8. Search works (/, n, N).
+9. Stream filter works (s to cycle).
+10. Follow mode works (f).
+11. Closing the overlay unsubscribes.
+12. No direct `ProcessManager` imports.
+13. Config fields (processList, output, follow) appear in `/ps:settings`.
 
 ---
 
-## Phase 5: Dock Extension (`extensions/processes-dock/`)
+## Phase 4: Dock Extension (`extensions/processes-dock/`)
 
 ### Goal
 
-Own the dock widget, status widget, and `/ps:dock`, `/ps:pin` commands.
+Own `/ps:dock`, `/ps:pin`, the dock widget, and the status widget.
+
+This extension is positioned as a **reference extension**: it demonstrates how to build custom process UIs using core events. It is documented as an example for extension authors who want to customize process display.
+
+### Design decisions
+
+- The dock is NOT in the core extension. It is an optional, separate extension.
+- Uses `pi.events` exclusively to talk to the core extension. No `ProcessManager` imports.
+- The status widget is included here, not in core.
+- Config values (widget settings) are obtained via `CHANNELS.REQUEST_CONFIG`.
+
+### Config additions
+
+When this extension is loaded, the core config gains:
+- `widget` section: `showStatusWidget`, `dockDefaultState`, `dockHeight`
+
+These config fields are added to `extensions/processes/config/types.ts` and `build-sections.ts` so they appear in `/ps:settings`.
 
 ### Files
 
@@ -1227,17 +1186,13 @@ Entry point. Registers:
 Subscribes to:
 - `CHANNELS.STARTED`, `CHANNELS.ENDED`, `CHANNELS.CHANGED` -- for widget updates
 - `CHANNELS.OUTPUT_CHANGED` -- for dock live updates
-- `processes:dock:focus` -- emitted by list extension when user selects a process
 
-Tracks disposers, cleans up on session_shutdown.
-
+Tracks disposers, cleans up on `session_shutdown`.
 Needs to register on `session_start` to get `ctx` for widget management.
 
 #### `extensions/processes-dock/commands/dock.ts`
 
 The `/ps:dock` command handler. Controls dock visibility (show/hide/toggle).
-
-Same as current implementation but operates on local dock state.
 
 #### `extensions/processes-dock/commands/pin.ts`
 
@@ -1245,61 +1200,38 @@ The `/ps:pin` command handler. Pins the dock to a specific process.
 
 Uses `CHANNELS.REQUEST_LIST` for completions and `CHANNELS.REQUEST_GET` to validate.
 
-This command focuses the dock on a specific process. It does not affect any future cross-session persistence policy.
-
-Current behavior: `/ps:pin` sets the dock focus to a process. Preserve this.
-
 #### `extensions/processes-dock/components/log-dock-component.ts`
 
-Rewrite of current `src/components/log-dock-component.ts`.
-
-Changes:
-- Uses log subscription protocol instead of direct manager access
-- Uses `CHANNELS.REQUEST_LIST` for process list
-- Uses `CHANNELS.REQUEST_COMBINED_OUTPUT` for collapsed view (last line preview)
-- Subscribes to `CHANNELS.CHANGED` for process list updates
+Uses log subscription protocol for open mode. Uses `CHANNELS.REQUEST_LIST` for process list. Uses `CHANNELS.REQUEST_COMBINED_OUTPUT` for collapsed view (last line preview).
 
 The dock has two modes:
-- **Collapsed**: shows running process names + last log line. Uses `REQUEST_COMBINED_OUTPUT` with tailLines=1.
-- **Open**: shows LogFileViewer-style live output for the focused process. Uses log subscription.
+- **Collapsed**: shows running process names + last log line.
+- **Open**: shows live output for the focused process via log subscription.
 
 #### `extensions/processes-dock/widget/setup.ts`
 
-Rewrite of current `src/hooks/widget/setup.ts`.
-
-This is the widget orchestrator. It:
-- Tracks `activeCtx` from `session_start`
-- Manages dock state (visibility, follow, focusedProcessId)
-- Renders the status widget (below editor) using `ctx.ui.setWidget()`
-- Renders the dock widget (above editor) using `ctx.ui.setWidget()`
-- Reacts to process lifecycle events to auto-show/hide dock
-
-For process list data, emits `CHANNELS.REQUEST_LIST`. For config, emits `CHANNELS.REQUEST_CONFIG`.
+Widget orchestrator. Manages dock state, renders status widget and dock widget.
 
 #### `extensions/processes-dock/widget/status-widget.ts`
 
-Rewrite of current `src/hooks/widget/status-widget.ts`.
-
-The `renderStatusWidget()` function. Takes process list and theme, returns rendered lines.
-
-Uses `CHANNELS.REQUEST_LIST` to get the process list.
+`renderStatusWidget()` function. Takes process list and theme, returns rendered lines.
 
 #### `extensions/processes-dock/widget/types.ts`
 
-Dock state types. Same as current:
+Dock state types:
 - `DockVisibility = "hidden" | "collapsed" | "open"`
 - `DockState { visibility, followEnabled, focusedProcessId }`
 - `DockActions { getFocusedProcessId, isFollowEnabled, setFocus, expand, collapse, hide, toggle }`
 
 #### `extensions/processes-dock/dock-state.ts`
 
-The dock state machine. Manages DockState and DockActions. Extracted from current widget/setup.ts.
+Dock state machine. Manages `DockState` and `DockActions`.
 
 #### `extensions/processes-dock/logs-client.ts`
 
 Same pattern as `extensions/processes-logs/logs-client.ts`. Encapsulates log subscription for the dock's open mode.
 
-### Phase 5 Verification
+### Phase 4 Verification
 
 1. Status widget shows below editor when enabled.
 2. Dock shows above editor.
@@ -1307,18 +1239,32 @@ Same pattern as `extensions/processes-logs/logs-client.ts`. Encapsulates log sub
 4. `/ps:pin` focuses dock on a process.
 5. Dock collapsed mode shows process names + last line.
 6. Dock open mode streams live output.
-7. Follow mode auto-shows dock when process starts (if enabled).
-8. Auto-hide on all processes finished (if enabled).
-9. Process selection from `/ps` (Enter) focuses the dock.
-10. No direct ProcessManager imports.
+7. Auto-hide on all processes finished (if enabled).
+8. No direct `ProcessManager` imports.
+9. Config fields (widget) appear in `/ps:settings`.
+10. Documented as reference extension for custom process UIs.
 
 ---
 
-## Phase 6: Cleanup and Final Integration
+## Phase 5: Cleanup and Final Integration
 
 ### Goal
 
-Stabilize the package, run full regression, clean up dead code.
+Stabilize the package, add agent steering guidance, and clean up dead code.
+
+### `update` tool action -- DONE
+
+Implemented in Phase 2G (`33df3b0`). Renames running processes and mutates log watches (append/replace/remove/clear). See Phase 2G status above for details.
+
+### Agent steering guidance
+
+Tighten promptGuidelines and ship the skill to steer agents away from common mistakes identified during PR #33 review.
+
+- Consolidate 8 promptGuidelines into ~5 tighter lines
+- Recreate `skills/pi-processes/SKILL.md` with expanded anti-patterns and bad/good examples
+- Add steering text to `formatStartDetails` and `formatOutputDetails`
+
+See NEXT.md step 5 for full details.
 
 ### Tasks
 
@@ -1329,40 +1275,16 @@ Stabilize the package, run full regression, clean up dead code.
   "pi": {
     "extensions": [
       "./extensions/processes/index.ts",
-      "./extensions/processes-list/index.ts",
       "./extensions/processes-logs/index.ts",
       "./extensions/processes-dock/index.ts"
     ]
   }
 }
+```
 
 If `skills/pi-processes/` is intentionally restored later, add it back to `pi.skills`. Do not keep a `pi.skills` entry pointing at a missing directory.
-```
 
-Update `files` array:
-```json
-{
-  "files": [
-    "src",
-    "extensions",
-    "README.md",
-    "CONTRIBUTING.md"
-  ]
-}
-```
-
-#### 2. Update tsconfig.json
-
-Update `include` to cover both `src/` and `extensions/`:
-```json
-{
-  "include": ["src/**/*", "extensions/**/*"]
-}
-```
-
-#### 3. Delete any old Pi-aware `src/` files that moved to extensions
-
-The initial rewrite already removed the old Pi-aware `src/` tree. At cleanup time, verify no stragglers were recreated:
+#### 2. Delete any old Pi-aware `src/` files that moved to extensions
 
 Remove if present:
 - `src/index.ts` (old entry point)
@@ -1373,37 +1295,31 @@ Remove if present:
 - `src/components/` (moved to respective extensions)
 - `src/constants/` (replaced by `src/types.ts` / `src/protocol.ts`)
 
-Keep the pi-agnostic `src/` library.
-
-#### 4. Import audit
+#### 3. Import audit
 
 Verify:
 - `src/` has zero imports from `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`, `@aliou/pi-utils-settings`, `@aliou/pi-utils-ui`
-- `extensions/processes-list/`, `extensions/processes-logs/`, `extensions/processes-dock/` have zero imports from `src/manager` or `src/get-manager`
+- `extensions/processes-logs/` and `extensions/processes-dock/` have zero imports from `src/manager` or `src/get-manager`
 - Only `extensions/processes/` imports `getManager`
 
-#### 5. Update AGENTS.md
+#### 4. Update AGENTS.md
 
 Update the structure section to reflect the new directory layout.
 
-#### 6. Update skill file
-
-If `skills/pi-processes/SKILL.md` is restored, update it after the final command/tool surface is restored. Do not recreate the skill file as part of this rewrite unless explicitly needed.
-
-#### 7. Regression test matrix
+#### 5. Regression test matrix
 
 **Process lifecycle:**
 - Start a process -> appears in `/ps`, dock updates, status widget updates
 - Process exits successfully -> notification appears, dock auto-hides (if configured), `/ps` shows exit(0)
-- Process fails -> notification custom message appears with exit code and triggers an agent turn by default
-- Stop a process -> `/ps:kill` or tool `stop` action, process shows as killed
+- Process fails -> notification custom message appears with exit code and triggers an agent turn
+- Stop a process -> overlay kill action or tool `stop` action
 
 **Session lifecycle:**
 - Reload/new/fork -> the current extension-owned manager is shut down
 - Pi exit -> all live processes are killed via `manager.killAll()`
 
 **Log streaming:**
-- `/ps:logs` shows live output
+- `/ps` (alias for `/ps:logs`) shows live output
 - Tab switching in logs overlay re-subscribes correctly
 - Dock open mode shows live output
 - Search in logs works
@@ -1414,8 +1330,8 @@ If `skills/pi-processes/SKILL.md` is restored, update it after the final command
 - Config changes take effect
 
 **Tool:**
-- All planned tool actions work: start, list, stop, output, logs, clear, write
-- Tool rendering (call and result) works correctly
+- All tool actions work: start, list, stop, output, update
+- Tool rendering works correctly
 - Extension notification reactions work for lifecycle and log-match events
 
 **Background blocker:**
@@ -1423,20 +1339,16 @@ If `skills/pi-processes/SKILL.md` is restored, update it after the final command
 
 **Edge cases:**
 - Multiple processes running simultaneously
-- Rapid start/kill cycles
 - No processes -> empty states in all UIs
-- Very long output -> truncation works in tool output action
+- Very long output -> truncation works
 
-### Phase 6 Verification
+### Phase 5 Verification
 
 1. `pnpm typecheck` passes
 2. `pnpm lint` passes
-3. `pnpm test` passes (manager tests + command-executor tests)
+3. `pnpm test` passes
 4. Full manual QA pass through all commands and tool actions
 5. Reload cycle test (start processes, reload, verify expected behavior)
-
----
-
 ## Phase 7: Cleanup Hooks (post-rewrite, not part of current rewrite)
 
 ### Goal
@@ -1575,15 +1487,16 @@ Design notes live in `docs/future-cleanup-hooks.md` until this phase is ready to
 
 During the rewrite, the extension is intentionally restored in slices.
 
-Current user-visible state after Phase 2A:
-- The LLM-facing `process` tool exists.
-- The tool supports `start`, `list`, and `stop`.
-- `/ps`, `/ps:kill`, `/ps:clear`, `/ps:logs`, `/ps:dock`, `/ps:pin`, and `/ps:settings` are not restored yet.
+Current user-visible state after Phase 2G:
+- The LLM-facing `process` tool exists with `start`, `list`, `stop`, `output`, and `update` actions.
+- `/ps:settings` works.
+- No `/ps`, `/ps:logs`, `/ps:dock`, or `/ps:pin` yet.
 
 Planned final user-visible behavior:
-- Preserve the prior command/UI behavior where still useful.
-- Prefer `stop` as the LLM-facing tool action name; keep `/ps:kill` as the explicit UI command name.
-- Restore output/log access, clear, stdin write, extension-owned log-match notifications, lifecycle notifications, settings, list UI, logs UI, and dock UI.
+- `/ps` is an alias for `/ps:logs`, registered by the logs extension.Opens the log overlay.
+- Kill and clear are keyboard actions inside the overlay, not standalone commands.
+- `/ps:dock` and `/ps:pin` are in the dock extension (separate, optional).
+- The dock extension is documented as a reference for building custom process UIs.
 
 Cross-session process persistence is deferred; see `docs/future-persistent-manager.md`.
 

@@ -65,6 +65,16 @@ export class ProcessManager {
     return this.registry.getPublicInfo(id);
   }
 
+  rename(id: string, name: string): ProcessInfo | null {
+    const info = this.registry.rename(id, name);
+    if (info) {
+      this.events.emit("event", {
+        type: "processes_changed",
+      } satisfies ManagerEvent);
+    }
+    return info;
+  }
+
   getOutput(
     id: string,
     tailLines = 100,

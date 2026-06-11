@@ -22,8 +22,19 @@ import { executeStart, formatStartDetails, type StartDetails } from "./start";
 import * as startRender from "./start/render";
 import { executeStop, formatStopDetails, type StopDetails } from "./stop";
 import * as stopRender from "./stop/render";
+import {
+  executeUpdate,
+  formatUpdateDetails,
+  type UpdateDetails,
+} from "./update";
+import * as updateRender from "./update/render";
 
-type ProcessDetails = StartDetails | ListDetails | StopDetails | OutputDetails;
+type ProcessDetails =
+  | StartDetails
+  | ListDetails
+  | StopDetails
+  | OutputDetails
+  | UpdateDetails;
 
 export function registerProcessTool(
   pi: ExtensionAPI,
@@ -35,9 +46,9 @@ export function registerProcessTool(
       name: "process",
       label: "Process",
       description:
-        "Start, list, stop, and inspect output of long-running background processes.",
+        "Start, list, stop, update, and inspect output of long-running background processes.",
       promptSnippet:
-        "Start, list, stop, and inspect output of long-running background processes.",
+        "Start, list, stop, update, and inspect output of long-running background processes.",
       promptGuidelines: [
         "Use process when a command should keep running while the conversation continues, such as a dev server, watcher, or log tail.",
         "Use process start to start long-running background commands instead of shell background patterns like &, nohup, disown, or setsid.",
@@ -46,6 +57,7 @@ export function registerProcessTool(
         "Use process output to inspect recent stdout/stderr of a background process. Use pattern and mode to filter for specific lines, such as errors or readiness signals.",
         "By default, process failures trigger an agent turn, successes add context only, and killed processes are ignored. Use notify to override.",
         "Use notify.logMatches on start to get notified when output matches a readiness or error pattern. Log matchers control agent attention, not display.",
+        "Use process update to rename a running process or modify log watches on a running process. Only running processes can be updated.",
       ],
       parameters: ProcessesParams,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
@@ -76,6 +88,8 @@ async function execute(
       return executeStop(params, manager, notifications);
     case "output":
       return executeOutput(params, manager);
+    case "update":
+      return executeUpdate(params, manager, notifications);
     default:
       throw new Error(`unsupported process action: ${String(params.action)}`);
   }
@@ -100,6 +114,10 @@ function renderProcessCall(
     case "output":
       return new ToolLayout().setHeader(
         outputRender.buildHeader(args, theme, context),
+      );
+    case "update":
+      return new ToolLayout().setHeader(
+        updateRender.buildHeader(args, theme, context),
       );
     default:
       return fallbackContainer(theme);
@@ -128,27 +146,28 @@ function buildBody(
   options: { expanded?: boolean },
   theme: Theme,
 ): Container {
-  if (details.action === "start") {
-    return options.expanded
-      ? startRender.buildExpanded(details, theme)
-      : startRender.buildCollapsed(details, theme);
+  switch (details.action) {
+    case "start":
+      return options.expanded
+        ? startRender.buildExpanded(details, theme)
+        : startRender.buildCollapsed(details, theme);
+    case "list":
+      return options.expanded
+        ? listRender.buildExpanded(details, theme)
+        : listRender.buildCollapsed(details, theme);
+    case "output":
+      return options.expanded
+        ? outputRender.buildExpanded(details, theme)
+        : outputRender.buildCollapsed(details, theme);
+    case "update":
+      return options.expanded
+        ? updateRender.buildExpanded(details, theme)
+        : updateRender.buildCollapsed(details, theme);
+    case "stop":
+      return options.expanded
+        ? stopRender.buildExpanded(details, theme)
+        : stopRender.buildCollapsed(details, theme);
   }
-
-  if (details.action === "list") {
-    return options.expanded
-      ? listRender.buildExpanded(details, theme)
-      : listRender.buildCollapsed(details, theme);
-  }
-
-  if (details.action === "output") {
-    return options.expanded
-      ? outputRender.buildExpanded(details, theme)
-      : outputRender.buildCollapsed(details, theme);
-  }
-
-  return options.expanded
-    ? stopRender.buildExpanded(details, theme)
-    : stopRender.buildCollapsed(details, theme);
 }
 
 function buildFooter(
@@ -165,6 +184,8 @@ function buildFooter(
       return stopRender.buildFooter(details, options, theme);
     case "output":
       return outputRender.buildFooter(details, options, theme);
+    case "update":
+      return updateRender.buildFooter(details, options, theme);
   }
 }
 
@@ -178,6 +199,8 @@ function formatDetails(details: ProcessDetails): string {
       return formatStopDetails(details);
     case "output":
       return formatOutputDetails(details);
+    case "update":
+      return formatUpdateDetails(details);
   }
 }
 

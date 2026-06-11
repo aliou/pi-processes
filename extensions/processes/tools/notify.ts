@@ -55,20 +55,59 @@ function normalizeLogMatches(input: unknown): LogMatcherConfig[] {
   return input.map((entry, index) => normalizeLogMatch(entry, index));
 }
 
-function normalizeLogMatch(input: unknown, index: number): LogMatcherConfig {
-  const path = `notify.logMatches[${index}]`;
+export function normalizeLogMatchItems(
+  input: unknown,
+  options: {
+    actionLabel: string;
+    pathPrefix: string;
+    maxItems?: number;
+  },
+): LogMatcherConfig[] {
+  const { actionLabel, pathPrefix } = options;
+  const maxItems = options.maxItems ?? MAX_NOTIFY_LOG_MATCHERS;
+
+  if (input === undefined || input === null) {
+    throw new Error(`${actionLabel} ${pathPrefix} is required`);
+  }
+
+  if (!Array.isArray(input)) {
+    throw new Error(`${actionLabel} ${pathPrefix} must be an array`);
+  }
+
+  if (input.length === 0) {
+    throw new Error(`${actionLabel} ${pathPrefix} must not be empty`);
+  }
+
+  if (input.length > maxItems) {
+    throw new Error(
+      `${actionLabel} ${pathPrefix} supports at most ${maxItems} items`,
+    );
+  }
+
+  return input.map((entry, index) =>
+    normalizeLogMatch(entry, index, { actionLabel, pathPrefix }),
+  );
+}
+
+export function normalizeLogMatch(
+  input: unknown,
+  index: number,
+  options?: { actionLabel?: string; pathPrefix?: string },
+): LogMatcherConfig {
+  const actionLabel = options?.actionLabel ?? "process start";
+  const path = `${options?.pathPrefix ?? "notify.logMatches"}[${index}]`;
 
   if (!isRecord(input)) {
-    throw new Error(`process start ${path} must be an object`);
+    throw new Error(`${actionLabel} ${path} must be an object`);
   }
 
   if (typeof input.pattern !== "string") {
-    throw new Error(`process start ${path}.pattern must be a string`);
+    throw new Error(`${actionLabel} ${path}.pattern must be a string`);
   }
 
   if (input.pattern.length > MAX_NOTIFY_PATTERN_LENGTH) {
     throw new Error(
-      `process start ${path}.pattern must be at most ${MAX_NOTIFY_PATTERN_LENGTH} characters`,
+      `${actionLabel} ${path}.pattern must be at most ${MAX_NOTIFY_PATTERN_LENGTH} characters`,
     );
   }
 
@@ -109,9 +148,7 @@ function normalizeStringEnum<const T extends readonly string[]>(
   if (input === undefined || input === null) return undefined;
 
   if (typeof input !== "string" || !allowed.includes(input)) {
-    throw new Error(
-      `process start ${path} must be one of: ${allowed.join(", ")}`,
-    );
+    throw new Error(`${path} must be one of: ${allowed.join(", ")}`);
   }
 
   return input;
@@ -121,7 +158,7 @@ function normalizeBoolean(input: unknown, path: string): boolean | undefined {
   if (input === undefined || input === null) return undefined;
 
   if (typeof input !== "boolean") {
-    throw new Error(`process start ${path} must be a boolean`);
+    throw new Error(`${path} must be a boolean`);
   }
 
   return input;
@@ -133,7 +170,7 @@ function validateRegex(pattern: string, path: string): void {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
-      `process start ${path}.pattern is not a valid regular expression: ${message}`,
+      `${path}.pattern is not a valid regular expression: ${message}`,
     );
   }
 }

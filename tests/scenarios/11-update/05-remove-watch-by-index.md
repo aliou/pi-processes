@@ -1,0 +1,1 @@
+Start a background process named "indexed-watch" that prints "tick" every second with three log watches: "alpha", "beta", "gamma". Then use the process update action to remove the watch at index 1 (the "beta" watch). Confirm that only "alpha" and "gamma" remain.

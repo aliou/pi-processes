@@ -1,0 +1,1 @@
+Start a background process named "multi-watch" that prints "tick" every second with three log watches: "ready" on stdout, "error" on stderr, and "warn" on both. Then use the process update action to remove the "error" watch by pattern. Confirm that two watches remain after the update.

@@ -28,6 +28,13 @@ export class ProcessRegistry {
     return managed ? formatProcess(managed) : null;
   }
 
+  rename(id: string, name: string): ProcessInfo | null {
+    const managed = this.processes.get(id);
+    if (!managed) return null;
+    managed.name = name;
+    return formatProcess(managed);
+  }
+
   delete(id: string): boolean {
     return this.processes.delete(id);
   }

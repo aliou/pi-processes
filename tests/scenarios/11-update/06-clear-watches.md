@@ -1,0 +1,1 @@
+Start a background process named "cleanup" that prints "tick" every second with two log watches: "ready" and "error". Then use the process update action to clear all watches. Confirm that zero watches remain after the update.

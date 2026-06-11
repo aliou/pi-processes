@@ -15,6 +15,13 @@ export const PROCESS_OUTPUT_STREAMS = ["stdout", "stderr", "both"] as const;
 
 export const PROCESS_OUTPUT_MATCH_MODES = ["literal", "regex"] as const;
 
+export const PROCESS_WATCH_UPDATE_MODES = [
+  "append",
+  "replace",
+  "remove",
+  "clear",
+] as const;
+
 export const PROCESS_LIST_STATUS_FILTERS = [
   "all",
   "running",
@@ -70,6 +77,44 @@ const NotifyLogMatchParams = Type.Object({
   ),
 });
 
+const WatchUpdateItemParams = Type.Object({
+  index: Type.Optional(
+    Type.Integer({
+      minimum: 0,
+      description:
+        "Matcher index to remove. Only for remove mode. If pattern is also provided, index takes precedence.",
+    }),
+  ),
+  pattern: Type.Optional(
+    Type.String({
+      maxLength: MAX_NOTIFY_PATTERN_LENGTH,
+      description:
+        "Log pattern. Required for append and replace modes. Optional for remove mode (use index or pattern).",
+    }),
+  ),
+  mode: Type.Optional(
+    StringEnum(PROCESS_NOTIFY_LOG_MATCH_MODES, {
+      description: "Pattern matching mode. Defaults to literal.",
+    }),
+  ),
+  stream: Type.Optional(
+    StringEnum(PROCESS_NOTIFY_LOG_MATCH_STREAMS, {
+      description: "Output stream to inspect. Defaults to both.",
+    }),
+  ),
+  repeat: Type.Optional(
+    Type.Boolean({
+      description:
+        "Whether this matcher can notify more than once. Defaults to false.",
+    }),
+  ),
+  on: Type.Optional(
+    StringEnum(PROCESS_NOTIFY_ATTENTIONS, {
+      description: "Agent attention for this log match. Defaults to turn.",
+    }),
+  ),
+});
+
 const NotifyParams = Type.Object({
   onSuccess: Type.Optional(
     StringEnum(PROCESS_NOTIFY_ATTENTIONS, {
@@ -99,7 +144,7 @@ const NotifyParams = Type.Object({
 });
 
 export const ProcessesParams = Type.Object({
-  action: StringEnum(["start", "list", "stop", "output"] as const, {
+  action: StringEnum(["start", "list", "stop", "output", "update"] as const, {
     description: "Action to perform.",
   }),
   name: Type.Optional(
@@ -153,6 +198,26 @@ export const ProcessesParams = Type.Object({
         "Pattern matching mode for output filter. Defaults to literal. Only for output action.",
     }),
   ),
+  watches: Type.Optional(
+    Type.Object(
+      {
+        mode: StringEnum(PROCESS_WATCH_UPDATE_MODES, {
+          description: "How to update log watches.",
+        }),
+        items: Type.Optional(
+          Type.Array(WatchUpdateItemParams, {
+            maxItems: MAX_NOTIFY_LOG_MATCHERS,
+            description:
+              "Watch entries. For append/replace, provide full matcher definitions. For remove, provide index or pattern to identify matchers to remove. Ignored for clear.",
+          }),
+        ),
+      },
+      {
+        description:
+          "Update log watches on a running process. Only for update action.",
+      },
+    ),
+  ),
 });
 
 export type ProcessesParamsType = Static<typeof ProcessesParams>;
@@ -170,3 +235,5 @@ export type ProcessNotifyLogMatchStream =
 export type ProcessOutputStream = (typeof PROCESS_OUTPUT_STREAMS)[number];
 export type ProcessOutputMatchMode =
   (typeof PROCESS_OUTPUT_MATCH_MODES)[number];
+export type ProcessWatchUpdateMode =
+  (typeof PROCESS_WATCH_UPDATE_MODES)[number];

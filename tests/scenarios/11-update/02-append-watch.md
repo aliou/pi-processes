@@ -1,0 +1,1 @@
+Start a background process named "pipeline" that prints "tick" every second with no log watches. Then use the process update action to append a log watch for the pattern "error" on stderr. The watch should trigger an agent turn when matched.

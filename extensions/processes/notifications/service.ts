@@ -10,7 +10,7 @@ import {
   evaluateLogMatchers,
   type LogMatchResult,
 } from "./log-matchers";
-import type { NotifyConfig } from "./registry";
+import type { NotifyConfig, WatchState } from "./registry";
 import {
   createNotificationRegistry,
   type NotificationRegistry,
@@ -39,6 +39,8 @@ export interface NotificationServiceDeps {
 
 interface ProcessMatcherState {
   matchers: CompiledLogMatcher[];
+  revision: number;
+  generation: number;
 }
 
 export function createNotificationService(deps: NotificationServiceDeps): {
@@ -109,16 +111,11 @@ export function createNotificationService(deps: NotificationServiceDeps): {
   ): void {
     if (!event.appendedText || event.appendedText.length === 0) return;
 
-    const config = registry.get(event.id);
-    if (!config) return;
+    const watchState = registry.getWatchState(event.id);
+    if (!watchState) return;
 
-    let state = matcherStates.get(event.id);
-    if (!state) {
-      const matchers = compileLogMatchers(config);
-      if (matchers.length === 0) return;
-      state = { matchers };
-      matcherStates.set(event.id, state);
-    }
+    const state = syncMatcherState(event.id, watchState);
+    if (!state) return;
 
     const now = Date.now();
     const matches = evaluateLogMatchers(
@@ -252,6 +249,84 @@ export function createNotificationService(deps: NotificationServiceDeps): {
       case "ignore":
         return { triggerTurn: false, deliverAs: "steer" };
     }
+  }
+
+  function syncMatcherState(
+    processId: string,
+    watchState: WatchState,
+  ): ProcessMatcherState | null {
+    const existing = matcherStates.get(processId);
+
+    if (!existing) {
+      const matchers = compileLogMatchers({
+        logMatches: watchState.logMatches,
+      });
+      if (matchers.length === 0) return null;
+      const state: ProcessMatcherState = {
+        matchers,
+        revision: watchState.revision,
+        generation: watchState.generation,
+      };
+      matcherStates.set(processId, state);
+      return state;
+    }
+
+    if (existing.revision === watchState.revision) return existing;
+
+    const next = compileLogMatchers({ logMatches: watchState.logMatches });
+
+    if (existing.generation === watchState.generation) {
+      preserveMatcherRuntimeState(existing.matchers, next);
+    }
+
+    if (next.length === 0) {
+      matcherStates.delete(processId);
+      return null;
+    }
+
+    const state: ProcessMatcherState = {
+      matchers: next,
+      revision: watchState.revision,
+      generation: watchState.generation,
+    };
+    matcherStates.set(processId, state);
+    return state;
+  }
+
+  function preserveMatcherRuntimeState(
+    prev: CompiledLogMatcher[],
+    next: CompiledLogMatcher[],
+  ): void {
+    const byKey = new Map<string, CompiledLogMatcher[]>();
+    for (const m of prev) {
+      const key = matcherIdentityKey(m);
+      const bucket = byKey.get(key);
+      if (bucket) {
+        bucket.push(m);
+      } else {
+        byKey.set(key, [m]);
+      }
+    }
+
+    for (const m of next) {
+      const key = matcherIdentityKey(m);
+      const bucket = byKey.get(key);
+      if (!bucket || bucket.length === 0) continue;
+      const donor = bucket.shift();
+      if (!donor) continue;
+      m.fired = donor.fired;
+      m.lastMatchTime = donor.lastMatchTime;
+    }
+  }
+
+  function matcherIdentityKey(m: {
+    pattern: string;
+    mode: string;
+    stream: string;
+    repeat: boolean;
+    on: string;
+  }): string {
+    return JSON.stringify([m.pattern, m.mode, m.stream, m.repeat, m.on]);
   }
 
   function cleanupMatcherState(processId: string): void {

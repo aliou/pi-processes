@@ -82,6 +82,30 @@ Implemented in `33df3b0`.
 - Import audit (src/ stays pi-agnostic, UI extensions don't import manager)
 - Update AGENTS.md structure section
 
+## 5. Agent steering guidance
+
+Tighten promptGuidelines and ship the skill to steer agents away from common mistakes. To be done after steps 2-3.
+
+### promptGuidelines rewrite (~5 lines)
+- Merge existing 8 lines into ~5 tighter ones
+- Fold in: list before start, use watches not polling, use update not restart, output is for targeted inspection only, don't re-summarize tool output
+
+### Skill: `skills/pi-processes/SKILL.md`
+- Recreate (was removed in `58aad4b`)
+- Expanded guidance with bad/good examples for common mistakes:
+  - Polling output instead of setting watches
+  - Restarting instead of updating watches
+  - Starting duplicate processes
+  - Not watching for common failure patterns (EADDRINUSE, etc.)
+  - Re-summarizing tool output to the user
+  - Using output for deep inspection (use logs/read instead)
+  - Vague process names
+  - Leaving obsolete processes running
+
+### Steering text in tool output
+- Add to `formatStartDetails` when watches are active: "Continue other work; watch notifications will trigger follow-up."
+- Add to `formatOutputDetails` when process is still running: "Process is still running. Use watches instead of polling."
+
 ## Parallelism
 
-Steps 2 and 3 are independent of each other and of step 1. They can be done in any order or in parallel. Step 1 is simplest and completes the LLM tool surface, so it goes first. Step 4 is last.
+Steps 2 and 3 are independent of each other. They can be done in any order or in parallel. Step 5 comes after both. Step 4 is last.

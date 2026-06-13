@@ -10,12 +10,12 @@ import {
   type RequestLogFilesPayload,
   type RequestOutputPayload,
 } from "../../../src/protocol";
-import type { ResolvedProcessConfig } from "../config";
+import type { ProcessProtocolConfig } from "../config";
 
 export function registerRequestHandlers(
   events: EventBus,
   manager: ProcessManager,
-  getConfig: () => ResolvedProcessConfig,
+  getConfig: () => ProcessProtocolConfig,
 ): () => void {
   const disposers = [
     events.on(CHANNELS.REQUEST_LIST, (payload) => {

@@ -11,7 +11,7 @@ import {
 } from "@aliou/pi-utils-settings";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import type { ProcessConfig, ResolvedProcessConfig } from "../config";
+import type { ProcessConfig, ProcessProtocolConfig } from "../config";
 import { createSettingsConfigStore } from "../config";
 import { applySettingChange } from "./apply-setting-change";
 import { buildSections } from "./build-sections";
@@ -19,19 +19,20 @@ import { buildSections } from "./build-sections";
 export function registerProcessSettings(pi: ExtensionAPI): void {
   const configStore = createSettingsConfigStore();
 
-  registerSettingsCommand<ProcessConfig, ResolvedProcessConfig>(pi, {
+  registerSettingsCommand<ProcessConfig, ProcessProtocolConfig>(pi, {
     commandName: "ps:settings",
     title: "Processes Settings",
     configStore,
     buildSections: (
       tabConfig: ProcessConfig | null,
-      resolved: ResolvedProcessConfig,
+      resolved: ProcessProtocolConfig,
       ctx,
     ): SettingsSection[] => {
       return buildSections(tabConfig, resolved, {
         setDraft: ctx.setDraft,
         scope: ctx.scope,
         isInherited: ctx.isInherited,
+        theme: ctx.theme,
       });
     },
     onSettingChange: (id, newValue, config) => {

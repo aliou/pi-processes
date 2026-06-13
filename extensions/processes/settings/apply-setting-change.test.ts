@@ -28,6 +28,13 @@ describe("applySettingChange", () => {
     expect(result?.execution?.shellPath).toBe("");
   });
 
+  it("returns null for non-core setting IDs", () => {
+    expect(
+      applySettingChange("follow.enabledByDefault", "off", base),
+    ).toBeNull();
+    expect(applySettingChange("output.maxOutputLines", "250", base)).toBeNull();
+  });
+
   it("returns null for unknown setting IDs", () => {
     expect(applySettingChange("unknown.field", "value", base)).toBeNull();
   });

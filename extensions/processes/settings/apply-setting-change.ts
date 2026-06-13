@@ -1,8 +1,7 @@
 /**
- * Apply a setting change to the config.
+ * Apply a setting change to the core processes config.
  *
- * Converts display values (e.g. "on"/"off") to storage types (booleans, numbers).
- * Returns the updated config, or null to fall through to default string storage.
+ * Logs/overview/dock settings are handled by their owning extensions.
  */
 
 import { setNestedValue } from "@aliou/pi-utils-settings";

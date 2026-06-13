@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ProcessManager } from "../../../src/manager";
 import { CHANNELS } from "../../../src/protocol";
 import type { ProcessInfo } from "../../../src/types";
-import type { ResolvedProcessConfig } from "../config";
+import type { ProcessProtocolConfig } from "../config";
 import { DEFAULT_CONFIG } from "../config";
 import { registerRequestHandlers } from "./requests";
 
@@ -108,7 +108,7 @@ describe("registerRequestHandlers", () => {
   it("replies with loaded config", () => {
     const events = createEventBus();
     const manager = {} as ProcessManager;
-    const config: ResolvedProcessConfig = {
+    const config: ProcessProtocolConfig = {
       ...DEFAULT_CONFIG,
       execution: { shellPath: "/bin/bash" },
     };

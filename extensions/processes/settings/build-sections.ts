@@ -1,89 +1,38 @@
 /**
- * Build settings sections for the processes extension.
+ * Build settings sections for the processes package.
  *
- * Each section maps to a top-level config group.
- * Values show the scope-local override or the inherited resolved value.
+ * The first-level view stays focused. Extension-specific groups open focused
+ * detail panels instead of expanding every setting into one long list.
  */
 
-import type { Scope, SettingsSection } from "@aliou/pi-utils-settings";
+import {
+  type Scope,
+  SettingsDetailEditor,
+  type SettingsSection,
+  type SettingsTheme,
+} from "@aliou/pi-utils-settings";
 import type { SettingItem } from "@earendil-works/pi-tui";
 
-import type { ProcessConfig, ResolvedProcessConfig } from "../config";
+import type { ProcessConfig, ProcessProtocolConfig } from "../config";
 
 interface BuildSectionsContext {
   setDraft: (config: ProcessConfig) => void;
   scope: Scope;
   isInherited: (path: string) => boolean;
+  theme: SettingsTheme;
 }
 
 export function buildSections(
   tabConfig: ProcessConfig | null,
-  resolved: ResolvedProcessConfig,
-  _ctx: BuildSectionsContext,
+  resolved: ProcessProtocolConfig,
+  ctx: BuildSectionsContext,
 ): SettingsSection[] {
   const scopedConfig = structuredClone(tabConfig ?? {}) as ProcessConfig;
 
-  function boolItem(
-    id: string,
-    label: string,
-    description: string,
-    scopedValue: boolean | undefined,
-    resolvedValue: boolean,
-  ): SettingItem {
-    const display =
-      scopedValue === undefined
-        ? `inherited: ${resolvedValue ? "on" : "off"}`
-        : scopedValue
-          ? "on"
-          : "off";
-    return {
-      id,
-      label,
-      description,
-      currentValue: display,
-      values: ["on", "off"],
-    };
-  }
-
-  function textItem(
-    id: string,
-    label: string,
-    description: string,
-    scopedValue: string | undefined,
-    resolvedValue: string | undefined,
-    emptyText: string,
-  ): SettingItem {
-    const display =
-      scopedValue === undefined
-        ? resolvedValue === undefined
-          ? emptyText
-          : `inherited: ${resolvedValue || emptyText}`
-        : scopedValue || emptyText;
-    return {
-      id,
-      label,
-      description,
-      currentValue: display,
-    };
-  }
-
   const executionSection: SettingsSection = {
-    label: "Execution",
+    label: "Core",
     items: [
-      textItem(
-        "execution.shellPath",
-        "Shell path",
-        "Path to the shell executable for process commands. Leave empty to use the system default.",
-        scopedConfig.execution?.shellPath,
-        resolved.execution.shellPath,
-        "(default)",
-      ),
-    ],
-  };
-
-  const interceptionSection: SettingsSection = {
-    label: "Interception",
-    items: [
+      buildShellPathItem(scopedConfig, resolved, ctx),
       boolItem(
         "interception.blockBackgroundCommands",
         "Block background commands",
@@ -94,5 +43,229 @@ export function buildSections(
     ],
   };
 
-  return [executionSection, interceptionSection];
+  const logsSection: SettingsSection = {
+    label: "Interfaces",
+    items: [buildLogsDetailItem(scopedConfig, resolved, ctx)],
+  };
+
+  return [executionSection, logsSection];
+}
+
+function buildShellPathItem(
+  scopedConfig: ProcessConfig,
+  resolved: ProcessProtocolConfig,
+  ctx: BuildSectionsContext,
+): SettingItem {
+  const shellPath =
+    scopedConfig.execution?.shellPath ?? resolved.execution.shellPath ?? "";
+  const display = scopedConfig.execution?.shellPath
+    ? scopedConfig.execution.shellPath
+    : resolved.execution.shellPath
+      ? `inherited: ${resolved.execution.shellPath}`
+      : "(default)";
+
+  return {
+    id: "execution.shellPath.details",
+    label: "Shell path",
+    currentValue: display,
+    description:
+      "Open focused settings for the shell executable used by process commands.",
+    submenu: (_current, done) => {
+      const current = scopedConfig;
+      let nextShellPath = shellPath;
+
+      const syncDraft = () => {
+        ctx.setDraft({
+          ...current,
+          execution: {
+            ...current.execution,
+            shellPath: nextShellPath,
+          },
+        });
+      };
+
+      return new SettingsDetailEditor({
+        title: "Shell path",
+        theme: ctx.theme,
+        fields: [
+          {
+            id: "execution.shellPath.value",
+            type: "text",
+            label: "Shell path",
+            description:
+              "Path to the shell executable. Leave empty to use the system default.",
+            getValue: () => nextShellPath,
+            setValue: (value) => {
+              nextShellPath = value;
+              syncDraft();
+            },
+            displayValue: (value) => value || "(default)",
+          },
+        ],
+        getDoneSummary: () => nextShellPath || "(default)",
+        onDone: (summary) => done(summary),
+      });
+    },
+  };
+}
+
+function buildLogsDetailItem(
+  scopedConfig: ProcessConfig,
+  resolved: ProcessProtocolConfig,
+  ctx: BuildSectionsContext,
+): SettingItem {
+  const maxVisibleTabs =
+    scopedConfig.processList?.maxVisibleProcesses ??
+    resolved.processList.maxVisibleProcesses;
+  const viewportRows =
+    scopedConfig.processList?.maxPreviewLines ??
+    resolved.processList.maxPreviewLines;
+  const historyLines =
+    scopedConfig.output?.maxOutputLines ?? resolved.output.maxOutputLines;
+  const followByDefault =
+    scopedConfig.follow?.enabledByDefault ?? resolved.follow.enabledByDefault;
+
+  return {
+    id: "logs.details",
+    label: "Logs overlay",
+    currentValue: `${historyLines} lines · ${viewportRows} rows · ${followByDefault ? "follow" : "manual"}`,
+    description:
+      "Open focused settings for /ps:logs tabs, history, viewport, and follow behavior.",
+    submenu: (_current, done) => {
+      const current = scopedConfig;
+      let nextMaxVisibleTabs = String(maxVisibleTabs);
+      let nextViewportRows = String(viewportRows);
+      let nextHistoryLines = String(historyLines);
+      let nextFollowByDefault = followByDefault;
+      let nextAutoHideOnFinish =
+        scopedConfig.follow?.autoHideOnFinish ??
+        resolved.follow.autoHideOnFinish;
+
+      const syncDraft = () => {
+        const updated: ProcessConfig = {
+          ...current,
+          processList: {
+            ...current.processList,
+            maxVisibleProcesses: parsePositiveInt(nextMaxVisibleTabs),
+            maxPreviewLines: parsePositiveInt(nextViewportRows),
+          },
+          output: {
+            ...current.output,
+            maxOutputLines: parsePositiveInt(nextHistoryLines),
+          },
+          follow: {
+            ...current.follow,
+            enabledByDefault: nextFollowByDefault,
+            autoHideOnFinish: nextAutoHideOnFinish,
+          },
+        };
+        ctx.setDraft(updated);
+      };
+
+      return new SettingsDetailEditor({
+        title: "Logs overlay",
+        theme: ctx.theme,
+        fields: [
+          {
+            id: "logs.maxVisibleTabs",
+            type: "text",
+            label: "Max visible tabs",
+            description:
+              "Maximum process tabs shown before overflow indicators appear.",
+            getValue: () => nextMaxVisibleTabs,
+            setValue: (value) => {
+              nextMaxVisibleTabs = value;
+              syncDraft();
+            },
+            validate: positiveIntegerError,
+          },
+          {
+            id: "logs.viewportRows",
+            type: "text",
+            label: "Viewport rows",
+            description:
+              "Maximum log rows rendered in the /ps:logs overlay body.",
+            getValue: () => nextViewportRows,
+            setValue: (value) => {
+              nextViewportRows = value;
+              syncDraft();
+            },
+            validate: positiveIntegerError,
+          },
+          {
+            id: "logs.historyLines",
+            type: "text",
+            label: "History lines",
+            description:
+              "Maximum existing log lines loaded when opening a process log.",
+            getValue: () => nextHistoryLines,
+            setValue: (value) => {
+              nextHistoryLines = value;
+              syncDraft();
+            },
+            validate: positiveIntegerError,
+          },
+          {
+            id: "logs.followByDefault",
+            type: "boolean",
+            label: "Follow by default",
+            description: "Open process logs pinned to the latest output.",
+            getValue: () => nextFollowByDefault,
+            setValue: (value) => {
+              nextFollowByDefault = value;
+              syncDraft();
+            },
+          },
+          {
+            id: "logs.autoHideOnFinish",
+            type: "boolean",
+            label: "Auto-hide on finish",
+            description:
+              "Close the logs overlay when all processes have finished.",
+            getValue: () => nextAutoHideOnFinish,
+            setValue: (value) => {
+              nextAutoHideOnFinish = value;
+              syncDraft();
+            },
+          },
+        ],
+        getDoneSummary: () =>
+          `${parsePositiveInt(nextHistoryLines)} lines · ${parsePositiveInt(nextViewportRows)} rows · ${nextFollowByDefault ? "follow" : "manual"}`,
+        onDone: (summary) => done(summary),
+      });
+    },
+  };
+}
+
+function boolItem(
+  id: string,
+  label: string,
+  description: string,
+  scopedValue: boolean | undefined,
+  resolvedValue: boolean,
+): SettingItem {
+  const display =
+    scopedValue === undefined
+      ? `inherited: ${resolvedValue ? "on" : "off"}`
+      : scopedValue
+        ? "on"
+        : "off";
+  return {
+    id,
+    label,
+    description,
+    currentValue: display,
+    values: ["on", "off"],
+  };
+}
+
+function positiveIntegerError(value: string): string | null {
+  return Number.isInteger(Number(value)) && Number(value) > 0
+    ? null
+    : "Enter a positive integer";
+}
+
+function parsePositiveInt(value: string): number {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) || parsed <= 0 ? 1 : parsed;
 }

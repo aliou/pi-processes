@@ -6,11 +6,11 @@ import {
 } from "@aliou/pi-utils-settings";
 import pkg from "../../../package.json" with { type: "json" };
 import { DEFAULT_CONFIG } from "./defaults";
-import type { ProcessConfig, ResolvedProcessConfig } from "./types";
+import type { ProcessConfig, ProcessProtocolConfig } from "./types";
 
 export const configLoader = new ConfigLoader<
   ProcessConfig,
-  ResolvedProcessConfig
+  ProcessProtocolConfig
 >("processes", DEFAULT_CONFIG, {
   scopes: ["global", "local", "memory"],
   schemaUrl: buildSchemaUrl(pkg.name, pkg.version),
@@ -18,7 +18,7 @@ export const configLoader = new ConfigLoader<
 
 export function createSettingsConfigStore(): ConfigStore<
   ProcessConfig,
-  ResolvedProcessConfig
+  ProcessProtocolConfig
 > {
   return {
     save: (scope, config) => configLoader.save(scope, config),

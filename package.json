@@ -16,7 +16,8 @@
   },
   "pi": {
     "extensions": [
-      "./extensions/processes/index.ts"
+      "./extensions/processes/index.ts",
+      "./extensions/processes-logs/index.ts"
     ],
     "skills": [
       "./skills/pi-processes"

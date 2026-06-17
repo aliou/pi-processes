@@ -4,8 +4,9 @@ import type {
   ExtensionCommandContext,
   Theme,
 } from "@earendil-works/pi-coding-agent";
+import type { ProcessProtocolConfig } from "../../../src/protocol";
 import type { ProcessInfo } from "../../../src/types";
-import { requestProcess, requestProcessList } from "../client";
+import { requestConfig, requestProcess, requestProcessList } from "../client";
 import { allProcessCompletions } from "../completions";
 import { LogOverlayComponent } from "../components/log-overlay-component";
 
@@ -52,6 +53,14 @@ async function openLogs(
     return;
   }
 
+  let config: ProcessProtocolConfig;
+  try {
+    config = requestConfig(options.events);
+  } catch (error) {
+    ctx.ui.notify(String(error), "error");
+    return;
+  }
+
   const result = await ctx.ui.custom<"closed">(
     (tui, theme: Theme, _keybindings, done) => {
       let unregister: () => void = () => undefined;
@@ -60,6 +69,7 @@ async function openLogs(
         tui,
         theme,
         initialProcessId,
+        config,
         onClose: () => {
           unregister();
           done("closed");

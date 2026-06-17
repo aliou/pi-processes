@@ -52,7 +52,6 @@ export interface ProcessProtocolConfig {
     blockBackgroundCommands: boolean;
   };
   processList: {
-    maxVisibleProcesses: number;
     maxPreviewLines: number;
   };
   output: {

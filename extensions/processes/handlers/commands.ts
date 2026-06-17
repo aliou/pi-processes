@@ -7,6 +7,7 @@ import {
   type CommandKillPayload,
 } from "../../../src/protocol";
 import type { KillResult } from "../../../src/types";
+import { isRecord } from "../../../src/utils/is-record";
 import type { NotificationRegistry } from "../notifications/registry";
 import { killIntentionally } from "./kill-process";
 
@@ -75,10 +76,6 @@ function isOptionalNumber(value: unknown): value is number | undefined {
   return (
     value === undefined || (typeof value === "number" && Number.isFinite(value))
   );
-}
-
-function isRecord(payload: unknown): payload is Record<string, unknown> {
-  return typeof payload === "object" && payload !== null;
 }
 
 function safeReply<T>(reply: (result: T) => void, result: T): void {

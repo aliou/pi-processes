@@ -10,8 +10,6 @@ import type { ProcessConfig } from "../config";
 
 const BOOLEAN_FIELDS = new Set(["interception.blockBackgroundCommands"]);
 
-const TEXT_FIELDS = new Set(["execution.shellPath"]);
-
 export function applySettingChange(
   id: string,
   newValue: string,
@@ -21,11 +19,6 @@ export function applySettingChange(
 
   if (BOOLEAN_FIELDS.has(id)) {
     setNestedValue(updated, id, newValue === "on");
-    return updated;
-  }
-
-  if (TEXT_FIELDS.has(id)) {
-    setNestedValue(updated, id, newValue === "(default)" ? "" : newValue);
     return updated;
   }
 

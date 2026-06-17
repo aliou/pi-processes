@@ -6,6 +6,7 @@ import {
   type LogsSubscribePayload,
   type LogsUnsubscribePayload,
 } from "../../../src/protocol";
+import { isRecord } from "../../../src/utils/is-record";
 
 interface LogSubscriber {
   subscriberId: string;
@@ -133,8 +134,4 @@ function isOptionalNumber(value: unknown): value is number | undefined {
   return (
     value === undefined || (typeof value === "number" && Number.isFinite(value))
   );
-}
-
-function isRecord(payload: unknown): payload is Record<string, unknown> {
-  return typeof payload === "object" && payload !== null;
 }

@@ -9,17 +9,21 @@ import {
   truncateToWidth,
   visibleWidth,
 } from "@earendil-works/pi-tui";
-import { CHANNELS, type ProcessesChangedPayload } from "../../../src/protocol";
+import {
+  CHANNELS,
+  type ProcessesChangedPayload,
+  type ProcessProtocolConfig,
+} from "../../../src/protocol";
 import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
 import { formatRuntime, truncateCmd } from "../../../src/utils/format";
-import { requestConfig, requestProcessList } from "../client";
+import { isRecord } from "../../../src/utils/is-record";
+import { requestProcessList } from "../client";
 import {
   connectToProcessLogs,
   type LogsConnection,
   type ProcessLogLine,
 } from "../logs-client";
 import { LogFileViewer } from "./log-file-viewer";
-import { statusIcon } from "./status-format";
 
 type OverlayMode = "normal" | "search-typing" | "search-active";
 
@@ -28,6 +32,7 @@ interface LogOverlayOptions {
   tui: TUI;
   theme: Theme;
   initialProcessId?: string;
+  config: ProcessProtocolConfig;
   onClose: () => void;
 }
 
@@ -47,20 +52,17 @@ export class LogOverlayComponent implements Component {
   private message: string | null = null;
   private mode: OverlayMode = "normal";
   private searchInput = new Input();
-  private readonly config: ReturnType<typeof requestConfig>;
   private hasSeenRunningProcess = false;
   private readonly disposers: Array<() => void> = [];
   private disposed = false;
 
   constructor(private readonly opts: LogOverlayOptions) {
-    this.config = requestConfig(opts.events);
     this.configureSearchInput();
 
     this.refreshProcesses(opts.initialProcessId);
     this.disposers.push(
       opts.events.on(CHANNELS.CHANGED, (payload) => {
-        const change = payload as ProcessesChangedPayload;
-        if (isChangedPayload(change)) this.handleProcessesChanged(change);
+        if (isChangedPayload(payload)) this.handleProcessesChanged(payload);
       }),
     );
   }
@@ -230,7 +232,7 @@ export class LogOverlayComponent implements Component {
     const fromTerminal = Math.floor(rows * OVERLAY_FRACTION) - CHROME_LINES;
     return Math.max(
       MIN_LOG_ROWS,
-      Math.min(this.config.processList.maxPreviewLines, fromTerminal),
+      Math.min(this.opts.config.processList.maxPreviewLines, fromTerminal),
     );
   }
 
@@ -281,7 +283,7 @@ export class LogOverlayComponent implements Component {
       return;
     }
     if (
-      this.config.follow.autoHideOnFinish &&
+      this.opts.config.follow.autoHideOnFinish &&
       this.hasSeenRunningProcess &&
       this.processes.every((process) => process.status !== "running")
     ) {
@@ -296,7 +298,7 @@ export class LogOverlayComponent implements Component {
     this.selectedIndex =
       (this.selectedIndex + delta + this.processes.length) %
       this.processes.length;
-    this.ensureTabVisible();
+    this.tabViewOffset = this.selectedIndex;
     this.subscribeToSelected();
   }
 
@@ -322,7 +324,7 @@ export class LogOverlayComponent implements Component {
     if (!selected) return;
 
     const connection = connectToProcessLogs(this.opts.events, selected.id, {
-      tailLines: this.config.output.maxOutputLines,
+      tailLines: this.opts.config.output.defaultTailLines,
     });
 
     if (isLogsConnectionError(connection)) {
@@ -333,8 +335,8 @@ export class LogOverlayComponent implements Component {
     this.message = null;
     this.connection = connection;
     this.viewer = new LogFileViewer(connection.initialLines, this.opts.theme, {
-      followEnabled: this.config.follow.enabledByDefault,
-      maxBufferLines: this.config.output.maxOutputLines,
+      followEnabled: this.opts.config.follow.enabledByDefault,
+      maxBufferLines: this.opts.config.output.maxOutputLines,
     });
     connection.onChunk((lines: ProcessLogLine[]) => {
       this.viewer?.appendLines(lines);
@@ -351,35 +353,75 @@ export class LogOverlayComponent implements Component {
     if (this.processes.length === 0)
       return this.opts.theme.fg("dim", "No processes");
 
-    const dim = (value: string) => this.opts.theme.fg("dim", value);
-    const accent = (value: string) => this.opts.theme.fg("accent", value);
-    const separator = "  ";
-    const hasLeft = this.tabViewOffset > 0;
-    const left = hasLeft ? dim("← ") : "";
-    const tabs: string[] = [];
-    let used = visibleWidth(left);
-    let lastVisible = this.tabViewOffset - 1;
+    const parts = this.processes.map((process, index) =>
+      this.renderTab(process, index === this.selectedIndex),
+    );
 
-    for (let i = this.tabViewOffset; i < this.processes.length; i++) {
-      const process = this.processes[i];
-      if (!process) continue;
-      const isActive = i === this.selectedIndex;
-      const name = truncateCmd(process.name, MAX_TAB_NAME);
-      const icon = this.coloredStatusIcon(process);
-      const tab = isActive
-        ? `${accent("[")}${icon} ${accent(name)}${accent("]")}`
-        : `${dim(" ")}${icon} ${dim(name)}${dim(" ")}`;
-      const reserveRight = i < this.processes.length - 1 ? 2 : 0;
-      const needed =
-        (tabs.length > 0 ? visibleWidth(separator) : 0) + visibleWidth(tab);
-      if (used + needed + reserveRight > width) break;
-      tabs.push(tab);
-      used += needed;
-      lastVisible = i;
+    const separator = " ";
+    const allTabs = parts.join(separator);
+    if (visibleWidth(allTabs) <= width) return truncateToWidth(allTabs, width);
+
+    const window = this.renderTabWindow(parts, separator, width);
+    return truncateToWidth(window, width, "", true);
+  }
+
+  private renderTab(process: ProcessInfo, active: boolean): string {
+    const t = this.opts.theme;
+    const dot = this.renderTabDot(process, active);
+    const label = truncateCmd(process.name, MAX_TAB_NAME);
+    const tab = active
+      ? t.bg("selectedBg", ` ${dot} ${t.fg("accent", label)} `)
+      : ` ${dot} ${t.fg("dim", label)} `;
+    return tab;
+  }
+
+  private renderTabWindow(
+    parts: string[],
+    separator: string,
+    width: number,
+  ): string {
+    const dim = (value: string) => this.opts.theme.fg("dim", value);
+    const activeIndex = Math.max(0, this.selectedIndex);
+    let start = activeIndex;
+    let end = activeIndex;
+
+    while (true) {
+      const canGrowLeft = start > 0;
+      const canGrowRight = end < parts.length - 1;
+      if (!canGrowLeft && !canGrowRight) break;
+
+      const leftFits =
+        canGrowLeft &&
+        this.tabWindowFits(parts, separator, start - 1, end, width);
+      const rightFits =
+        canGrowRight &&
+        this.tabWindowFits(parts, separator, start, end + 1, width);
+
+      if (!leftFits && !rightFits) break;
+
+      if (leftFits && rightFits) {
+        if (activeIndex - start <= end - activeIndex) start--;
+        else end++;
+      } else if (leftFits) start--;
+      else end++;
     }
 
-    const right = lastVisible < this.processes.length - 1 ? dim(" →") : "";
-    return truncateToWidth(`${left}${tabs.join(separator)}${right}`, width);
+    const left = start > 0 ? dim("← ") : "";
+    const right = end < parts.length - 1 ? dim(" →") : "";
+    return `${left}${parts.slice(start, end + 1).join(separator)}${right}`;
+  }
+
+  private tabWindowFits(
+    parts: string[],
+    separator: string,
+    start: number,
+    end: number,
+    width: number,
+  ): boolean {
+    const left = start > 0 ? this.opts.theme.fg("dim", "← ") : "";
+    const right = end < parts.length - 1 ? this.opts.theme.fg("dim", " →") : "";
+    const rendered = `${left}${parts.slice(start, end + 1).join(separator)}${right}`;
+    return visibleWidth(rendered) <= width;
   }
 
   private renderMetaLine(width: number, process: ProcessInfo | null): string {
@@ -441,16 +483,23 @@ export class LogOverlayComponent implements Component {
     return truncateToWidth(`${prefix}${keys}`, width);
   }
 
+  private renderTabDot(process: ProcessInfo, active: boolean): string {
+    const t = this.opts.theme;
+    if (process.status === "running") {
+      return active ? t.fg("accent", "●") : t.fg("dim", "○");
+    }
+    if (process.status === "exited" && process.success) {
+      return t.fg("success", "●");
+    }
+    if (process.status === "terminating") {
+      return t.fg("warning", "●");
+    }
+    return t.fg("error", "●");
+  }
+
   private renderFooterKeys(width: number): string {
     const dim = (value: string) => this.opts.theme.fg("dim", value);
     const accent = (value: string) => this.opts.theme.fg("accent", value);
-
-    if (this.mode === "search-typing") {
-      return truncateToWidth(
-        `${dim("enter")} apply  ${dim("esc")} cancel  ${dim("ctrl+u")} clear`,
-        width,
-      );
-    }
 
     if (this.mode === "search-active") {
       return truncateToWidth(
@@ -473,25 +522,6 @@ export class LogOverlayComponent implements Component {
       `${dim("tab/shift+tab")} switch  ${dim("g/G")} top/bot  ${dim("j/k")} scroll  ${dim("/")} search  ${dim("s:")}${stdout}${dim("+")}${stderr}  ${dim("f")} follow  ${dim("q")} close`,
       width,
     );
-  }
-
-  private coloredStatusIcon(process: ProcessInfo): string {
-    const icon = statusIcon(process.status, process.success);
-    if (process.status === "running")
-      return this.opts.theme.fg("success", icon);
-    if (
-      process.status === "terminating" ||
-      process.status === "terminate_timeout"
-    ) {
-      return this.opts.theme.fg("warning", icon);
-    }
-    if (process.status === "exited" && process.success) {
-      return this.opts.theme.fg("dim", icon);
-    }
-    if (process.status === "exited" || process.status === "killed") {
-      return this.opts.theme.fg("error", icon);
-    }
-    return this.opts.theme.fg("dim", icon);
   }
 }
 
@@ -544,7 +574,7 @@ function centeredBlock(
 }
 
 function isChangedPayload(
-  payload: ProcessesChangedPayload,
+  payload: unknown,
 ): payload is ProcessesChangedPayload {
   return (
     isRecord(payload) &&
@@ -552,8 +582,4 @@ function isChangedPayload(
       payload.reason === "ended" ||
       payload.reason === "cleared")
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }

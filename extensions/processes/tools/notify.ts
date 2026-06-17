@@ -1,3 +1,4 @@
+import { isRecord } from "../../../src/utils/is-record";
 import {
   MAX_LOG_MATCH_PATTERN_LENGTH,
   MAX_LOG_MATCHERS_PER_PROCESS,
@@ -173,8 +174,4 @@ function validateRegex(pattern: string, path: string): void {
       `${path}.pattern is not a valid regular expression: ${message}`,
     );
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

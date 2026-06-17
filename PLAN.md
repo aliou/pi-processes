@@ -339,8 +339,6 @@ extensions/
     components/
       log-overlay-component.ts
       log-file-viewer.ts
-      process-picker-component.ts
-      status-format.ts
     completions.ts
     logs-client.ts
 
@@ -907,7 +905,7 @@ Config sections (Phase 2F):
 Config/settings organization after the logs split:
 - `/ps:settings` is the single settings command for the package.
 - The top-level settings list stays focused: Core settings are shown directly, extension-specific groups open focused `SettingsDetailEditor` subpanels.
-- Logs settings live under the "Logs overlay" detail panel: visible tabs, log history limit, viewport rows, default follow, and auto-hide behavior.
+- Logs settings live under the "Logs overlay" detail panel: log history limit, viewport rows, default follow, and auto-hide behavior.
 - Future `/ps` overview/control settings should get their own detail panel: max visible processes and process list display density.
 - Dock/widget settings should get their own detail panel: showStatusWidget, dockDefaultState, dockHeight.
 
@@ -1033,7 +1031,7 @@ Own `/ps:logs` only. The logs extension is focused on process output: selecting 
 ### Config additions
 
 When this extension is loaded, the core config gains:
-- `processList` section: `maxVisibleProcesses`, `maxPreviewLines`
+- `processList` section: `maxPreviewLines`
 - `output` section: `defaultTailLines`, `maxOutputLines`
 - `follow` section: `enabledByDefault`, `autoHideOnFinish`
 
@@ -1091,25 +1089,13 @@ Receives lines from the subscription protocol instead of reading from disk:
 
 **Recommended approach:** Log subscriptions always send combined-format lines (with type: "stdout" | "stderr"). The viewer maintains an in-memory buffer and applies stream filtering locally.
 
-#### `extensions/processes-logs/components/process-picker-component.ts`
-
-Minimal process picker for when `/ps:logs` is called without an argument. Uses `CHANNELS.REQUEST_LIST`.
-
-#### `extensions/processes-logs/components/status-format.ts`
-
-Moved from `src/components/status-format.ts`. Contains:
-- `statusLabel(proc: ProcessInfo): string`
-- `statusIcon(status: ProcessStatus, success: boolean | null): string`
-- `formatStatusTag(proc, theme): string` (uses Theme, so it belongs here, not in `src/`)
-
 #### `extensions/processes-logs/completions.ts`
 
-Provides argument completions for `/ps:logs` (and `/ps`).
+Provides argument completions for `/ps:logs`.
 
 Emits `CHANNELS.REQUEST_LIST` to get the current process list, then filters.
 
 Exports:
-- `runningProcessCompletions(events: EventBus): (prefix: string) => AutocompleteItem[]`
 - `allProcessCompletions(events: EventBus): (prefix: string) => AutocompleteItem[]`
 
 #### `extensions/processes-logs/logs-client.ts`
@@ -1119,7 +1105,7 @@ Helper that encapsulates the subscribe/unsubscribe/chunk listening pattern.
 ```ts
 interface LogsConnection {
   initialLines: Array<{ type: "stdout" | "stderr"; text: string }>;
-  onChunk: (callback: (lines: Array<{ type: "stdout" | "stderr"; text: string }>) => void) => void;
+  onChunk: (callback: (lines: Array<{ type: "stdout" | "stderr"; text: string }>) => void) => () => void;
   unsubscribe: () => void;
 }
 
@@ -1127,7 +1113,7 @@ function connectToProcessLogs(
   events: EventBus,
   processId: string,
   opts?: { tailLines?: number }
-): LogsConnection
+): LogsConnection | { ok: false; error: string }
 ```
 
 ### Phase 3 Verification
@@ -1153,7 +1139,7 @@ Make process notifications observable through `pi.events` before they are delive
 
 ### Part 1: Emit notification events from the notifier
 
-Add a notification event channel to `src/protocol.ts`, for example:
+Add a notification event channel to `src/protocol/channels.ts`, plus notification payload types under `src/protocol/` and re-export them from `src/protocol/index.ts`. For example:
 
 ```ts
 CHANNELS.NOTIFICATION = "processes:notification"
@@ -1354,7 +1340,7 @@ Remove if present:
 - `src/hooks/` (moved to `extensions/processes/hooks/`)
 - `src/commands/` (moved to list/logs/dock extensions)
 - `src/components/` (moved to respective extensions)
-- `src/constants/` (replaced by `src/types.ts` / `src/protocol.ts`)
+- `src/constants/` (replaced by `src/types.ts` / `src/protocol/`)
 
 #### 3. Import audit
 

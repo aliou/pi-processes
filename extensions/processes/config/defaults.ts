@@ -8,7 +8,6 @@ export const DEFAULT_CONFIG: ProcessProtocolConfig = {
     blockBackgroundCommands: true,
   },
   processList: {
-    maxVisibleProcesses: 10,
     maxPreviewLines: 24,
   },
   output: {

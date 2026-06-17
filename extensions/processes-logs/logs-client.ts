@@ -5,6 +5,7 @@ import {
   type LogsSubscribePayload,
   type LogsUnsubscribePayload,
 } from "../../src/protocol";
+import { isRecord } from "../../src/utils/is-record";
 
 export type ProcessLogLine = { type: "stdout" | "stderr"; text: string };
 
@@ -22,24 +23,7 @@ export function connectToProcessLogs(
   const subscriberId = `processes-logs-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   let initialLines: ProcessLogLine[] = [];
   let error: string | null = null;
-
-  const payload: LogsSubscribePayload = {
-    subscriberId,
-    processId,
-    tailLines: opts.tailLines,
-    reply: (result) => {
-      if (result.ok) {
-        initialLines = result.initialLines;
-      } else {
-        error = result.error;
-      }
-    },
-  };
-
-  events.emit(CHANNELS.LOGS_SUBSCRIBE, payload);
-
-  if (error) return { ok: false, error };
-
+  let replied = false;
   let disposed = false;
   const chunkCallbacks = new Set<(lines: ProcessLogLine[]) => void>();
 
@@ -52,6 +36,34 @@ export function connectToProcessLogs(
 
     for (const callback of chunkCallbacks) callback(chunk.lines);
   });
+
+  const payload: LogsSubscribePayload = {
+    subscriberId,
+    processId,
+    tailLines: opts.tailLines,
+    reply: (result) => {
+      replied = true;
+      if (result.ok) {
+        initialLines = result.initialLines;
+      } else {
+        error = result.error;
+      }
+    },
+  };
+
+  events.emit(CHANNELS.LOGS_SUBSCRIBE, payload);
+
+  if (!replied) {
+    disposeChunkListener();
+    return {
+      ok: false,
+      error: "processes core extension did not reply to log subscription",
+    };
+  }
+  if (error) {
+    disposeChunkListener();
+    return { ok: false, error };
+  }
 
   return {
     initialLines,
@@ -86,8 +98,4 @@ function isProcessLogLine(line: unknown): line is ProcessLogLine {
     (line.type === "stdout" || line.type === "stderr") &&
     typeof line.text === "string"
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }

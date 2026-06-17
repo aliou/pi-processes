@@ -1,6 +1,7 @@
 import type { ProcessManager } from "../../../../src/manager";
 import type { ProcessInfo } from "../../../../src/types";
 import { LIVE_STATUSES } from "../../../../src/types";
+import { isRecord } from "../../../../src/utils/is-record";
 import type {
   LogMatcherConfig,
   NotificationRegistry,
@@ -275,10 +276,6 @@ function normalizeWatchRemoveSpecs(items: unknown[]): WatchRemoveSpec[] {
       `process update watches.items[${index}] requires either index or pattern for remove mode`,
     );
   });
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function formatUpdateDetails(details: UpdateDetails): string {

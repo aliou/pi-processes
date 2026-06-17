@@ -25,3 +25,4 @@ The agent starts managed processes with the `process` tool. The user can open `/
 - `s` cycles combined/stdout/stderr streams.
 - `f` toggles follow mode.
 - Closing the overlay unsubscribes cleanly; reopening shows fresh output.
+- Logs overlay settings affect row count, loaded history, and default follow mode after reopening.

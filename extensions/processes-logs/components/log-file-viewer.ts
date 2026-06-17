@@ -129,7 +129,6 @@ export class LogFileViewer {
   }
 
   render(width: number, height: number): string[] {
-    this.refreshMatches();
     const visible = this.visibleLines();
     if (visible.length === 0) {
       return this.renderEmpty(width, height);

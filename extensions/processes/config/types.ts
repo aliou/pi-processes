@@ -16,7 +16,6 @@ export interface InterceptionConfig {
 }
 
 export interface ProcessListConfig {
-  maxVisibleProcesses?: number;
   maxPreviewLines?: number;
 }
 

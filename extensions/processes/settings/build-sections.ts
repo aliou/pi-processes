@@ -29,7 +29,7 @@ export function buildSections(
 ): SettingsSection[] {
   const scopedConfig = structuredClone(tabConfig ?? {}) as ProcessConfig;
 
-  const executionSection: SettingsSection = {
+  const coreSection: SettingsSection = {
     label: "Core",
     items: [
       buildShellPathItem(scopedConfig, resolved, ctx),
@@ -48,7 +48,7 @@ export function buildSections(
     items: [buildLogsDetailItem(scopedConfig, resolved, ctx)],
   };
 
-  return [executionSection, logsSection];
+  return [coreSection, logsSection];
 }
 
 function buildShellPathItem(
@@ -114,9 +114,6 @@ function buildLogsDetailItem(
   resolved: ProcessProtocolConfig,
   ctx: BuildSectionsContext,
 ): SettingItem {
-  const maxVisibleTabs =
-    scopedConfig.processList?.maxVisibleProcesses ??
-    resolved.processList.maxVisibleProcesses;
   const viewportRows =
     scopedConfig.processList?.maxPreviewLines ??
     resolved.processList.maxPreviewLines;
@@ -133,7 +130,6 @@ function buildLogsDetailItem(
       "Open focused settings for /ps:logs tabs, history, viewport, and follow behavior.",
     submenu: (_current, done) => {
       const current = scopedConfig;
-      let nextMaxVisibleTabs = String(maxVisibleTabs);
       let nextViewportRows = String(viewportRows);
       let nextHistoryLines = String(historyLines);
       let nextFollowByDefault = followByDefault;
@@ -146,7 +142,6 @@ function buildLogsDetailItem(
           ...current,
           processList: {
             ...current.processList,
-            maxVisibleProcesses: parsePositiveInt(nextMaxVisibleTabs),
             maxPreviewLines: parsePositiveInt(nextViewportRows),
           },
           output: {
@@ -166,19 +161,6 @@ function buildLogsDetailItem(
         title: "Logs overlay",
         theme: ctx.theme,
         fields: [
-          {
-            id: "logs.maxVisibleTabs",
-            type: "text",
-            label: "Max visible tabs",
-            description:
-              "Maximum process tabs shown before overflow indicators appear.",
-            getValue: () => nextMaxVisibleTabs,
-            setValue: (value) => {
-              nextMaxVisibleTabs = value;
-              syncDraft();
-            },
-            validate: positiveIntegerError,
-          },
           {
             id: "logs.viewportRows",
             type: "text",

@@ -21,13 +21,6 @@ describe("applySettingChange", () => {
     expect(off?.interception?.blockBackgroundCommands).toBe(false);
   });
 
-  it("converts '(default)' sentinel to empty string for shellPath", () => {
-    const result = applySettingChange("execution.shellPath", "(default)", {
-      execution: { shellPath: "/bin/zsh" },
-    });
-    expect(result?.execution?.shellPath).toBe("");
-  });
-
   it("returns null for non-core setting IDs", () => {
     expect(
       applySettingChange("follow.enabledByDefault", "off", base),

@@ -13,6 +13,7 @@ import {
   CHANNELS,
   type ProcessesChangedPayload,
   type ProcessProtocolConfig,
+  type ProcessProtocolNotificationPayload,
 } from "../../../src/protocol";
 import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
 import { formatRuntime, truncateCmd } from "../../../src/utils/format";
@@ -42,6 +43,15 @@ const MIN_OVERLAY_WIDTH = 80;
 const MIN_OVERLAY_HEIGHT = 12;
 const OVERLAY_FRACTION = 0.9;
 const MAX_TAB_NAME = 12;
+const MAX_NOTIFY_MARKERS_PER_PROCESS = 100;
+
+interface NotifyMatchMark {
+  pattern: string;
+  line: string;
+  stream: "stdout" | "stderr";
+  matcherIndex: number;
+  timestamp: number;
+}
 
 export class LogOverlayComponent implements Component {
   private processes: ProcessInfo[] = [];
@@ -55,6 +65,8 @@ export class LogOverlayComponent implements Component {
   private hasSeenRunningProcess = false;
   private readonly disposers: Array<() => void> = [];
   private disposed = false;
+  /** Per-process notify log-match markers, capped per process. */
+  private readonly notifyMarkers = new Map<string, NotifyMatchMark[]>();
 
   constructor(private readonly opts: LogOverlayOptions) {
     this.configureSearchInput();
@@ -65,6 +77,35 @@ export class LogOverlayComponent implements Component {
         if (isChangedPayload(payload)) this.handleProcessesChanged(payload);
       }),
     );
+    this.disposers.push(
+      opts.events.on(CHANNELS.NOTIFICATION, (payload) => {
+        this.handleNotification(payload);
+      }),
+    );
+  }
+
+  private handleNotification(payload: unknown): void {
+    if (!isLogMatchNotification(payload)) return;
+    const mark: NotifyMatchMark = {
+      pattern: payload.logMatch.pattern,
+      line: payload.logMatch.line,
+      stream: payload.logMatch.stream,
+      matcherIndex: payload.logMatch.matcherIndex,
+      timestamp: payload.timestamp,
+    };
+
+    const list = this.notifyMarkers.get(payload.processId) ?? [];
+    list.push(mark);
+    if (list.length > MAX_NOTIFY_MARKERS_PER_PROCESS) {
+      list.splice(0, list.length - MAX_NOTIFY_MARKERS_PER_PROCESS);
+    }
+    this.notifyMarkers.set(payload.processId, list);
+
+    const selected = this.selectedProcess();
+    if (selected && selected.id === payload.processId) {
+      this.viewer?.addNotifyMatch(mark);
+      this.opts.tui.requestRender();
+    }
   }
 
   render(width: number): string[] {
@@ -338,6 +379,8 @@ export class LogOverlayComponent implements Component {
       followEnabled: this.opts.config.follow.enabledByDefault,
       maxBufferLines: this.opts.config.output.maxOutputLines,
     });
+    const stored = this.notifyMarkers.get(selected.id);
+    if (stored) for (const mark of stored) this.viewer.addNotifyMatch(mark);
     connection.onChunk((lines: ProcessLogLine[]) => {
       this.viewer?.appendLines(lines);
       this.opts.tui.requestRender();
@@ -582,4 +625,24 @@ function isChangedPayload(
       payload.reason === "ended" ||
       payload.reason === "cleared")
   );
+}
+
+function isLogMatchNotification(
+  payload: unknown,
+): payload is ProcessProtocolNotificationPayload & {
+  kind: "log_match";
+  logMatch: NonNullable<ProcessProtocolNotificationPayload["logMatch"]>;
+} {
+  if (!isRecord(payload)) return false;
+  if (payload.kind !== "log_match") return false;
+  if (typeof payload.processId !== "string") return false;
+  if (typeof payload.timestamp !== "number") return false;
+  const logMatch = payload.logMatch;
+  if (!isRecord(logMatch)) return false;
+  if (typeof logMatch.pattern !== "string") return false;
+  if (typeof logMatch.line !== "string") return false;
+  if (logMatch.stream !== "stdout" && logMatch.stream !== "stderr")
+    return false;
+  if (typeof logMatch.matcherIndex !== "number") return false;
+  return true;
 }

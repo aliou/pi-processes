@@ -18,6 +18,7 @@ export class LogFileViewer {
   private searchMatches: number[] = [];
   private searchCurrentMatch = -1;
   private centerTarget: number | null = null;
+  private readonly notifyLines = new Set<string>();
 
   constructor(
     initialLines: ProcessLogLine[],
@@ -104,6 +105,23 @@ export class LogFileViewer {
     this.searchCurrentMatch = -1;
   }
 
+  /**
+   * Records a notify log-match marker. Lines whose text equals the matched
+   * line are highlighted distinctly from manual search matches and with lower
+   * priority (search current match > search match > notify match > stream).
+   */
+  addNotifyMatch(match: { line: string }): void {
+    if (match.line) this.notifyLines.add(match.line);
+  }
+
+  clearNotifyMatches(): void {
+    this.notifyLines.clear();
+  }
+
+  getNotifyMatchCount(): number {
+    return this.notifyLines.size;
+  }
+
   nextMatch(): void {
     if (this.searchMatches.length === 0) return;
     this.searchCurrentMatch =
@@ -165,6 +183,9 @@ export class LogFileViewer {
       }
       if (matchSet.has(visibleIndex)) {
         return truncateToWidth(this.theme.fg("warning", text), width);
+      }
+      if (this.notifyLines.has(line.text)) {
+        return truncateToWidth(this.theme.underline(text), width);
       }
       if (line.type === "stderr") {
         return truncateToWidth(this.theme.fg("warning", text), width);

@@ -22,4 +22,7 @@ export const CHANNELS = {
   LOGS_SUBSCRIBE: "processes:logs:subscribe",
   LOGS_UNSUBSCRIBE: "processes:logs:unsubscribe",
   LOGS_CHUNK: "processes:logs:chunk",
+
+  // Notification fanout (core emits, UI + core delivery listen)
+  NOTIFICATION: "processes:notification",
 } as const;

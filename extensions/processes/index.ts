@@ -2,6 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getManager } from "../../src/get-manager";
 import { configLoader } from "./config";
 import { registerCommandHandlers } from "./handlers/commands";
+import { registerNotificationDelivery } from "./handlers/notifications";
 import { registerRequestHandlers } from "./handlers/requests";
 import { registerLogSubscriptions } from "./handlers/subscriptions";
 import { registerBackgroundBlocker } from "./hooks/background-blocker";
@@ -33,7 +34,7 @@ export default async function processesExtension(
   });
   const notifications = createNotificationRegistry();
   const notificationService = createNotificationService({
-    pi,
+    events: pi.events,
     manager,
     registry: notifications,
     getProcess: (id) => manager.get(id),
@@ -46,6 +47,7 @@ export default async function processesExtension(
     registerRequestHandlers(pi.events, manager, getConfig),
     registerCommandHandlers(pi.events, manager, notifications),
     registerLogSubscriptions(pi.events, manager),
+    registerNotificationDelivery(pi.events, pi),
   ];
 
   registerBackgroundBlocker(

@@ -1,5 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { LogFileViewer } from "./log-file-viewer";
 
 function makeTheme(): Theme {
@@ -8,7 +8,7 @@ function makeTheme(): Theme {
     bg: (_color: string, text: string) => text,
     bold: (text: string) => `[b]${text}[/b]`,
     italic: (text: string) => text,
-    underline: (text: string) => text,
+    underline: (text: string) => `[u]${text}[/u]`,
     inverse: (text: string) => `[inv]${text}[/inv]`,
     strikethrough: (text: string) => text,
   } as unknown as Theme;
@@ -139,5 +139,56 @@ describe("LogFileViewer", () => {
 
     const lines = trimLines(viewer.render(20, 5));
     expect(lines[4]).toBe("line 14");
+  });
+
+  it("highlights notify log-match lines with lower priority than search", () => {
+    const underline = vi.fn((text: string) => text);
+    const theme = {
+      ...makeTheme(),
+      underline,
+    } as unknown as Theme;
+    const viewer = new LogFileViewer(
+      [
+        { type: "stdout", text: "match" },
+        { type: "stdout", text: "other" },
+      ],
+      theme,
+      { followEnabled: false, maxBufferLines: 10 },
+    );
+
+    viewer.addNotifyMatch({ line: "match" });
+    expect(viewer.getNotifyMatchCount()).toBe(1);
+
+    viewer.render(100, 2);
+    // Notify match line is underlined...
+    expect(underline).toHaveBeenCalledTimes(1);
+    expect(underline.mock.calls[0][0].trim()).toBe("match");
+  });
+
+  it("search matches take priority over notify matches", () => {
+    const underline = vi.fn((text: string) => text);
+    const inverse = vi.fn((text: string) => text);
+    const bold = vi.fn((text: string) => text);
+    const theme = {
+      ...makeTheme(),
+      underline,
+      inverse,
+      bold,
+    } as unknown as Theme;
+    const viewer = new LogFileViewer(
+      [{ type: "stdout", text: "match" }],
+      theme,
+      { followEnabled: false, maxBufferLines: 10 },
+    );
+
+    viewer.addNotifyMatch({ line: "match" });
+    viewer.setSearch("match");
+
+    viewer.render(100, 1);
+    // Current search match is bold+inverse, not underline-only.
+    expect(inverse).toHaveBeenCalledTimes(1);
+    expect(inverse.mock.calls[0][0].trim()).toBe("match");
+    expect(bold).toHaveBeenCalled();
+    expect(underline).not.toHaveBeenCalled();
   });
 });

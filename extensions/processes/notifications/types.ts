@@ -1,38 +1,11 @@
-import type {
-  ProcessEndReason,
-  ProcessSignalInfo,
-  ProcessStatus,
-} from "../../../src/types";
-
-export type Attention = "turn" | "context" | "ignore";
-
-export type ProcessNotificationKind =
-  | "success"
-  | "failure"
-  | "crash"
-  | "killed"
-  | "timeout"
-  | "log_match";
-
-export interface ProcessNotificationLogMatchDetails {
-  pattern: string;
-  mode: "literal" | "regex";
-  stream: "stdout" | "stderr";
-  line: string;
-  matcherIndex: number;
-}
-
-export interface ProcessNotificationDetails {
-  kind: ProcessNotificationKind;
-  processId: string;
-  processName: string;
-  command: string;
-  timestamp: number;
-  summary: string;
-  status?: ProcessStatus;
-  exitCode?: number | null;
-  endReason?: ProcessEndReason | null;
-  signal?: ProcessSignalInfo | null;
-  logMatch?: ProcessNotificationLogMatchDetails;
-  attention: Attention;
-}
+// Re-export the protocol-safe notification types so the core extension and the
+// protocol layer cannot drift apart. The canonical shape lives in
+// `src/protocol/notifications.ts`; these names keep existing import sites
+// stable while guaranteeing structural compatibility with the events emitted on
+// CHANNELS.NOTIFICATION.
+export type {
+  ProcessProtocolAttention as Attention,
+  ProcessProtocolNotificationKind as ProcessNotificationKind,
+  ProcessProtocolNotificationLogMatch as ProcessNotificationLogMatchDetails,
+  ProcessProtocolNotificationPayload as ProcessNotificationDetails,
+} from "../../../src/protocol";

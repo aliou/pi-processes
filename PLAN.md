@@ -137,7 +137,7 @@ Implemented and validated in Phase 2F:
 - Unit tests for config, build-sections, apply-setting-change, background-blocker, and i18n.
 
 Current intentional gaps:
-- No logs/dock UI extensions yet.
+- No dock UI extension yet (`extensions/processes-dock/` is the next phase).
 - Keybindings are managed by Pi's built-in KeybindingsManager; not in extension config.
 - `clear` and `write` tool actions are deferred. The agent can `read` log file paths returned by `list` or `output` for full-log access.
 - `package.json` still references `./skills/pi-processes`, but the local `skills/` directory is absent. Either restore the skill later or remove the `pi.skills`/`files` entries during cleanup.
@@ -1013,6 +1013,10 @@ After Phase 2F:
 
 ## Phase 3: Logs Extension (`extensions/processes-logs/`)
 
+### Status
+
+Phase 3 is complete. The logs extension is registered in `package.json`, `/ps:logs` opens a tabbed overlay backed by the log subscription protocol, and the extension has unit tests for the protocol client, completions, and the `LogFileViewer` (render, scroll, search, stream filter, follow, notify-match highlighting). The `LogOverlayComponent` itself is covered indirectly through its dependencies plus a manual/e2e pass, since there is no TUI test harness.
+
 ### Goal
 
 Own `/ps:logs` only. The logs extension is focused on process output: selecting a process, viewing live logs, scrolling, searching, stream filtering, and follow mode. It does not own process-management controls such as kill or clear.
@@ -1132,6 +1136,20 @@ function connectToProcessLogs(
 ---
 
 ## Phase 3 bis: Notification Event Fanout and Log-Match Highlighting
+
+### Status
+
+Phase 3 bis is complete. Notification flow is now event-driven: `NotificationService` emits a protocol-safe payload on `CHANNELS.NOTIFICATION`, a core delivery listener converts the payload back into a persisted `ad-process:notification` custom message with attention-derived send options, and the logs overlay consumes the same channel to highlight matched log lines. Lifecycle and log-match notifications behave exactly as before; only the delivery path changed.
+
+Implemented:
+- `CHANNELS.NOTIFICATION` channel and `ProcessProtocolNotificationPayload` protocol type in `src/protocol/notifications.ts` (re-exported from `src/protocol/index.ts`).
+- Extension notification types now re-export the protocol types so the two cannot drift.
+- `NotificationService` takes `events: EventBus` and emits payloads instead of calling `pi.sendMessage`.
+- `attentionToSendOptions` moved to `extensions/processes/notification-sender.ts` and is reused by the delivery listener.
+- `extensions/processes/handlers/notifications.ts` delivery listener with malformed-payload guarding; wired into `extensions/processes/index.ts` disposers (disposed before the manager is killed on `session_shutdown`).
+- `/ps:logs` listens for `kind === "log_match"` notifications, stores per-process match markers (capped at 100 per process), forwards markers to the focused viewer, and replays stored markers on tab switch.
+- `LogFileViewer` underlines notify-match lines with lower priority than manual search (current search match > search match > notify match > stream/stderr color).
+- Tests: service tests rewritten to assert on emitted events; delivery handler tests; viewer notify-highlight and priority tests.
 
 ### Goal
 

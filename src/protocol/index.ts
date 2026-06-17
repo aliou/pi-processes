@@ -12,6 +12,12 @@ export type {
   LogsUnsubscribePayload,
 } from "./logs";
 export type {
+  ProcessProtocolAttention,
+  ProcessProtocolNotificationKind,
+  ProcessProtocolNotificationLogMatch,
+  ProcessProtocolNotificationPayload,
+} from "./notifications";
+export type {
   ProcessProtocolConfig,
   RequestCombinedOutputPayload,
   RequestConfigPayload,

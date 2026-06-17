@@ -1,8 +1,8 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { EventBus } from "@earendil-works/pi-coding-agent";
 
 import type { ProcessManager } from "../../../src/manager";
+import { CHANNELS } from "../../../src/protocol";
 import type { ManagerEvent, ProcessInfo } from "../../../src/types";
-import { sendProcessNotificationMessage } from "../notification-sender";
 import { classifyProcessEnd } from "./classify";
 import {
   type CompiledLogMatcher,
@@ -31,7 +31,14 @@ const DEFAULT_ATTENTION: Record<
 };
 
 export interface NotificationServiceDeps {
-  pi: ExtensionAPI;
+  /**
+   * Event bus used to fan out notification events on CHANNELS.NOTIFICATION.
+   * The service never calls pi.sendMessage directly; a core delivery listener
+   * converts the emitted payload into a persisted custom message. This keeps
+   * notification flow event-driven and lets UI extensions observe the same
+   * events (e.g. for log-match highlighting).
+   */
+  events: EventBus;
   manager: ProcessManager;
   registry: NotificationRegistry;
   getProcess: (id: string) => ProcessInfo | null;
@@ -46,7 +53,7 @@ interface ProcessMatcherState {
 export function createNotificationService(deps: NotificationServiceDeps): {
   dispose: () => void;
 } {
-  const { pi, manager, registry, getProcess } = deps;
+  const { events, manager, registry, getProcess } = deps;
   let disposed = false;
   const matcherStates = new Map<string, ProcessMatcherState>();
 
@@ -98,9 +105,7 @@ export function createNotificationService(deps: NotificationServiceDeps): {
       attention === "ignore" && shouldForceDisplay ? "context" : attention;
 
     const details = buildLifecycleDetails(info, kind, effectiveAttention);
-    const sendOptions = attentionToSendOptions(effectiveAttention);
-
-    sendProcessNotificationMessage(pi, details, sendOptions);
+    events.emit(CHANNELS.NOTIFICATION, details);
 
     cleanupMatcherState(info.id);
     registry.unregister(info.id);
@@ -135,8 +140,7 @@ export function createNotificationService(deps: NotificationServiceDeps): {
         attention,
         now,
       );
-      const sendOptions = attentionToSendOptions(attention);
-      sendProcessNotificationMessage(pi, details, sendOptions);
+      events.emit(CHANNELS.NOTIFICATION, details);
     }
   }
 
@@ -235,20 +239,6 @@ export function createNotificationService(deps: NotificationServiceDeps): {
       },
       attention,
     };
-  }
-
-  function attentionToSendOptions(attention: Attention): {
-    triggerTurn: boolean;
-    deliverAs: "steer" | "followUp" | "nextTurn";
-  } {
-    switch (attention) {
-      case "turn":
-        return { triggerTurn: true, deliverAs: "steer" };
-      case "context":
-        return { triggerTurn: false, deliverAs: "steer" };
-      case "ignore":
-        return { triggerTurn: false, deliverAs: "steer" };
-    }
   }
 
   function syncMatcherState(

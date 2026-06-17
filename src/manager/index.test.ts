@@ -15,9 +15,6 @@ import type { ManagerEvent } from "../types";
 import { LIVE_STATUSES } from "../types";
 import { ProcessManager } from ".";
 
-vi.mock("node:fs");
-vi.mock("node:fs/promises");
-
 const fakeProcesses = new Map<number, FakeChildProcess>();
 let nextPid = 10_000;
 

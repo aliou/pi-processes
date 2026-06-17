@@ -1,8 +1,5 @@
 import { fs, vol } from "memfs";
-import { assert, beforeEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("node:fs");
-vi.mock("node:fs/promises");
+import { assert, beforeEach, describe, expect, it } from "vitest";
 
 import { ProcessLogStore } from "./process-log-store";
 

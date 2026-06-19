@@ -62,6 +62,10 @@ export interface ProcessProtocolConfig {
     enabledByDefault: boolean;
     autoHideOnFinish: boolean;
   };
+  widget: {
+    dockDefaultState: "closed" | "collapsed" | "expanded";
+    dockHeight: number;
+  };
 }
 
 export interface RequestConfigPayload {

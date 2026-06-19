@@ -29,6 +29,11 @@ export interface FollowConfig {
   autoHideOnFinish?: boolean;
 }
 
+export interface WidgetConfig {
+  dockDefaultState?: "closed" | "collapsed" | "expanded";
+  dockHeight?: number;
+}
+
 export interface ProcessConfig {
   $schema?: string;
   execution?: ExecutionConfig;
@@ -36,6 +41,7 @@ export interface ProcessConfig {
   processList?: ProcessListConfig;
   output?: OutputConfig;
   follow?: FollowConfig;
+  widget?: WidgetConfig;
 }
 
 export type { ProcessProtocolConfig };

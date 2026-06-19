@@ -45,7 +45,10 @@ export function buildSections(
 
   const logsSection: SettingsSection = {
     label: "Interfaces",
-    items: [buildLogsDetailItem(scopedConfig, resolved, ctx)],
+    items: [
+      buildLogsDetailItem(scopedConfig, resolved, ctx),
+      buildDockDetailItem(scopedConfig, resolved, ctx),
+    ],
   };
 
   return [coreSection, logsSection];
@@ -213,6 +216,78 @@ function buildLogsDetailItem(
         ],
         getDoneSummary: () =>
           `${parsePositiveInt(nextHistoryLines)} lines · ${parsePositiveInt(nextViewportRows)} rows · ${nextFollowByDefault ? "follow" : "manual"}`,
+        onDone: (summary) => done(summary),
+      });
+    },
+  };
+}
+
+function buildDockDetailItem(
+  scopedConfig: ProcessConfig,
+  resolved: ProcessProtocolConfig,
+  ctx: BuildSectionsContext,
+): SettingItem {
+  const dockDefaultState =
+    scopedConfig.widget?.dockDefaultState ?? resolved.widget.dockDefaultState;
+  const dockHeight =
+    scopedConfig.widget?.dockHeight ?? resolved.widget.dockHeight;
+
+  return {
+    id: "dock.details",
+    label: "Dock",
+    currentValue: `${dockDefaultState} · ${dockHeight} lines`,
+    description:
+      "Open focused settings for the /ps:dock widget above the editor.",
+    submenu: (_current, done) => {
+      const current = scopedConfig;
+      let nextDockDefaultState = dockDefaultState;
+      let nextDockHeight = String(dockHeight);
+
+      const syncDraft = () => {
+        ctx.setDraft({
+          ...current,
+          widget: {
+            ...current.widget,
+            dockDefaultState: nextDockDefaultState,
+            dockHeight: parsePositiveInt(nextDockHeight),
+          },
+        });
+      };
+
+      return new SettingsDetailEditor({
+        title: "Dock",
+        theme: ctx.theme,
+        fields: [
+          {
+            id: "dock.defaultState",
+            type: "enum",
+            label: "Default state",
+            description: "Initial state, also used when a new process starts.",
+            options: ["closed", "collapsed", "expanded"],
+            getValue: () => nextDockDefaultState,
+            setValue: (value) => {
+              nextDockDefaultState = value as
+                | "closed"
+                | "collapsed"
+                | "expanded";
+              syncDraft();
+            },
+          },
+          {
+            id: "dock.height",
+            type: "text",
+            label: "Number of lines displayed",
+            description: "Maximum rows rendered by the dock.",
+            getValue: () => nextDockHeight,
+            setValue: (value) => {
+              nextDockHeight = value;
+              syncDraft();
+            },
+            validate: positiveIntegerError,
+          },
+        ],
+        getDoneSummary: () =>
+          `${nextDockDefaultState} · ${parsePositiveInt(nextDockHeight)} lines`,
         onDone: (summary) => done(summary),
       });
     },

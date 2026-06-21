@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.11.2
+
+### Patch Changes
+
+- [`63b08bc`](https://github.com/victor-software-house/pi-processes/commit/63b08bc3e0edf2b2f589a6159fc15379fcb5217c) Thanks [@any-victor](https://github.com/any-victor)! - Bump pi-render-core to 0.7.14 for WidthAwareText render cache fix.
+
 ## 0.11.1
 
 ### Patch Changes

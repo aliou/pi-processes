@@ -1,5 +1,5 @@
 import { createEventBus } from "@earendil-works/pi-coding-agent";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import type { ProcessProtocolNotificationPayload } from "../../../src/protocol";
 import { CHANNELS } from "../../../src/protocol";
 import type { ProcessInfo } from "../../../src/types";
@@ -526,6 +526,101 @@ describe("NotificationService", () => {
 
     expect(spy.emitted).toHaveLength(1);
     expect(registry.get("proc_1")).toBeNull();
+
+    service.dispose();
+  });
+
+  // --- Issue #54: stale logWatch notifications after clear ---
+  //
+  // When a process with a broad repeating watch finishes and is cleared,
+  // any not-yet-delivered log-match notifications for that process must be
+  // suppressed. The service achieves this by unregistering watches on
+  // process_ended (which runs before clear), so a later process_output_changed
+  // for the cleared id short-circuits (getWatchState returns null).
+
+  it("suppresses stale log-match notifications emitted after process_ended for a cleared process", async () => {
+    const fakeManager = createFakeManager();
+    const spy = createNotificationSpy();
+    const registry = createNotificationRegistry();
+
+    processes.set("proc_1", makeInfo({ id: "proc_1", status: "running" }));
+    registry.register("proc_1", {
+      logMatches: [{ pattern: "warning", repeat: true }],
+    });
+
+    const service = createNotificationService({
+      events: spy.events,
+      manager: fakeManager as never,
+      registry,
+      getProcess: (id) => processes.get(id) ?? null,
+    });
+
+    // Process emits a matching line while running -> one live notification.
+    fakeManager.emit({
+      type: "process_output_changed",
+      id: "proc_1",
+      appendedText: [{ type: "stdout", text: "warning: something" }],
+    });
+    expect(spy.emitted).toHaveLength(1);
+
+    // Process finishes. handleProcessEnded is deferred via microtask.
+    processes.set(
+      "proc_1",
+      makeInfo({
+        id: "proc_1",
+        status: "exited",
+        success: false,
+        exitCode: 1,
+        endReason: "exit",
+      }),
+    );
+    const endedInfo = processes.get("proc_1");
+    assert(endedInfo, "ended process should exist");
+    fakeManager.emit({
+      type: "process_ended",
+      info: endedInfo,
+    });
+    await flushQueuedMicrotasks();
+
+    // process_ended emits a lifecycle notification and unregisters watches.
+    const lifecycleEmits = spy.emitted.filter((e) => e.kind !== "log_match");
+    expect(lifecycleEmits).toHaveLength(1);
+    expect(registry.getWatchState("proc_1")).toBeNull();
+
+    // Clear: registry state is gone; simulate the manager having dropped the
+    // record. A belated process_output_changed for the cleared id arrives.
+    processes.delete("proc_1");
+    fakeManager.emit({
+      type: "process_output_changed",
+      id: "proc_1",
+      appendedText: [{ type: "stdout", text: "warning: stale line" }],
+    });
+
+    // No further log-match notification is produced for the cleared process.
+    expect(spy.emitted.filter((e) => e.kind === "log_match")).toHaveLength(1);
+
+    service.dispose();
+  });
+
+  it("does not emit log-match notifications for a process id that was never registered", () => {
+    const fakeManager = createFakeManager();
+    const spy = createNotificationSpy();
+    const registry = createNotificationRegistry();
+
+    const service = createNotificationService({
+      events: spy.events,
+      manager: fakeManager as never,
+      registry,
+      getProcess: (id) => processes.get(id) ?? null,
+    });
+
+    fakeManager.emit({
+      type: "process_output_changed",
+      id: "unknown_proc",
+      appendedText: [{ type: "stdout", text: "warning: anything" }],
+    });
+
+    expect(spy.emitted).toHaveLength(0);
 
     service.dispose();
   });

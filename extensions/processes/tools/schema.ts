@@ -144,9 +144,12 @@ const NotifyParams = Type.Object({
 });
 
 export const ProcessesParams = Type.Object({
-  action: StringEnum(["start", "list", "stop", "output", "update"] as const, {
-    description: "Action to perform.",
-  }),
+  action: StringEnum(
+    ["start", "list", "stop", "output", "update", "clear"] as const,
+    {
+      description: "Action to perform.",
+    },
+  ),
   name: Type.Optional(
     Type.String({ description: "Process name. Required for start." }),
   ),

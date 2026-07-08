@@ -8,6 +8,8 @@ import { type Component, Container, Text } from "@earendil-works/pi-tui";
 
 import type { ProcessManager } from "../../../src/manager";
 import type { NotificationRegistry } from "../notifications/registry";
+import { type ClearDetails, executeClear, formatClearDetails } from "./clear";
+import * as clearRender from "./clear/render";
 import { ToolLayout } from "./components";
 import { executeList, formatListDetails, type ListDetails } from "./list";
 import * as listRender from "./list/render";
@@ -34,7 +36,8 @@ type ProcessDetails =
   | ListDetails
   | StopDetails
   | OutputDetails
-  | UpdateDetails;
+  | UpdateDetails
+  | ClearDetails;
 
 export function registerProcessTool(
   pi: ExtensionAPI,
@@ -46,9 +49,9 @@ export function registerProcessTool(
       name: "process",
       label: "Process",
       description:
-        "Start, list, stop, update, and inspect output of long-running background processes.",
+        "Start, list, stop, update, clear, and inspect output of long-running background processes.",
       promptSnippet:
-        "Start, list, stop, update, and inspect output of long-running background processes.",
+        "Start, list, stop, update, clear, and inspect output of long-running background processes.",
       promptGuidelines: [
         "Use process when a command should keep running while the conversation continues, such as a dev server, watcher, or log tail.",
         "Use process start to start long-running background commands instead of shell background patterns like &, nohup, disown, or setsid.",
@@ -90,6 +93,8 @@ async function execute(
       return executeOutput(params, manager);
     case "update":
       return executeUpdate(params, manager, notifications);
+    case "clear":
+      return executeClear(manager);
     default:
       throw new Error(`unsupported process action: ${String(params.action)}`);
   }
@@ -119,6 +124,8 @@ function renderProcessCall(
       return new ToolLayout().setHeader(
         updateRender.buildHeader(args, theme, context),
       );
+    case "clear":
+      return new ToolLayout().setHeader(clearRender.buildHeader(args, theme));
     default:
       return fallbackContainer(theme);
   }
@@ -167,6 +174,10 @@ function buildBody(
       return options.expanded
         ? stopRender.buildExpanded(details, theme)
         : stopRender.buildCollapsed(details, theme);
+    case "clear":
+      return options.expanded
+        ? clearRender.buildExpanded(details, theme)
+        : clearRender.buildCollapsed(details, theme);
   }
 }
 
@@ -186,6 +197,8 @@ function buildFooter(
       return outputRender.buildFooter(details, options, theme);
     case "update":
       return updateRender.buildFooter(details, options, theme);
+    case "clear":
+      return clearRender.buildFooter(details, options, theme);
   }
 }
 
@@ -201,6 +214,8 @@ function formatDetails(details: ProcessDetails): string {
       return formatOutputDetails(details);
     case "update":
       return formatUpdateDetails(details);
+    case "clear":
+      return formatClearDetails(details);
   }
 }
 

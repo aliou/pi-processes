@@ -12,3 +12,13 @@ export interface CommandKillPayload {
 export interface CommandClearPayload {
   reply: (cleared: number) => void;
 }
+
+// UI emits; the dock extension (if loaded) handles it by pinning the process
+// to the dock. Pass `id: null` to unpin. If the dock extension is not
+// registered, no listener replies.
+export interface CommandPinPayload {
+  id: string | null;
+  reply: (result: CommandPinResult) => void;
+}
+
+export type CommandPinResult = { ok: true } | { ok: false; error: string };

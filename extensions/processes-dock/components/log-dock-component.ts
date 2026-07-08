@@ -42,14 +42,14 @@ export function renderLogDock(
   snapshot: LogDockSnapshot,
   theme: Theme,
   width: number,
-  height: number,
+  logRows: number,
 ): string[] {
   if (snapshot.state.visibility === "closed") return [];
   if (snapshot.processes.length === 0) return [];
 
   const body =
     snapshot.state.visibility === "expanded"
-      ? buildExpandedBody(snapshot, theme, Math.max(1, height - 4))
+      ? buildExpandedBody(snapshot, theme, Math.max(1, logRows))
       : buildCollapsedBody(snapshot, theme);
 
   return new Panel({
@@ -59,9 +59,7 @@ export function renderLogDock(
     padding: 0,
     borderStyle: (text) => theme.fg("dim", text),
     titleStyle: (text) => theme.fg("accent", theme.bold(text)),
-  })
-    .render(width)
-    .slice(0, height);
+  }).render(width);
 }
 
 function buildCollapsedBody(

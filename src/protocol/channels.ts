@@ -17,6 +17,8 @@ export const CHANNELS = {
   // Command channels (UI -> core, callback)
   COMMAND_KILL: "processes:command:kill",
   COMMAND_CLEAR: "processes:command:clear",
+  // Pin handled by the dock extension, if loaded.
+  COMMAND_PIN: "processes:command:pin",
 
   // Log subscription channels
   LOGS_SUBSCRIBE: "processes:logs:subscribe",

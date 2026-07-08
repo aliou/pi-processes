@@ -5,7 +5,12 @@ export type {
   ProcessesStartedPayload,
 } from "./broadcasts";
 export { CHANNELS } from "./channels";
-export type { CommandClearPayload, CommandKillPayload } from "./commands";
+export type {
+  CommandClearPayload,
+  CommandKillPayload,
+  CommandPinPayload,
+  CommandPinResult,
+} from "./commands";
 export type {
   LogsChunkPayload,
   LogsSubscribePayload,

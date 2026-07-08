@@ -151,6 +151,33 @@ describe("renderLogDock", () => {
     expect(lines.join("\n")).toContain("warn once");
   });
 
+  it("treats expanded height as log rows, not total widget rows", () => {
+    const lines = renderLogDock(
+      snapshot({
+        pinnedLines: [
+          { type: "stdout", text: "line one" },
+          { type: "stdout", text: "line two" },
+          { type: "stdout", text: "line three" },
+        ],
+        state: {
+          visibility: "expanded",
+          followEnabled: true,
+          focusedProcessId: "proc_1",
+        },
+      }),
+      makeTheme(),
+      100,
+      2,
+    );
+
+    // Chrome is added on top of the configured log rows:
+    // top border + process strip + rule + 2 log rows + bottom border.
+    expect(lines).toHaveLength(6);
+    expect(lines.join("\n")).toContain("line two");
+    expect(lines.join("\n")).toContain("line three");
+    expect(lines.join("\n")).not.toContain("line one");
+  });
+
   it("shows notification badges and highlights matching lines", () => {
     const lines = renderLogDock(
       snapshot({

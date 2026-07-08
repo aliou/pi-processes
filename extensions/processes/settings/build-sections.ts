@@ -235,7 +235,7 @@ function buildDockDetailItem(
   return {
     id: "dock.details",
     label: "Dock",
-    currentValue: `${dockDefaultState} · ${dockHeight} lines`,
+    currentValue: `${dockDefaultState} · ${dockHeight} log lines`,
     description:
       "Open focused settings for the /ps:dock widget above the editor.",
     submenu: (_current, done) => {
@@ -276,8 +276,9 @@ function buildDockDetailItem(
           {
             id: "dock.height",
             type: "text",
-            label: "Number of lines displayed",
-            description: "Maximum rows rendered by the dock.",
+            label: "Log lines displayed",
+            description:
+              "Maximum log/content rows shown inside the dock. Border, title, process strip, and separator are added on top.",
             getValue: () => nextDockHeight,
             setValue: (value) => {
               nextDockHeight = value;
@@ -287,7 +288,7 @@ function buildDockDetailItem(
           },
         ],
         getDoneSummary: () =>
-          `${nextDockDefaultState} · ${parsePositiveInt(nextDockHeight)} lines`,
+          `${nextDockDefaultState} · ${parsePositiveInt(nextDockHeight)} log lines`,
         onDone: (summary) => done(summary),
       });
     },

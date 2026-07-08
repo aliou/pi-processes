@@ -5,6 +5,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import {
   CHANNELS,
+  type CommandPinPayload,
   type ProcessesOutputChangedPayload,
   type ProcessProtocolNotificationPayload,
 } from "../../../src/protocol";
@@ -14,6 +15,7 @@ import {
   type ProcessLogLine,
   requestCombinedOutput,
   requestConfig,
+  requestProcess,
   requestProcessList,
 } from "../client";
 import { renderLogDock } from "../components/log-dock-component";
@@ -124,11 +126,6 @@ export function setupDockWidgets(
       const pinned = selectPinnedProcess(processes, current);
       if (!pinned) {
         state.actions.setFocus(null);
-      } else if (!LIVE_STATUSES.has(pinned.status)) {
-        const latestRunning = processes.find((process) =>
-          LIVE_STATUSES.has(process.status),
-        );
-        if (latestRunning) state.actions.setFocus(latestRunning.id);
       }
     }
 
@@ -142,7 +139,8 @@ export function setupDockWidgets(
 
     if (
       processes.length === 0 ||
-      (hasSeenRunningProcess &&
+      (!state.getState().focusedProcessId &&
+        hasSeenRunningProcess &&
         processes.every((process) => !LIVE_STATUSES.has(process.status)))
     ) {
       state.actions.close();
@@ -287,10 +285,51 @@ export function setupDockWidgets(
     render();
   };
 
+  const handlePin = (payload: unknown) => {
+    const command = payload as CommandPinPayload;
+    if (!isCommandPinPayload(command)) return;
+    // COMMAND_PIN can arrive before the dock's throttled CHANGED refresh has
+    // run. Refresh the local snapshot first so expand/pin renders immediately
+    // against the current process list.
+    processes = sortProcesses(requestProcessList(events));
+    // id: null unpins the dock (mirrors `/ps:pin clear`).
+    if (command.id === null) {
+      actions.setFocus(null);
+      actions.expand();
+      render();
+      safeReply(command.reply, { ok: true });
+      return;
+    }
+    const process = requestProcess(events, command.id);
+    if (!process) {
+      safeReply(command.reply, { ok: false, error: "Process not found" });
+      return;
+    }
+    if (
+      !LIVE_STATUSES.has(process.status) &&
+      actions.getFocusedProcessId() !== process.id
+    ) {
+      safeReply(command.reply, {
+        ok: false,
+        error: "Only running processes can be pinned",
+      });
+      return;
+    }
+    actions.setFocus(process.id);
+    actions.expand();
+    render();
+    safeReply(command.reply, { ok: true });
+  };
+
   disposers.push(events.on(CHANNELS.STARTED, handleStarted));
   disposers.push(events.on(CHANNELS.ENDED, scheduleRefresh));
   disposers.push(events.on(CHANNELS.CHANGED, scheduleRefresh));
   disposers.push(events.on(CHANNELS.OUTPUT_CHANGED, handleOutputChanged));
+  disposers.push(
+    events.on(CHANNELS.COMMAND_PIN, (payload) => {
+      handlePin(payload);
+    }),
+  );
   disposers.push(
     events.on(CHANNELS.NOTIFICATION, (payload) => {
       if (!isLogMatchNotification(payload)) return;
@@ -371,4 +410,21 @@ function isLogMatchNotification(
     isRecord(payload.logMatch) &&
     typeof payload.logMatch.line === "string"
   );
+}
+
+function isCommandPinPayload(payload: unknown): payload is CommandPinPayload {
+  return (
+    isRecord(payload) &&
+    (typeof payload.id === "string" || payload.id === null) &&
+    typeof payload.reply === "function"
+  );
+}
+
+function safeReply<T>(reply: (result: T) => void, result: T): void {
+  try {
+    reply(result);
+  } catch {
+    // Reply callbacks are owned by the requester.
+    return;
+  }
 }

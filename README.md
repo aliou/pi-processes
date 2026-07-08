@@ -89,7 +89,7 @@ Without arguments, Pi shows a picker.
 
 ## Control the dock
 
-Use `/ps:dock [show|hide|toggle]` to control dock visibility.
+Use `/ps:dock [expand|collapse|close]` to control dock visibility.
 
 The dock gives you a compact live view without leaving the conversation.
 
@@ -118,7 +118,7 @@ Available settings include:
 
 ## Runtime log watch alerts
 
-Use `process` tool `start` with `logWatches` to trigger immediate alerts while the process is still running.
+Use `process` tool `start` with `notify.logMatches` to trigger immediate alerts while the process is still running.
 
 - default behavior: each watch fires once (`repeat: false`)
 - set `repeat: true` to trigger on every match
@@ -131,9 +131,11 @@ Example: server ready marker (one-time default)
   "action": "start",
   "name": "dev-server",
   "command": "pnpm dev",
-  "logWatches": [
-    { "pattern": "ready on http://localhost:3000" }
-  ]
+  "notify": {
+    "logMatches": [
+      { "pattern": "ready on http://localhost:3000" }
+    ]
+  }
 }
 ```
 
@@ -144,9 +146,15 @@ Example: error marker from stderr
   "action": "start",
   "name": "builder",
   "command": "pnpm build --watch",
-  "logWatches": [
-    { "pattern": "TypeError|ReferenceError", "stream": "stderr" }
-  ]
+  "notify": {
+    "logMatches": [
+      {
+        "pattern": "TypeError|ReferenceError",
+        "mode": "regex",
+        "stream": "stderr"
+      }
+    ]
+  }
 }
 ```
 
@@ -157,9 +165,11 @@ Example: repeatable watch on stdout only
   "action": "start",
   "name": "worker",
   "command": "pnpm worker",
-  "logWatches": [
-    { "pattern": "job completed", "stream": "stdout", "repeat": true }
-  ]
+  "notify": {
+    "logMatches": [
+      { "pattern": "job completed", "stream": "stdout", "repeat": true }
+    ]
+  }
 }
 ```
 

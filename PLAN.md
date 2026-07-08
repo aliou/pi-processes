@@ -9,7 +9,7 @@ Rewrite `@aliou/pi-processes` from a single extension into a package exposing 3 
 
 The core extension registers `/ps` as the process overview/control UI. It is a full-screen editor-replacement panel for browsing processes, killing live processes, clearing finished processes, filtering/sorting the list, previewing recent output, and pinning live processes to the dock.
 
-The rewrite preserves the intended user-facing behavior. The LLM-facing `process` tool supports `start`, `list`, `stop`, `output`, and `update`. The `update` action allows renaming processes and mutating log watches on running processes.
+The rewrite preserves the intended user-facing behavior. The LLM-facing `process` tool supports `start`, `list`, `stop`, `output`, `update`, and `clear`. The `update` action allows renaming processes and mutating log watches on running processes.
 
 ---
 
@@ -136,13 +136,13 @@ Implemented and validated in Phase 2F:
 
 Current intentional gaps (tracked in NEXT.md):
 - `/ps` overview/control panel is implemented in the core extension.
-- No `clear` LLM tool action yet. The `COMMAND_CLEAR` protocol exists; the tool action is planned after `/ps`. The agent can `read` log file paths returned by `list` or `output` for full-log access meanwhile.
+  - `clear` LLM tool action is implemented and calls `ProcessManager.clearFinished()`.
 - `write` LLM tool action is intentionally not planned for the rewrite. `ProcessManager.writeToStdin()` exists in `src/` but is not exposed as a tool action.
 - `logs` LLM tool action was intentionally dropped as redundant; `list` and `output` return log file paths.
 - `debug-preview` is intentionally removed from the plan.
 - Keybindings are managed by Pi's built-in KeybindingsManager; not in extension config.
-- `package.json` still references `./skills/pi-processes`, but the local `skills/` directory is absent. Either restore the skill later or remove the `pi.skills`/`files` entries during cleanup.
-- Agent steering guidance (promptGuidelines rewrite, skill, steering text in tool output) is deferred to Phase 5.
+- `package.json` references `./skills/pi-processes`, and the local skill is restored.
+- Agent steering guidance is implemented in promptGuidelines, tool result text, and `skills/pi-processes/SKILL.md`.
 
 Integrated decisions:
 1. Cross-session persistence is deferred. It is not a `ProcessManager` option, not a process field, and not a tool parameter.
@@ -1260,7 +1260,7 @@ Needs to register on `session_start` to get `ctx` for widget management.
 
 #### `extensions/processes-dock/commands/dock.ts`
 
-The `/ps:dock` command handler. Controls dock visibility (show/hide/toggle).
+The `/ps:dock` command handler. Controls dock visibility (`expand`, `collapse`, `close`).
 
 #### `extensions/processes-dock/commands/pin.ts`
 
@@ -1303,7 +1303,7 @@ Same pattern as `extensions/processes-logs/logs-client.ts`. Encapsulates log sub
 
 1. Status widget shows below editor when enabled.
 2. Dock shows above editor.
-3. `/ps:dock show/hide/toggle` works.
+3. `/ps:dock expand/collapse/close` works.
 4. `/ps:pin` focuses dock on a process.
 5. Dock collapsed mode shows process names + last line.
 6. Dock open mode streams live output.
@@ -1325,13 +1325,13 @@ Stabilize the package, add agent steering guidance, and clean up dead code.
 
 Implemented in Phase 2G (`33df3b0`). Renames running processes and mutates log watches (append/replace/remove/clear). See Phase 2G status above for details.
 
-### Agent steering guidance
+### Agent steering guidance -- DONE
 
 Tighten promptGuidelines and ship the skill to steer agents away from common mistakes identified during PR #33 review.
 
-- Consolidate 8 promptGuidelines into ~5 tighter lines
-- Recreate `skills/pi-processes/SKILL.md` with expanded anti-patterns and bad/good examples
-- Add steering text to `formatStartDetails` and `formatOutputDetails`
+  - Consolidated promptGuidelines into 5 tighter lines.
+  - Restored `skills/pi-processes/SKILL.md` with expanded anti-patterns and bad/good examples.
+  - Added steering text to `formatStartDetails` and `formatOutputDetails`.
 
 See NEXT.md step 5 for full details.
 
@@ -1351,7 +1351,7 @@ See NEXT.md step 5 for full details.
 }
 ```
 
-If `skills/pi-processes/` is intentionally restored later, add it back to `pi.skills`. Do not keep a `pi.skills` entry pointing at a missing directory.
+`skills/pi-processes/` is restored and remains listed in `pi.skills`.
 
 #### 2. Delete any old Pi-aware `src/` files that moved to extensions
 
@@ -1557,7 +1557,7 @@ Design notes live in `docs/future-cleanup-hooks.md` until this phase is ready to
 Phases 1 through 4 (plus Phase 3 bis) are complete. Current user-visible state:
 
 Done:
-- The LLM-facing `process` tool exists with `start`, `list`, `stop`, `output`, and `update` actions.
+- The LLM-facing `process` tool exists with `start`, `list`, `stop`, `output`, `update`, and `clear` actions.
 - `/ps` overview/control panel is implemented in the core extension. It uses a local vendored header-capable panel, a fixed-height scrollable process-list content area, a bounded recent-output preview, colored statuses, filter/sort controls, clear/kill actions, and dock pin/unpin via `CHANNELS.COMMAND_PIN`.
 - `/ps:settings` works.
 - `/ps:logs` opens the logs-only subscription overlay with search, stream filter, follow, and notify-match highlighting.
@@ -1565,9 +1565,7 @@ Done:
 - `/ps:kill` and `/ps:clear` commands are wired through the core command protocol.
 
 Remaining (see NEXT.md):
-- `clear` LLM tool action: planned after `/ps`.
-- Agent steering guidance (promptGuidelines, skill, steering text in tool output).
-- Final package/config cleanup.
+  - Final issue audit before closing the rewrite.
 
 Intentionally not in the rewrite:
 - `write` LLM tool action (manager API exists, not exposed).

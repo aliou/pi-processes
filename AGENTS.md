@@ -4,7 +4,7 @@ Public Pi package for managing background processes. Exposes multiple Pi extensi
 
 ## Tool and command audience
 
-The `process` tool and all `/ps:*` commands are for **LLM use only**, not for users directly. Users can monitor processes via `/ps:logs` and kill them via `/ps:list`, but they should never be the ones starting processes -- that is the agent's job.
+The `process` tool and all `/ps:*` commands are for **LLM use only**, not for users directly. Users can monitor and control processes via `/ps` and `/ps:logs`, but they should never be the ones starting processes -- that is the agent's job.
 
 During UI tests that require processes to be running, either give the user a prompt to send to the agent (which will start the processes via the `process` tool), or use tmux to drive it programmatically. Never instruct the user to run shell commands manually.
 

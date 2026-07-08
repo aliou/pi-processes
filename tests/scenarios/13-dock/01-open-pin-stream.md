@@ -7,9 +7,9 @@ Do not stop them. After both processes start, list them and include their proces
 
 After the agent responds, I will manually test:
 
-1. `/ps:dock open` shows a framed dock with both processes.
+1. `/ps:dock expand` shows a framed dock with both processes.
 2. `/ps:pin <dock-mixed-id>` pins the mixed-output process.
 3. The dock log tail streams stdout and stderr live for the pinned process.
 4. `/ps:dock collapse` shows compact rows with last-line previews.
-5. `/ps:dock hide` removes the dock.
-6. `/ps:dock toggle` brings it back.
+5. `/ps:dock close` removes the dock.
+6. `/ps:dock expand` brings it back.

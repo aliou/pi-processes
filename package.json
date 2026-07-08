@@ -28,6 +28,9 @@
   "publishConfig": {
     "access": "public"
   },
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "files": [
     "src",
     "extensions",
@@ -38,23 +41,26 @@
   "dependencies": {
     "@aliou/pi-utils-settings": "^0.16.0",
     "@aliou/pi-utils-ui": "^0.5.0",
-    "@aliou/sh": "^0.1.0",
-    "typebox": "^1.0.0"
+    "@aliou/sh": "^0.1.0"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=0.74.0 <1",
-    "@earendil-works/pi-tui": ">=0.74.0 <1"
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
   },
   "devDependencies": {
     "@aliou/biome-plugins": "^0.8.1",
     "@biomejs/biome": "^2.4.15",
     "@changesets/cli": "^2.27.11",
-    "@earendil-works/pi-ai": "0.74.0",
-    "@earendil-works/pi-coding-agent": "0.74.0",
+    "@earendil-works/pi-ai": "0.80.3",
+    "@earendil-works/pi-coding-agent": "0.80.3",
+    "@earendil-works/pi-tui": "0.80.3",
     "@golevelup/ts-vitest": "^4.0.0",
     "@types/node": "^25.0.10",
     "husky": "^9.1.7",
     "memfs": "^4.57.2",
+    "typebox": "1.1.38",
     "typescript": "^5.9.3",
     "vitest": "^4.1.5"
   },
@@ -78,10 +84,16 @@
   },
   "packageManager": "pnpm@10.26.1",
   "peerDependenciesMeta": {
+    "@earendil-works/pi-ai": {
+      "optional": true
+    },
     "@earendil-works/pi-coding-agent": {
       "optional": true
     },
     "@earendil-works/pi-tui": {
+      "optional": true
+    },
+    "typebox": {
       "optional": true
     }
   }

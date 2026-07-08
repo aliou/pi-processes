@@ -23,6 +23,11 @@ You can then inspect, pin, or stop those processes from the UI.
 
 ## Installation
 
+Requirements:
+
+- Pi `0.80.3` or newer
+- Node.js `22.19.0` or newer for local development
+
 From npm:
 
 ```bash

@@ -10,11 +10,13 @@ During UI tests that require processes to be running, either give the user a pro
 
 ## Stack
 
-- TypeScript (strict mode), pnpm 10.26.1, Biome, Changesets
+- TypeScript (strict mode), Node.js >=22.19.0, pnpm 10.26.1, Biome, Changesets
+- The package targets Pi 0.80.3. Keep imported Pi-bundled packages in `peerDependencies` with `"*"` ranges and exact local versions in `devDependencies`: `@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`, and `typebox`.
 
 ## Scripts
 
 - `pnpm typecheck`, `pnpm lint`, `pnpm format`, `pnpm test`, `pnpm test:e2e`, `pnpm changeset`
+- Run `pnpm install` after package metadata changes and check Pi package resolution with `pnpm why @earendil-works/pi-tui` and `pnpm why @earendil-works/pi-ai`.
 
 ## Testing
 
@@ -33,9 +35,9 @@ Avoid fixed sleeps in both unit and e2e tests. Prefer event-driven helpers that 
 - `src/` - pi-agnostic process management (manager, types, protocol, utils). Zero pi imports.
 - `extensions/processes/` - core extension: tool registration, settings, hooks, event bridge, request/command handlers, `/ps` overview panel, `/ps:settings`
 - `extensions/processes-logs/` - `/ps:logs` command and log overlay
-- `extensions/processes-dock/` - `/ps:dock`, `/ps:pin` commands, dock widget, status widget, `COMMAND_PIN` handler
+- `extensions/processes-dock/` - `/ps:dock`, `/ps:pin` commands, dock widget, `COMMAND_PIN` handler
 
-See `PLAN.md` for the full architecture and implementation plan.
+Future design notes live in `docs/future-persistent-manager.md` and `docs/future-cleanup-hooks.md`. Keep implemented behavior in living docs and put new active plans under `.agents/plans/`.
 
 ## Rendering conventions
 

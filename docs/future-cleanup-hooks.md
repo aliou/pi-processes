@@ -1,8 +1,6 @@
 # Future Cleanup Hooks
 
-This document captures the post-rewrite design for generic cleanup hooks in `pi-processes`.
-
-This is not part of the current multi-extension rewrite. Finish the rewrite first, then implement this feature against the final architecture.
+This document captures a future design for generic cleanup hooks in `pi-processes`.
 
 ## Problem
 
@@ -81,7 +79,7 @@ The shared stop helper should be used by:
 
 A later part of this feature should let the agent or user attach, replace, or possibly remove cleanup metadata for an already-running process.
 
-This is needed because a future nudge system may detect a command that likely needs cleanup only after the command has already started.
+This is needed because a nudge system may detect a command that likely needs cleanup only after the command has already started.
 
 Potential model:
 

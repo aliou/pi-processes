@@ -130,9 +130,18 @@ function renderProcessCall(
 
 function renderProcessResult(
   result: { details?: unknown },
-  options: { expanded?: boolean },
+  options: { expanded?: boolean; isPartial?: boolean },
   theme: Theme,
+  context?: { isError?: boolean },
 ): Component {
+  if (options.isPartial) {
+    return fallbackContainer(theme, "process running...");
+  }
+
+  if (context?.isError) {
+    return fallbackContainer(theme, "process failed");
+  }
+
   const details = result.details as ProcessDetails | undefined;
 
   if (!details) {

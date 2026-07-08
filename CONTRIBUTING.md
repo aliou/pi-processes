@@ -8,6 +8,11 @@ Keep development details, testing notes, internal tool guidance, and docs build 
 
 ## Development
 
+Requirements:
+
+- Node.js `22.19.0` or newer
+- pnpm `10.26.1`
+
 Install dependencies:
 
 ```bash
@@ -17,20 +22,34 @@ pnpm install
 Run checks:
 
 ```bash
-pnpm lint
 pnpm typecheck
+pnpm lint
+pnpm test
+pnpm test:e2e
 ```
 
 ## Repository layout
 
-- `src/` - extension source
-- `src/tools/` - `process` tool and actions
-- `src/commands/` - `/ps` commands and settings UI
-- `src/hooks/` - lifecycle hooks, blocker, message rendering, widgets
-- `src/components/` - TUI components
+- `src/` - Pi-agnostic process management, types, protocol, and utilities
+- `extensions/processes/` - core extension, process tool, settings, lifecycle hooks, notifications, protocol handlers, `/ps`, and `/ps:settings`
+- `extensions/processes-logs/` - `/ps:logs` command and log overlay
+- `extensions/processes-dock/` - `/ps:dock`, `/ps:pin`, and the dock widget
 - `skills/` - shipped package skills
 - `.agents/skills/` - local repo-only skills for development workflows
 - `.github/docs-site/` - isolated docs page build
+
+## Package metadata
+
+The package targets Pi `0.80.3`.
+
+Pi bundles core packages for extensions. Keep direct imports of these packages in `peerDependencies` with `"*"` ranges and exact local versions in `devDependencies`:
+
+- `@earendil-works/pi-ai`
+- `@earendil-works/pi-coding-agent`
+- `@earendil-works/pi-tui`
+- `typebox`
+
+Keep normal third-party runtime dependencies in `dependencies`.
 
 ## Internal behavior
 

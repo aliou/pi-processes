@@ -1,6 +1,6 @@
 # Future Persistent Manager
 
-Phase 1 intentionally does not keep processes alive across `/reload`, `/new`, or `/fork`. The core extension owns one `ProcessManager` in its extension closure and shuts it down with `manager.killAll()` and `manager.cleanup()` during `session_shutdown`.
+The current implementation does not keep processes alive across `/reload`, `/new`, or `/fork`. The core extension owns one `ProcessManager` in its extension closure and shuts it down with `manager.killAll()` and `manager.cleanup()` during `session_shutdown`.
 
 This document describes how to add cross-session persistence later if we decide the UX is worth the extra lifecycle complexity.
 

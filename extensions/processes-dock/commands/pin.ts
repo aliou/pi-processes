@@ -65,7 +65,7 @@ async function pickPinTarget(
   events: EventBus,
   controller: DockController,
 ): Promise<string | null> {
-  if (!ctx.hasUI) {
+  if (ctx.mode !== "tui") {
     report(ctx, "Usage: /ps:pin <process-id|clear>", "warning");
     return null;
   }
@@ -94,28 +94,32 @@ async function pickPinTarget(
     return null;
   }
 
-  return ctx.ui.custom<string | null>((tui, theme, _keybindings, done) => {
-    const list = new SelectList(
-      items,
-      Math.min(items.length, 10),
-      getSelectListTheme(),
-    );
-    list.onSelect = (item) => done(String(item.value));
-    list.onCancel = () => done(null);
+  const result = await ctx.ui.custom<string | null>(
+    (tui, theme, _keybindings, done) => {
+      const list = new SelectList(
+        items,
+        Math.min(items.length, 10),
+        getSelectListTheme(),
+      );
+      list.onSelect = (item) => done(String(item.value));
+      list.onCancel = () => done(null);
 
-    return {
-      render: (width: number) => [
-        theme.fg("muted", "─".repeat(Math.max(0, width))),
-        ...list.render(width),
-        theme.fg("muted", "─".repeat(Math.max(0, width))),
-      ],
-      invalidate: () => list.invalidate(),
-      handleInput: (data: string) => {
-        list.handleInput(data);
-        tui.requestRender();
-      },
-    };
-  });
+      return {
+        render: (width: number) => [
+          theme.fg("muted", "─".repeat(Math.max(0, width))),
+          ...list.render(width),
+          theme.fg("muted", "─".repeat(Math.max(0, width))),
+        ],
+        invalidate: () => list.invalidate(),
+        handleInput: (data: string) => {
+          list.handleInput(data);
+          tui.requestRender();
+        },
+      };
+    },
+  );
+
+  return result ?? null;
 }
 
 function completions(

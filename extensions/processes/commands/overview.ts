@@ -50,9 +50,11 @@ async function openOverview(
     return;
   }
 
-  if (!ctx.hasUI) {
+  if (ctx.mode !== "tui") {
     const processes = requestProcessList(options.events);
-    console.log(formatPlainProcessList(processes));
+    const message = formatPlainProcessList(processes);
+    if (ctx.hasUI) ctx.ui.notify(message, "info");
+    else console.log(message);
     return;
   }
 
@@ -64,22 +66,29 @@ async function openOverview(
     return;
   }
 
-  await ctx.ui.custom<"closed">((tui, theme: Theme, _keybindings, done) => {
-    let unregister: () => void = () => undefined;
-    const overlay = new OverviewComponent({
-      events: options.events,
-      tui,
-      theme,
-      config,
-      initialProcessId,
-      onClose: () => {
-        unregister();
-        done("closed");
-      },
-    });
-    unregister = options.registerOverlay(overlay);
-    return overlay;
-  });
+  const result = await ctx.ui.custom<"closed">(
+    (tui, theme: Theme, _keybindings, done) => {
+      let unregister: () => void = () => undefined;
+      const overlay = new OverviewComponent({
+        events: options.events,
+        tui,
+        theme,
+        config,
+        initialProcessId,
+        onClose: () => {
+          unregister();
+          done("closed");
+        },
+      });
+      unregister = options.registerOverlay(overlay);
+      return overlay;
+    },
+  );
+
+  if (result === undefined) {
+    const processes = requestProcessList(options.events);
+    ctx.ui.notify(formatPlainProcessList(processes), "info");
+  }
 }
 
 function formatPlainProcessList(processes: ProcessInfo[]): string {

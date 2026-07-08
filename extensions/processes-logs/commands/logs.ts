@@ -47,9 +47,11 @@ async function openLogs(
     return;
   }
 
-  if (!ctx.hasUI) {
+  if (ctx.mode !== "tui") {
     const processes = requestProcessList(options.events);
-    console.log(formatPlainProcessList(processes));
+    const message = formatPlainProcessList(processes);
+    if (ctx.hasUI) ctx.ui.notify(message, "info");
+    else console.log(message);
     return;
   }
 

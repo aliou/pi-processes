@@ -14,10 +14,9 @@ The agent starts managed processes with the `process` tool. The user can show, h
 
 ## Manual checklist
 
-- `/ps:dock open` shows a framed dock above the editor.
+- `/ps:dock expand` shows a framed dock above the editor.
 - `/ps:dock collapse` shows compact rows with process previews.
-- `/ps:dock hide` removes the dock.
-- `/ps:dock toggle` cycles hidden, collapsed, open.
+- `/ps:dock close` removes the dock.
 - `/ps:pin <process-id>` selects which process the dock shows and opens the dock.
 - Open mode streams live output for the pinned process.
 - Collapsed mode updates last-line previews.

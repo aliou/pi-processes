@@ -14,6 +14,7 @@ interface CleanupHookDeps {
   notifications: NotificationRegistry;
   notificationService: NotificationService;
   disposers?: Disposer[];
+  disposeOverlays?: () => void;
 }
 
 export function registerCleanupHook(
@@ -25,6 +26,10 @@ export function registerCleanupHook(
   pi.on("session_shutdown", async () => {
     if (shuttingDown) return;
     shuttingDown = true;
+
+    // Close any open overview panels first so they stop listening to events
+    // before the manager and protocol handlers are torn down.
+    deps.disposeOverlays?.();
 
     for (const dispose of deps.disposers ?? []) {
       dispose();

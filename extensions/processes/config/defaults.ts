@@ -9,6 +9,7 @@ export const DEFAULT_CONFIG: ProcessProtocolConfig = {
   },
   processList: {
     maxPreviewLines: 24,
+    maxVisibleProcesses: 12,
   },
   output: {
     defaultTailLines: 100,

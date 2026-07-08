@@ -7,7 +7,7 @@ Rewrite `@aliou/pi-processes` from a single extension into a package exposing 3 
 2. **processes-logs** -- owns `/ps:logs` only. Logs-focused overlay for process output, search, stream filtering, and follow mode.
 3. **processes-dock** -- owns `/ps:dock`, `/ps:pin`, dock widget, status widget. Positioned as a reference extension showing how to build custom process UIs using core events.
 
-The core extension does not register `/ps`. That command is deferred until a process overview/control UI exists. If the overview UI is not loaded, there is no `/ps` command — the user still has the LLM tool, `/ps:logs`, and `/ps:settings`.
+The core extension registers `/ps` as the process overview/control UI. It is a full-screen editor-replacement panel for browsing processes, killing live processes, clearing finished processes, filtering/sorting the list, previewing recent output, and pinning live processes to the dock.
 
 The rewrite preserves the intended user-facing behavior. The LLM-facing `process` tool supports `start`, `list`, `stop`, `output`, and `update`. The `update` action allows renaming processes and mutating log watches on running processes.
 
@@ -102,9 +102,7 @@ Implemented and validated in Phase 2E:
 - Session shutdown disposes protocol listeners and subscriptions before killing and cleaning up the manager.
 
 Latest validation:
-- `pnpm lint` passes.
-- `pnpm typecheck` passes.
-- `pnpm test` passes with 281 tests.
+- `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm test:e2e` all pass.
 
 Phase 2G update tool action is complete.
 
@@ -136,12 +134,14 @@ Implemented and validated in Phase 2F:
 - Protocol payloads remain structured and language-neutral; localized text is display-only.
 - Unit tests for config, build-sections, apply-setting-change, background-blocker, and i18n.
 
-Current intentional gaps:
-- No dock UI extension yet (`extensions/processes-dock/` is the next phase).
-- Keybindings are managed by Pi's built-in KeybindingsManager; not in extension config.
-- `clear` and `write` tool actions are deferred. The agent can `read` log file paths returned by `list` or `output` for full-log access.
-- `package.json` still references `./skills/pi-processes`, but the local `skills/` directory is absent. Either restore the skill later or remove the `pi.skills`/`files` entries during cleanup.
+Current intentional gaps (tracked in NEXT.md):
+- `/ps` overview/control panel is implemented in the core extension.
+- No `clear` LLM tool action yet. The `COMMAND_CLEAR` protocol exists; the tool action is planned after `/ps`. The agent can `read` log file paths returned by `list` or `output` for full-log access meanwhile.
+- `write` LLM tool action is intentionally not planned for the rewrite. `ProcessManager.writeToStdin()` exists in `src/` but is not exposed as a tool action.
+- `logs` LLM tool action was intentionally dropped as redundant; `list` and `output` return log file paths.
 - `debug-preview` is intentionally removed from the plan.
+- Keybindings are managed by Pi's built-in KeybindingsManager; not in extension config.
+- `package.json` still references `./skills/pi-processes`, but the local `skills/` directory is absent. Either restore the skill later or remove the `pi.skills`/`files` entries during cleanup.
 - Agent steering guidance (promptGuidelines rewrite, skill, steering text in tool output) is deferred to Phase 5.
 
 Integrated decisions:
@@ -1021,13 +1021,13 @@ Phase 3 is complete. The logs extension is registered in `package.json`, `/ps:lo
 
 Own `/ps:logs` only. The logs extension is focused on process output: selecting a process, viewing live logs, scrolling, searching, stream filtering, and follow mode. It does not own process-management controls such as kill or clear.
 
-`/ps` is deferred until after `/ps:logs` UI tweaking is complete. It will be defined in the main process UI extension as a quick overview/control surface for the process list (for example widget or overlay, with kill/clear actions). Until that is implemented, there is no `/ps` command. The user still has the LLM `process` tool, `/ps:logs`, and `/ps:settings`.
+`/ps` is implemented in the core extension as a process overview/control UI. It is not an alias for `/ps:logs`; `/ps:logs` remains logs-only.
 
 ### Design decisions
 
 - `/ps:logs` is logs-only and is registered by this extension.
-- `/ps` is not an alias for `/ps:logs`. It is deferred and will be implemented later as the process overview/control UI.
-- Kill and clear do not belong in `/ps:logs`; they belong in the future `/ps` overview/control UI.
+- `/ps` is not an alias for `/ps:logs`; it is the overview/control UI.
+- Kill and clear do not belong in `/ps:logs`; they belong in `/ps`.
 - Uses the log subscription protocol for live output streaming.
 - Uses `pi.events` exclusively to talk to the core extension. No `ProcessManager` imports.
 - Config values (output defaults, follow settings) are obtained via `CHANNELS.REQUEST_CONFIG`.
@@ -1215,6 +1215,10 @@ Recommended rendering behavior:
 
 ## Phase 4: Dock Extension (`extensions/processes-dock/`)
 
+### Status
+
+Phase 4 is complete. The dock extension is registered in `package.json`, `/ps:dock` and `/ps:pin` are wired through the core command protocol, the dock widget and status widget are driven by `extensions/processes-dock/widget/setup.ts`, and the extension consumes `CHANNELS.NOTIFICATION` log-match events. Scenario coverage lives in `tests/scenarios/13-dock/`.
+
 ### Goal
 
 Own `/ps:dock`, `/ps:pin`, the dock widget, and the status widget.
@@ -1377,7 +1381,7 @@ Update the structure section to reflect the new directory layout.
 - Start a process -> appears in `/ps`, dock updates, status widget updates
 - Process exits successfully -> notification appears, dock auto-hides (if configured), `/ps` shows exit(0)
 - Process fails -> notification custom message appears with exit code and triggers an agent turn
-- Stop a process -> tool `stop` action or future `/ps` overview/control UI
+- Stop a process -> tool `stop` action or `/ps` overview/control UI
 
 **Session lifecycle:**
 - Reload/new/fork -> the current extension-owned manager is shut down
@@ -1550,20 +1554,26 @@ Design notes live in `docs/future-cleanup-hooks.md` until this phase is ready to
 
 ## Appendix A: Things That Change for Users
 
-During the rewrite, the extension is intentionally restored in slices.
+Phases 1 through 4 (plus Phase 3 bis) are complete. Current user-visible state:
 
-Current user-visible state after Phase 2G:
+Done:
 - The LLM-facing `process` tool exists with `start`, `list`, `stop`, `output`, and `update` actions.
+- `/ps` overview/control panel is implemented in the core extension. It uses a local vendored header-capable panel, a fixed-height scrollable process-list content area, a bounded recent-output preview, colored statuses, filter/sort controls, clear/kill actions, and dock pin/unpin via `CHANNELS.COMMAND_PIN`.
 - `/ps:settings` works.
-- No `/ps`, `/ps:logs`, `/ps:dock`, or `/ps:pin` yet.
+- `/ps:logs` opens the logs-only subscription overlay with search, stream filter, follow, and notify-match highlighting.
+- `/ps:dock` and `/ps:pin` are live in the dock extension (separate, optional). The dock extension is documented as a reference for building custom process UIs.
+- `/ps:kill` and `/ps:clear` commands are wired through the core command protocol.
 
-Planned final user-visible behavior:
-- `/ps:logs` opens the logs-only overlay.
-- `/ps` is implemented later as a process overview/control UI with kill and clear actions.
-- `/ps:dock` and `/ps:pin` are in the dock extension (separate, optional).
-- The dock extension is documented as a reference for building custom process UIs.
+Remaining (see NEXT.md):
+- `clear` LLM tool action: planned after `/ps`.
+- Agent steering guidance (promptGuidelines, skill, steering text in tool output).
+- Final package/config cleanup.
 
-Cross-session process persistence is deferred; see `docs/future-persistent-manager.md`.
+Intentionally not in the rewrite:
+- `write` LLM tool action (manager API exists, not exposed).
+- `logs` LLM tool action (redundant with `list`/`output`).
+- `debug_preview` action (removed).
+- Cross-session process persistence; see `docs/future-persistent-manager.md`.
 
 ## Appendix B: Manager Lifetime Policy
 

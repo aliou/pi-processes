@@ -31,10 +31,9 @@ Avoid fixed sleeps in both unit and e2e tests. Prefer event-driven helpers that 
 ## Structure
 
 - `src/` - pi-agnostic process management (manager, types, protocol, utils). Zero pi imports.
-- `extensions/processes/` - core extension: tool registration, settings, hooks, event bridge, request/command handlers
-- `extensions/processes-list/` - `/ps`, `/ps:kill`, `/ps:clear` commands and TUI components
+- `extensions/processes/` - core extension: tool registration, settings, hooks, event bridge, request/command handlers, `/ps` overview panel, `/ps:settings`
 - `extensions/processes-logs/` - `/ps:logs` command and log overlay
-- `extensions/processes-dock/` - `/ps:dock`, `/ps:pin` commands, dock widget, status widget
+- `extensions/processes-dock/` - `/ps:dock`, `/ps:pin` commands, dock widget, status widget, `COMMAND_PIN` handler
 
 See `PLAN.md` for the full architecture and implementation plan.
 

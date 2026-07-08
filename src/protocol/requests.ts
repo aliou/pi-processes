@@ -53,6 +53,7 @@ export interface ProcessProtocolConfig {
   };
   processList: {
     maxPreviewLines: number;
+    maxVisibleProcesses: number;
   };
   output: {
     defaultTailLines: number;

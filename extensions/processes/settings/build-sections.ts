@@ -46,6 +46,7 @@ export function buildSections(
   const logsSection: SettingsSection = {
     label: "Interfaces",
     items: [
+      buildOverviewDetailItem(scopedConfig, resolved, ctx),
       buildLogsDetailItem(scopedConfig, resolved, ctx),
       buildDockDetailItem(scopedConfig, resolved, ctx),
     ],
@@ -106,6 +107,61 @@ function buildShellPathItem(
           },
         ],
         getDoneSummary: () => nextShellPath || "(default)",
+        onDone: (summary) => done(summary),
+      });
+    },
+  };
+}
+
+function buildOverviewDetailItem(
+  scopedConfig: ProcessConfig,
+  resolved: ProcessProtocolConfig,
+  ctx: BuildSectionsContext,
+): SettingItem {
+  const maxVisibleProcesses =
+    scopedConfig.processList?.maxVisibleProcesses ??
+    resolved.processList.maxVisibleProcesses;
+
+  return {
+    id: "overview.details",
+    label: "Overview panel",
+    currentValue: `${maxVisibleProcesses} rows`,
+    description:
+      "Open focused settings for the /ps overview panel visible row count.",
+    submenu: (_current, done) => {
+      const current = scopedConfig;
+      let nextMaxVisible = String(maxVisibleProcesses);
+
+      const syncDraft = () => {
+        const updated: ProcessConfig = {
+          ...current,
+          processList: {
+            ...current.processList,
+            maxVisibleProcesses: parsePositiveInt(nextMaxVisible),
+          },
+        };
+        ctx.setDraft(updated);
+      };
+
+      return new SettingsDetailEditor({
+        title: "Overview panel",
+        theme: ctx.theme,
+        fields: [
+          {
+            id: "overview.maxVisibleProcesses",
+            type: "text",
+            label: "Visible rows",
+            description:
+              "Maximum process rows shown at once in the /ps overview. The list scrolls past this.",
+            getValue: () => nextMaxVisible,
+            setValue: (value) => {
+              nextMaxVisible = value;
+              syncDraft();
+            },
+            validate: positiveIntegerError,
+          },
+        ],
+        getDoneSummary: () => `${parsePositiveInt(nextMaxVisible)} rows`,
         onDone: (summary) => done(summary),
       });
     },

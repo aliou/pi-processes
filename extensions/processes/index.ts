@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getManager } from "../../src/get-manager";
+import { registerOverviewCommand } from "./commands/overview";
 import { configLoader } from "./config";
 import { registerCommandHandlers } from "./handlers/commands";
 import { registerNotificationDelivery } from "./handlers/notifications";
@@ -42,6 +43,12 @@ export default async function processesExtension(
 
   const getConfig = () => configLoader.getConfig();
 
+  const openOverlays = new Set<{ dispose: () => void }>();
+  const registerOverlay = (overlay: { dispose: () => void }) => {
+    openOverlays.add(overlay);
+    return () => openOverlays.delete(overlay);
+  };
+
   const disposers = [
     registerEventBridge(pi.events, manager),
     registerRequestHandlers(pi.events, manager, getConfig),
@@ -58,11 +65,16 @@ export default async function processesExtension(
   registerProcessNotificationRenderer(pi);
   registerProcessTool(pi, manager, notifications);
   registerProcessSettings(pi);
+  registerOverviewCommand(pi, { events: pi.events, registerOverlay });
 
   registerCleanupHook(pi, {
     manager,
     notifications,
     notificationService,
     disposers,
+    disposeOverlays: () => {
+      for (const overlay of [...openOverlays]) overlay.dispose();
+      openOverlays.clear();
+    },
   });
 }

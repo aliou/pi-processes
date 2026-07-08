@@ -296,6 +296,9 @@ describe("formatOutputDetails", () => {
     expect(text).toContain('"server" (proc_1) [running]');
     expect(text).toContain("stdout:");
     expect(text).toContain("hello world");
+    expect(text).toContain(
+      "Process is still running. Use watches instead of polling.",
+    );
   });
 
   it("includes filter info when pattern is set", () => {
@@ -323,5 +326,10 @@ describe("formatOutputDetails", () => {
       makeDetails({ stdout: [], stderr: [], pattern: "missing" }),
     );
     expect(text).toContain("No matching lines found.");
+  });
+
+  it("does not add polling guidance for finished processes", () => {
+    const text = formatOutputDetails(makeDetails({ processStatus: "exited" }));
+    expect(text).not.toContain("Use watches instead of polling");
   });
 });

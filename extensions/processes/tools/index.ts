@@ -51,16 +51,13 @@ export function registerProcessTool(
       description:
         "Start, list, stop, update, clear, and inspect output of long-running background processes.",
       promptSnippet:
-        "Start, list, stop, update, clear, and inspect output of long-running background processes.",
+        "Manage long-running background processes: start, list, stop, update watches, clear finished entries, and inspect recent output.",
       promptGuidelines: [
-        "Use process when a command should keep running while the conversation continues, such as a dev server, watcher, or log tail.",
-        "Use process start to start long-running background commands instead of shell background patterns like &, nohup, disown, or setsid.",
-        "Use process list to inspect running background processes before starting duplicates; do not re-summarize the listed processes to the user because the tool output is already visible to them.",
-        "Use process stop to stop a background process started with process start.",
-        "Use process output to inspect recent stdout/stderr of a background process. Use pattern and mode to filter for specific lines, such as errors or readiness signals.",
-        "By default, process failures trigger an agent turn, successes add context only, and killed processes are ignored. Use notify to override.",
-        "Use notify.logMatches on start to get notified when output matches a readiness or error pattern. Log matchers control agent attention, not display.",
-        "Use process update to rename a running process or modify log watches on a running process. Only running processes can be updated.",
+        "Use process list before process start when a similar dev server, watcher, or log tail may already be running; do not re-summarize visible tool output to the user.",
+        "Use process start for long-running commands instead of shell background patterns like &, nohup, disown, or setsid; give each process a specific name.",
+        "Use notify.logMatches on process start, and process update to change watches on a running process, instead of polling process output or restarting just to change watches.",
+        "Use process output for targeted recent stdout/stderr inspection with pattern/mode filters; for deep log reads, use the log file paths from process list or process output with the read tool.",
+        "Use process stop for obsolete live processes and process clear for finished entries; by default failures trigger an agent turn, successes add context, and killed processes are ignored unless notify overrides it.",
       ],
       parameters: ProcessesParams,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {

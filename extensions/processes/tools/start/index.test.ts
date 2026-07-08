@@ -5,7 +5,7 @@ import type { ProcessManager } from "../../../../src/manager";
 import type { ProcessInfo } from "../../../../src/types";
 import type { NotificationRegistry } from "../../notifications/registry";
 import { createNotificationRegistry } from "../../notifications/registry";
-import { executeStart } from ".";
+import { executeStart, formatStartDetails } from ".";
 
 const processInfo: ProcessInfo = {
   id: "proc_1",
@@ -135,5 +135,32 @@ describe("executeStart", () => {
     ).toThrow(/not a valid regular expression/);
 
     expect(registry.get("proc_1")).toBeNull();
+  });
+});
+
+describe("formatStartDetails", () => {
+  it("adds a watch guidance sentence when log matches are active", () => {
+    const text = formatStartDetails({
+      action: "start",
+      process: processInfo,
+      notify: {
+        onSuccess: "context",
+        onFailure: "turn",
+        onKilled: "ignore",
+        logMatches: [
+          {
+            pattern: "ready",
+            mode: "literal",
+            stream: "both",
+            repeat: false,
+            on: "turn",
+          },
+        ],
+      },
+    });
+
+    expect(text).toContain(
+      "Continue other work; watch notifications will trigger follow-up.",
+    );
   });
 });

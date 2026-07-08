@@ -121,6 +121,10 @@ export function formatOutputDetails(details: OutputDetails): string {
     }
   }
 
+  if (details.processStatus === "running") {
+    parts.push("", "Process is still running. Use watches instead of polling.");
+  }
+
   const fullText = parts.join("\n");
   return truncateOutputText(fullText, {
     stdoutFile: details.stdoutFile,

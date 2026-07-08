@@ -43,5 +43,15 @@ export function executeStart(
 
 export function formatStartDetails(details: StartDetails): string {
   const process = details.process;
-  return `Started process ${process.name} (${process.id}) with pid ${process.pid}.`;
+  const parts = [
+    `Started process ${process.name} (${process.id}) with pid ${process.pid}.`,
+  ];
+
+  if (details.notify.logMatches && details.notify.logMatches.length > 0) {
+    parts.push(
+      "Continue other work; watch notifications will trigger follow-up.",
+    );
+  }
+
+  return parts.join(" ");
 }

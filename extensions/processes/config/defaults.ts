@@ -5,7 +5,7 @@ export const DEFAULT_CONFIG: ProcessProtocolConfig = {
     shellPath: undefined,
   },
   interception: {
-    blockBackgroundCommands: true,
+    blockBackgroundCommands: false,
   },
   processList: {
     maxPreviewLines: 24,

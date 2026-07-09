@@ -25,7 +25,7 @@ describe("buildSections", () => {
 
   it("distinguishes scoped vs inherited core values", () => {
     const scoped: ProcessConfig = {
-      interception: { blockBackgroundCommands: false },
+      interception: { blockBackgroundCommands: true },
     };
     const sections = buildSections(scoped, resolved, ctx);
 
@@ -36,8 +36,8 @@ describe("buildSections", () => {
         ?.items.find((i) => i.id === "interception.blockBackgroundCommands")
         ?.currentValue;
 
-    expect(getBlockerValue(sections)).toBe("off");
-    expect(getBlockerValue(inherited)).toBe("inherited: on");
+    expect(getBlockerValue(sections)).toBe("on");
+    expect(getBlockerValue(inherited)).toBe("inherited: off");
   });
 
   it("summarizes logs settings in a submenu item", () => {

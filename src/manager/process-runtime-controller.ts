@@ -167,6 +167,11 @@ export class ProcessRuntimeController {
       managed.endReason = "kill_timeout";
       managed.signal = formatSignalInfo(signal);
       managed.success = false;
+      // Record the death timestamp so the subsequent `close` event does not
+      // re-transition the process and clobber the timeout result. Without
+      // this, `child.on("close")` sees a null endTime, overwrites endReason
+      // to "signal", and emits a second (reclassified) process_ended.
+      managed.endTime = Date.now();
       this.transition(managed, "terminate_timeout");
       return {
         ok: false,
@@ -373,6 +378,14 @@ export class ProcessRuntimeController {
   private livenessTick(): void {
     for (const managed of this.registry.values()) {
       if (!LIVE_STATUSES.has(managed.status)) continue;
+      // A timed-out process was already finalized by kill() (endReason
+      // kill_timeout, endTime set, terminate_timeout status, and a tool
+      // result carrying reason:"timeout"). The tick's job is to detect
+      // autonomous deaths of running processes; reclassifying a finalized
+      // timeout here would clobber endReason/signal to "lost" and emit a
+      // second process_ended. The close handler also bails via the endTime
+      // guard, so the timeout classification is preserved as-is.
+      if (managed.status === "terminate_timeout") continue;
       if (!managed.pid || managed.pid <= 0) continue;
 
       const alive = isProcessGroupAlive(managed.pid);

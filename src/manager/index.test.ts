@@ -605,8 +605,47 @@ describe("kill", () => {
         success: false,
         endReason: "kill_timeout",
         signal: expect.objectContaining({ name: "SIGTERM", number: 15 }),
+        endTime: expect.any(Number),
       }),
     });
+  });
+
+  it("does not reclassify a timed-out process on the liveness tick", async () => {
+    vi.useFakeTimers();
+    using manager = new ProcessManager();
+    const events = collectEvents(manager);
+    const info = manager.start("test", "sleep 60", "/tmp");
+    const child = fakeProcesses.get(info.pid);
+    assert(child, "fake child should exist");
+    // Make kill() a no-op so the process appears unkillable -> timeout.
+    child.kill = () => {
+      child.killed = true;
+      return true;
+    };
+
+    const resultPromise = manager.kill(info.id);
+    await vi.advanceTimersByTimeAsync(3000);
+    const result = await resultPromise;
+    assert(!result.ok && result.reason === "timeout", "expected timeout");
+
+    // Now the process dies for real (the OS reaps it). The liveness tick must
+    // NOT reclassify it to killed/lost, clobber endReason, or emit a second
+    // process_ended. The kill() path already finalized it.
+    const endedBefore = events.filter((e) => e.type === "process_ended").length;
+    fakeProcesses.delete(info.pid);
+    await vi.advanceTimersByTimeAsync(5000);
+
+    const endedAfter = events.filter((e) => e.type === "process_ended").length;
+    expect(endedAfter).toBe(endedBefore);
+
+    const record = manager.get(info.id);
+    assert(record, "record should still exist");
+    expect(record).toEqual(
+      expect.objectContaining({
+        status: "terminate_timeout",
+        endReason: "kill_timeout",
+      }),
+    );
   });
 
   it("returns ok for already-exited process", async () => {

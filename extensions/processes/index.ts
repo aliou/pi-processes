@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getManager } from "../../src/get-manager";
 import { registerOverviewCommand } from "./commands/overview";
-import { configLoader, loadProcessConfig } from "./config";
+import { configLoader, drainImportMessages, loadProcessConfig } from "./config";
 import { registerCommandHandlers } from "./handlers/commands";
 import { registerNotificationDelivery } from "./handlers/notifications";
 import { registerRequestHandlers } from "./handlers/requests";
@@ -74,7 +74,10 @@ export default async function processesExtension(
 
 function registerMigrationMessageNotifications(pi: ExtensionAPI): void {
   pi.on("session_start", (_event, ctx) => {
-    const messages = configLoader.drainMessages();
+    const messages = [
+      ...drainImportMessages(),
+      ...configLoader.drainMessages(),
+    ];
     if (messages.length === 0) return;
 
     const formattedMessages = messages.map((m) => `- ${m}`);

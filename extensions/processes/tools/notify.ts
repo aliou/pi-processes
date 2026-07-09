@@ -111,6 +111,15 @@ export function normalizeLogMatch(
     throw new Error(`${actionLabel} ${path}.pattern must be a string`);
   }
 
+  // An empty or whitespace-only literal pattern matches every line
+  // (String#includes("")), and an empty regex matches every line too. Reject
+  // early so a stray "" from the model does not fire a notification per line.
+  if (input.pattern.trim().length === 0) {
+    throw new Error(
+      `${actionLabel} ${path}.pattern must not be empty or whitespace-only`,
+    );
+  }
+
   if (input.pattern.length > MAX_NOTIFY_PATTERN_LENGTH) {
     throw new Error(
       `${actionLabel} ${path}.pattern must be at most ${MAX_NOTIFY_PATTERN_LENGTH} characters`,

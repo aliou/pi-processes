@@ -16,10 +16,13 @@ describe("compileLineMatcher", () => {
       expect(matcher("an error occurred")).toBe(false);
     });
 
-    it("matches empty pattern against any line", () => {
+    it("never matches an empty literal pattern (no match-all footgun)", () => {
+      // An empty pattern would otherwise match every line via
+      // String#includes(""), firing a notification per line. Defend at the
+      // shared primitive; callers should treat "" as "no filter".
       const matcher = compileLineMatcher("", "literal");
-      expect(matcher("anything")).toBe(true);
-      expect(matcher("")).toBe(true);
+      expect(matcher("anything")).toBe(false);
+      expect(matcher("")).toBe(false);
     });
   });
 
@@ -32,6 +35,15 @@ describe("compileLineMatcher", () => {
 
     it("throws on invalid regex", () => {
       expect(() => compileLineMatcher("([", "regex")).toThrow();
+    });
+
+    it("never matches an empty regex pattern (no match-all footgun)", () => {
+      // An empty regex otherwise matches at every position and would fire a
+      // notification per line. Defend at the shared primitive; callers should
+      // treat "" as "no filter".
+      const matcher = compileLineMatcher("", "regex");
+      expect(matcher("anything")).toBe(false);
+      expect(matcher("")).toBe(false);
     });
 
     it("supports regex flags via pattern", () => {

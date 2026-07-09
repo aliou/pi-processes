@@ -93,6 +93,22 @@ describe("normalizeNotifyConfig", () => {
     ).toThrow(/pattern must be at most 500 characters/);
   });
 
+  it("rejects empty log-match patterns", () => {
+    expect(() =>
+      normalizeNotifyConfig({
+        logMatches: [{ pattern: "" }],
+      }),
+    ).toThrow(/pattern must not be empty or whitespace-only/);
+  });
+
+  it("rejects whitespace-only log-match patterns", () => {
+    expect(() =>
+      normalizeNotifyConfig({
+        logMatches: [{ pattern: "   \t " }],
+      }),
+    ).toThrow(/pattern must not be empty or whitespace-only/);
+  });
+
   it.each([
     ["onSuccess", { onSuccess: "bad" }],
     ["onFailure", { onFailure: "bad" }],

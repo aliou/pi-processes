@@ -1,6 +1,8 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getManager } from "../../src/get-manager";
 import { isWindowsPlatform } from "../../src/utils/platform";
+import { registerClearCommand } from "./commands/clear";
+import { registerKillCommand } from "./commands/kill";
 import { registerOverviewCommand } from "./commands/overview";
 import { configLoader, drainImportMessages, loadProcessConfig } from "./config";
 import { registerCommandHandlers } from "./handlers/commands";
@@ -74,6 +76,8 @@ export default async function processesExtension(
   registerProcessTool(pi, manager, notifications);
   registerProcessSettings(pi);
   registerOverviewCommand(pi, { events: pi.events, registerOverlay });
+  registerKillCommand(pi);
+  registerClearCommand(pi);
 
   registerCleanupHook(pi, {
     manager,

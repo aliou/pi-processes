@@ -1,11 +1,10 @@
 /**
  * Core-extension request/command helpers for the `/ps` overview panel.
  *
- * The overview panel lives in the core extension but, per NEXT.md, prefers the
- * existing `pi.events` protocol channels over calling the manager directly so
- * a future split-out of the panel stays cheap. These helpers are the core
- * equivalent of `extensions/processes-logs/client.ts` and
- * `extensions/processes-dock/client.ts`.
+ * The overview panel prefers the existing `pi.events` protocol channels over
+ * calling the manager directly so a future split-out of the panel stays cheap.
+ * These helpers are the core equivalent of `extensions/processes-logs/client.ts`
+ * and `extensions/processes-dock/client.ts`.
  */
 
 import type { EventBus } from "@earendil-works/pi-coding-agent";
@@ -82,44 +81,71 @@ export function requestCombinedOutput(
   return lines ?? [];
 }
 
+/**
+ * Kill a managed process. Resolves when the kill handler replies, or with a
+ * timeout error result if no listener responds.
+ *
+ * The kill handler runs `killIntentionally` asynchronously, so its reply fires
+ * on a later microtask rather than during the emit. That is why this returns a
+ * Promise (unlike the synchronous `requestClear`/`requestProcessList`): a
+ * synchronous read of `result` would always miss the reply and report failure.
+ *
+ * The safety timeout defaults to the kill timeout plus headroom so a successful
+ * slow kill still resolves first. The timer is unref'd so it never keeps the
+ * event loop alive.
+ */
 export function requestKill(
   events: EventBus,
   id: string,
   options?: { signal?: NodeJS.Signals; timeoutMs?: number },
-): KillResult {
-  let result: KillResult | null = null;
-  const payload: CommandKillPayload = {
-    id,
-    signal: options?.signal,
-    timeoutMs: options?.timeoutMs,
-    reply: (value) => {
-      result = value;
+): Promise<KillResult> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const killTimeoutMs = options?.timeoutMs ?? 3000;
+    const payload: CommandKillPayload = {
+      id,
+      signal: options?.signal,
+      timeoutMs: killTimeoutMs,
+      reply: (result) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(result);
+      },
+    };
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve(killTimeoutResult(id));
+    }, killTimeoutMs + 2000);
+    // Unref so a parked timer never keeps the event loop alive.
+    timer.unref?.();
+    events.emit(CHANNELS.COMMAND_KILL, payload);
+  });
+}
+
+function killTimeoutResult(id: string): KillResult {
+  return {
+    ok: false,
+    reason: "error",
+    info: {
+      id,
+      name: "(unknown)",
+      pid: -1,
+      command: "",
+      cwd: "",
+      startTime: 0,
+      endTime: null,
+      status: "exited",
+      exitCode: null,
+      success: false,
+      stdoutFile: "",
+      stderrFile: "",
+      endReason: null,
+      signal: null,
+      errorMessage: "No kill handler replied",
     },
   };
-  events.emit(CHANNELS.COMMAND_KILL, payload);
-  return (
-    result ?? {
-      ok: false,
-      reason: "error",
-      info: {
-        id,
-        name: "(unknown)",
-        pid: -1,
-        command: "",
-        cwd: "",
-        startTime: 0,
-        endTime: null,
-        status: "exited",
-        exitCode: null,
-        success: false,
-        stdoutFile: "",
-        stderrFile: "",
-        endReason: null,
-        signal: null,
-        errorMessage: "No kill handler replied",
-      },
-    }
-  );
 }
 
 export function requestClear(events: EventBus): number {

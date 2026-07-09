@@ -44,6 +44,8 @@ const MIN_OVERLAY_HEIGHT = 12;
 const OVERLAY_FRACTION = 0.9;
 const MAX_TAB_NAME = 12;
 const MAX_NOTIFY_MARKERS_PER_PROCESS = 100;
+/** Cap retained viewers so a long session does not hold unbounded buffers. */
+const MAX_CACHED_VIEWERS = 12;
 
 interface NotifyMatchMark {
   pattern: string;
@@ -67,6 +69,13 @@ export class LogOverlayComponent implements Component {
   private disposed = false;
   /** Per-process notify log-match markers, capped per process. */
   private readonly notifyMarkers = new Map<string, NotifyMatchMark[]>();
+  /**
+   * Per-process cached viewers. A tab switch unsubscribes the live log
+   * connection (only one process is subscribed at a time) but preserves the
+   * viewer so scroll position, search, follow toggle, and stream filter
+   * survive a round-trip. Mirrors the notifyMarkers persistence pattern.
+   */
+  private readonly viewers = new Map<string, LogFileViewer>();
 
   constructor(private readonly opts: LogOverlayOptions) {
     this.configureSearchInput();
@@ -196,6 +205,8 @@ export class LogOverlayComponent implements Component {
     this.connection?.unsubscribe();
     this.connection = null;
     this.viewer = null;
+    this.viewers.clear();
+    this.notifyMarkers.clear();
     for (const dispose of this.disposers.splice(0)) dispose();
   }
 
@@ -293,6 +304,7 @@ export class LogOverlayComponent implements Component {
       this.connection?.unsubscribe();
       this.connection = null;
       this.viewer = null;
+      this.pruneRemovedProcesses();
       return;
     }
 
@@ -306,6 +318,22 @@ export class LogOverlayComponent implements Component {
         : Math.min(this.selectedIndex, this.processes.length - 1);
     this.ensureTabVisible();
     this.subscribeToSelected();
+    this.pruneRemovedProcesses();
+  }
+
+  /** Drop cached viewers/markers for processes that no longer exist. */
+  private pruneRemovedProcesses(): void {
+    const live = new Set(this.processes.map((process) => process.id));
+    for (const id of [...this.viewers.keys()]) {
+      if (!live.has(id) && this.viewers.get(id) !== this.viewer) {
+        this.viewers.delete(id);
+      }
+    }
+    for (const id of [...this.notifyMarkers.keys()]) {
+      if (!live.has(id) && id !== this.selectedProcess()?.id) {
+        this.notifyMarkers.delete(id);
+      }
+    }
   }
 
   private sortProcesses(processes: ProcessInfo[]): ProcessInfo[] {
@@ -359,6 +387,9 @@ export class LogOverlayComponent implements Component {
 
   private subscribeToSelected(): void {
     const selected = this.selectedProcess();
+    // Drop the live subscription on switch, but keep the viewer (search,
+    // scroll, follow, stream filter) cached for the next time this tab is
+    // selected. Only one process is subscribed at a time.
     this.connection?.unsubscribe();
     this.connection = null;
     this.viewer = null;
@@ -375,16 +406,51 @@ export class LogOverlayComponent implements Component {
 
     this.message = null;
     this.connection = connection;
-    this.viewer = new LogFileViewer(connection.initialLines, this.opts.theme, {
-      followEnabled: this.opts.config.follow.enabledByDefault,
-      maxBufferLines: this.opts.config.output.maxOutputLines,
-    });
+
+    // Reuse a cached viewer if we already viewed this process; otherwise
+    // create one from the fresh initial tail.
+    let viewer = this.viewers.get(selected.id);
+    if (!viewer) {
+      viewer = new LogFileViewer(connection.initialLines, this.opts.theme, {
+        followEnabled: this.opts.config.follow.enabledByDefault,
+        maxBufferLines: this.opts.config.output.maxOutputLines,
+      });
+      this.viewers.set(selected.id, viewer);
+      this.pruneCachedViewers();
+    }
+    // NOTE: do NOT re-feed connection.initialLines into a cached viewer --
+    // doing so would duplicate lines already in its buffer.
+    this.viewer = viewer;
+
+    // Re-apply any notify markers that arrived while this viewer was
+    // detached (addNotifyMatch is a set, so this is idempotent for ones
+    // already applied).
     const stored = this.notifyMarkers.get(selected.id);
-    if (stored) for (const mark of stored) this.viewer.addNotifyMatch(mark);
+    if (stored) for (const mark of stored) viewer.addNotifyMatch(mark);
+
     connection.onChunk((lines: ProcessLogLine[]) => {
+      // The active viewer may have changed by the time a chunk arrives; only
+      // feed the one that is still current.
       this.viewer?.appendLines(lines);
       this.opts.tui.requestRender();
     });
+  }
+
+  /** Keep the retained-viewer map bounded across a long session. */
+  private pruneCachedViewers(): void {
+    while (this.viewers.size > MAX_CACHED_VIEWERS) {
+      const oldest = this.viewers.keys().next().value;
+      if (oldest === undefined) break;
+      const removed = this.viewers.get(oldest);
+      if (removed && removed === this.viewer) {
+        // Never evict the currently-displayed viewer; rotate it to the end
+        // so a fresher entry is evicted instead.
+        this.viewers.delete(oldest);
+        this.viewers.set(oldest, removed);
+        continue;
+      }
+      this.viewers.delete(oldest);
+    }
   }
 
   private startSearch(): void {

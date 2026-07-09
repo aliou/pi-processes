@@ -145,7 +145,7 @@ const NotifyParams = Type.Object({
 
 export const ProcessesParams = Type.Object({
   action: StringEnum(
-    ["start", "list", "stop", "output", "update", "clear"] as const,
+    ["start", "list", "stop", "output", "write", "update", "clear"] as const,
     {
       description: "Action to perform.",
     },
@@ -164,7 +164,9 @@ export const ProcessesParams = Type.Object({
   ),
   notify: Type.Optional(NotifyParams),
   id: Type.Optional(
-    Type.String({ description: "Process id. Required for stop and output." }),
+    Type.String({
+      description: "Process id. Required for stop, output, and write.",
+    }),
   ),
   limit: Type.Optional(
     Type.Number({ description: "Maximum number of processes to list." }),
@@ -199,6 +201,18 @@ export const ProcessesParams = Type.Object({
       maxLength: MAX_OUTPUT_PATTERN_LENGTH,
       description:
         "Optional output filter. Literal by default; regex only when mode is regex. Only for output action.",
+    }),
+  ),
+  input: Type.Optional(
+    Type.String({
+      description:
+        "Text to write to the process stdin. Only for write action. Defaults to an empty string when closing stdin with end.",
+    }),
+  ),
+  end: Type.Optional(
+    Type.Boolean({
+      description:
+        "Close stdin after writing. Use to signal end-of-input (EOF). Only for write action.",
     }),
   ),
   mode: Type.Optional(

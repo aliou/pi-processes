@@ -30,12 +30,15 @@ import {
   type UpdateDetails,
 } from "./update";
 import * as updateRender from "./update/render";
+import { executeWrite, formatWriteDetails, type WriteDetails } from "./write";
+import * as writeRender from "./write/render";
 
 type ProcessDetails =
   | StartDetails
   | ListDetails
   | StopDetails
   | OutputDetails
+  | WriteDetails
   | UpdateDetails
   | ClearDetails;
 
@@ -49,14 +52,15 @@ export function registerProcessTool(
       name: "process",
       label: "Process",
       description:
-        "Start, list, stop, update, clear, and inspect output of long-running background processes.",
+        "Start, list, stop, write to stdin, update, clear, and inspect output of long-running background processes.",
       promptSnippet:
-        "Manage long-running background processes: start, list, stop, update watches, clear finished entries, and inspect recent output.",
+        "Manage long-running background processes: start, list, stop, write to stdin, update watches, clear finished entries, and inspect recent output.",
       promptGuidelines: [
         "Use process list before process start when a similar dev server, watcher, or log tail may already be running; do not re-summarize visible tool output to the user.",
         "Use process start for long-running commands instead of shell background patterns like &, nohup, disown, or setsid; give each process a specific name.",
         "Use notify.logMatches on process start, and process update to change watches on a running process, instead of polling process output or restarting just to change watches.",
         "Use process output for targeted recent stdout/stderr inspection with pattern/mode filters; for deep log reads, use the log file paths from process list or process output with the read tool.",
+        "Use process write to send input to a running process's stdin (e.g. answering a prompt or piping data); set end: true to close stdin and signal EOF.",
         "Use process stop for obsolete live processes and process clear for finished entries; by default failures trigger an agent turn, successes add context, and externally-killed processes add context unless notify overrides it.",
       ],
       parameters: ProcessesParams,
@@ -88,6 +92,8 @@ async function execute(
       return executeStop(params, manager, notifications);
     case "output":
       return executeOutput(params, manager);
+    case "write":
+      return executeWrite(params, manager);
     case "update":
       return executeUpdate(params, manager, notifications);
     case "clear":
@@ -116,6 +122,10 @@ function renderProcessCall(
     case "output":
       return new ToolLayout().setHeader(
         outputRender.buildHeader(args, theme, context),
+      );
+    case "write":
+      return new ToolLayout().setHeader(
+        writeRender.buildHeader(args, theme, context),
       );
     case "update":
       return new ToolLayout().setHeader(
@@ -176,6 +186,10 @@ function buildBody(
       return options.expanded
         ? updateRender.buildExpanded(details, theme)
         : updateRender.buildCollapsed(details, theme);
+    case "write":
+      return options.expanded
+        ? writeRender.buildExpanded(details, theme)
+        : writeRender.buildCollapsed(details, theme);
     case "stop":
       return options.expanded
         ? stopRender.buildExpanded(details, theme)
@@ -203,6 +217,8 @@ function buildFooter(
       return outputRender.buildFooter(details, options, theme);
     case "update":
       return updateRender.buildFooter(details, options, theme);
+    case "write":
+      return writeRender.buildFooter(details, options, theme);
     case "clear":
       return clearRender.buildFooter(details, options, theme);
   }
@@ -220,6 +236,8 @@ function formatDetails(details: ProcessDetails): string {
       return formatOutputDetails(details);
     case "update":
       return formatUpdateDetails(details);
+    case "write":
+      return formatWriteDetails(details);
     case "clear":
       return formatClearDetails(details);
   }

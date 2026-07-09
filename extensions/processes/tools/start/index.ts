@@ -31,7 +31,8 @@ export function executeStart(
 
   const notify = normalizeNotifyConfig(params.notify);
 
-  const process = manager.start(params.name, params.command, ctx.cwd);
+  const cwd = params.cwd ?? ctx.cwd;
+  const process = manager.start(params.name, params.command, cwd);
   notifications.register(process.id, notify);
 
   return {

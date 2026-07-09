@@ -156,6 +156,12 @@ export const ProcessesParams = Type.Object({
   command: Type.Optional(
     Type.String({ description: "Shell command to run. Required for start." }),
   ),
+  cwd: Type.Optional(
+    Type.String({
+      description:
+        "Working directory for start. Defaults to the agent's current working directory. Only for start.",
+    }),
+  ),
   notify: Type.Optional(NotifyParams),
   id: Type.Optional(
     Type.String({ description: "Process id. Required for stop and output." }),

@@ -136,6 +136,46 @@ describe("executeStart", () => {
 
     expect(registry.get("proc_1")).toBeNull();
   });
+
+  it("starts with the explicit cwd when provided", () => {
+    const start = vi.fn(() => ({ ...processInfo, cwd: "/explicit" }));
+    const manager = { start } as unknown as ProcessManager;
+    const registry = createFakeRegistry();
+
+    const details = executeStart(
+      {
+        action: "start",
+        name: "dev",
+        command: "pnpm dev",
+        cwd: "/explicit",
+      },
+      manager,
+      ctx,
+      registry,
+    );
+
+    expect(start).toHaveBeenCalledWith("dev", "pnpm dev", "/explicit");
+    expect(details.process.cwd).toBe("/explicit");
+  });
+
+  it("falls back to ctx.cwd when cwd is not provided", () => {
+    const start = vi.fn(() => ({ ...processInfo, cwd: "/repo" }));
+    const manager = { start } as unknown as ProcessManager;
+    const registry = createFakeRegistry();
+
+    executeStart(
+      {
+        action: "start",
+        name: "dev",
+        command: "pnpm dev",
+      },
+      manager,
+      ctx,
+      registry,
+    );
+
+    expect(start).toHaveBeenCalledWith("dev", "pnpm dev", "/repo");
+  });
 });
 
 describe("formatStartDetails", () => {

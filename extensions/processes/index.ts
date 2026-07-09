@@ -21,6 +21,7 @@ export default async function processesExtension(
   pi: ExtensionAPI,
 ): Promise<void> {
   await loadProcessConfig();
+  registerMigrationMessageNotifications(pi);
 
   const manager = getManager({
     getConfiguredShellPath: () => configLoader.getConfig().execution.shellPath,
@@ -68,5 +69,19 @@ export default async function processesExtension(
       for (const overlay of [...openOverlays]) overlay.dispose();
       openOverlays.clear();
     },
+  });
+}
+
+function registerMigrationMessageNotifications(pi: ExtensionAPI): void {
+  pi.on("session_start", (_event, ctx) => {
+    const messages = configLoader.drainMessages();
+    if (messages.length === 0) return;
+
+    const formattedMessages = messages.map((m) => `- ${m}`);
+
+    const message = `[processes]\n${formattedMessages.join("\n")}`;
+    if (ctx.hasUI) {
+      ctx.ui.notify(message, "info");
+    }
   });
 }

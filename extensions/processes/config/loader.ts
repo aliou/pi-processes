@@ -1,19 +1,24 @@
 import {
-  buildSchemaUrl,
   ConfigLoader,
   type ConfigStore,
   type Scope,
 } from "@aliou/pi-utils-settings";
-import pkg from "../../../package.json" with { type: "json" };
 import { DEFAULT_CONFIG } from "./defaults";
+import { migrations } from "./migrations";
+import { PROCESS_CONFIG_SCHEMA_URL } from "./schema";
 import type { ProcessConfig, ProcessProtocolConfig } from "./types";
+
+export async function loadProcessConfig(): Promise<void> {
+  await configLoader.load();
+}
 
 export const configLoader = new ConfigLoader<
   ProcessConfig,
   ProcessProtocolConfig
 >("processes", DEFAULT_CONFIG, {
   scopes: ["global", "local", "memory"],
-  schemaUrl: buildSchemaUrl(pkg.name, pkg.version),
+  migrations,
+  schemaUrl: PROCESS_CONFIG_SCHEMA_URL,
 });
 
 export function createSettingsConfigStore(): ConfigStore<

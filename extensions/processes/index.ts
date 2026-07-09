@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getManager } from "../../src/get-manager";
+import { isWindowsPlatform } from "../../src/utils/platform";
 import { registerOverviewCommand } from "./commands/overview";
 import { configLoader, drainImportMessages, loadProcessConfig } from "./config";
 import { registerCommandHandlers } from "./handlers/commands";
@@ -20,6 +21,20 @@ import { registerProcessTool } from "./tools";
 export default async function processesExtension(
   pi: ExtensionAPI,
 ): Promise<void> {
+  if (isWindowsPlatform()) {
+    // POSIX-only: the manager relies on detached process groups and
+    // negative-pid group kill (src/utils/process-group.ts), neither of
+    // which exists on Windows. Bail before touching the config or spawning.
+    pi.on("session_start", (_event, ctx) => {
+      if (!ctx.hasUI) return;
+      ctx.ui.notify(
+        "The pi-processes extension is not available on Windows.",
+        "warning",
+      );
+    });
+    return;
+  }
+
   await loadProcessConfig();
   registerMigrationMessageNotifications(pi);
 

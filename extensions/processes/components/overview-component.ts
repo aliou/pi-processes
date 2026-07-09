@@ -248,8 +248,7 @@ export class OverviewComponent implements Component {
       (this.selectedIndex + delta + this.processes.length) %
       this.processes.length;
     this.clampViewOffset();
-    this.previewOffset = 0;
-    this.refreshPreview();
+    this.refreshPreview("newest");
     this.requestRender();
   }
 
@@ -275,22 +274,43 @@ export class OverviewComponent implements Component {
     this.requestRender();
   }
 
-  private refreshPreview(): void {
+  private refreshPreview(align: "newest" | "keep" = "keep"): void {
     const selected = this.selectedProcess();
     if (!selected) {
       this.previewLines = [];
+      this.previewOffset = 0;
       return;
     }
+
+    const available = this.previewHeight();
+    // Follow-tail: if the view was already pinned to the newest page (or the
+    // caller asked for newest), keep it there after reloading so new output
+    // scrolls into view. Otherwise preserve the user's scroll position so a
+    // deliberate K-scroll-up is not yanked back by the next output batch.
+    const oldTotal = this.previewLines.length;
+    const follow =
+      align === "newest" ||
+      oldTotal === 0 ||
+      this.previewOffset >= oldTotal - available;
+
     const lines = requestCombinedOutput(
       this.opts.events,
       selected.id,
       this.opts.config.output.defaultTailLines,
     );
     this.previewLines = lines.slice(-MAX_PREVIEW_LINES);
-    this.previewOffset = Math.min(
-      this.previewOffset,
-      Math.max(0, this.previewLines.length - 1),
-    );
+    const newTotal = this.previewLines.length;
+
+    if (follow) {
+      // Show the newest page: the last `available` lines, so the most recent
+      // output is visible immediately on select/open (matching 0.9.4).
+      this.previewOffset = Math.max(0, newTotal - available);
+    } else {
+      this.previewOffset = Math.min(
+        this.previewOffset,
+        Math.max(0, newTotal - 1),
+      );
+    }
   }
 
   private cycleSort(): void {

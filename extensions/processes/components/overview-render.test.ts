@@ -51,7 +51,7 @@ function makeProcess(overrides: Partial<ProcessInfo> = {}): ProcessInfo {
 }
 
 /** EventBus fake that replies synchronously to request/command channels. */
-function makeEvents(processes: ProcessInfo[] = []) {
+function makeEvents(processes: ProcessInfo[] = [], outputLines: string[] = []) {
   const listeners: Record<string, Array<(payload: never) => void>> = {};
   const pinCalls: (string | null)[] = [];
   return {
@@ -72,14 +72,13 @@ function makeEvents(processes: ProcessInfo[] = []) {
         return;
       }
       if (channel === CHANNELS.REQUEST_COMBINED_OUTPUT) {
-        (
-          payload as {
-            reply: (lines: { type: "stdout"; text: string }[]) => void;
-          }
-        ).reply([
-          { type: "stdout", text: "line one" },
-          { type: "stdout", text: "line two" },
-        ]);
+        const out: Array<{ type: "stdout"; text: string }> = outputLines.length
+          ? outputLines.map((text) => ({ type: "stdout" as const, text }))
+          : [
+              { type: "stdout" as const, text: "line one" },
+              { type: "stdout" as const, text: "line two" },
+            ];
+        (payload as { reply: (lines: typeof out) => void }).reply(out);
         return;
       }
       if (channel === CHANNELS.COMMAND_PIN) {
@@ -417,5 +416,36 @@ describe("overview panel render width safety", () => {
     );
     expect(header.slice(0, titleStart)).toContain("─");
     expect(header.slice(titleStart + "Processes".length)).toContain("─");
+  });
+
+  it("defaults the preview to the newest output page (newest-first)", () => {
+    // More lines than the fixed preview height (PREVIEW_HEIGHT = 8) so the
+    // newest-first default is observable: selecting/opening lands on the
+    // last page, not the first (oldest) page.
+    const lines = Array.from({ length: 12 }, (_, i) => `out line ${i + 1}`);
+    const processes = [
+      makeProcess({ id: "proc_1", name: "dev", status: "running" }),
+    ];
+    const events = makeEvents(processes, lines);
+    const tui = {
+      requestRender: () => {},
+      terminal: { rows: 24, columns: 112 },
+    } as unknown;
+    const component = new OverviewComponent({
+      events: events as never,
+      tui: tui as never,
+      theme: theme as never,
+      config: makeConfig() as never,
+      onClose: () => {},
+    });
+
+    const body = component.render(112).map(stripAnsi).join("\n");
+    // Newest page is lines 5-12 (12 total, height 8 -> start at 12-8=4 -> 5-12).
+    expect(body).toContain("5-12 of 12");
+    expect(body).toContain("out line 12");
+    expect(body).toContain("out line 5");
+    // The oldest lines (1-4) are off the newest page.
+    expect(body).not.toContain("out line 4");
+    expect(body).not.toContain("out line 1 ");
   });
 });

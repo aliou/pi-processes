@@ -27,7 +27,10 @@ const DEFAULT_ATTENTION: Record<
 > = {
   onSuccess: "context",
   onFailure: "turn",
-  onKilled: "ignore",
+  // External kills surface as context by default (see DEFAULT_NOTIFY_CONFIG
+  // in tools/notify.ts for rationale). Intentional stops are classified
+  // separately and never reach this branch.
+  onKilled: "context",
 };
 
 export interface NotificationServiceDeps {

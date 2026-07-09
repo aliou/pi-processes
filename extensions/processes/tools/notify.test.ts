@@ -7,7 +7,7 @@ describe("normalizeNotifyConfig", () => {
     expect(normalizeNotifyConfig(undefined)).toEqual({
       onSuccess: "context",
       onFailure: "turn",
-      onKilled: "ignore",
+      onKilled: "context",
       logMatches: [],
     });
   });
@@ -20,7 +20,7 @@ describe("normalizeNotifyConfig", () => {
     ).toEqual({
       onSuccess: "context",
       onFailure: "turn",
-      onKilled: "ignore",
+      onKilled: "context",
       logMatches: [
         {
           pattern: "ready",

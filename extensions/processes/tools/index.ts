@@ -57,7 +57,7 @@ export function registerProcessTool(
         "Use process start for long-running commands instead of shell background patterns like &, nohup, disown, or setsid; give each process a specific name.",
         "Use notify.logMatches on process start, and process update to change watches on a running process, instead of polling process output or restarting just to change watches.",
         "Use process output for targeted recent stdout/stderr inspection with pattern/mode filters; for deep log reads, use the log file paths from process list or process output with the read tool.",
-        "Use process stop for obsolete live processes and process clear for finished entries; by default failures trigger an agent turn, successes add context, and killed processes are ignored unless notify overrides it.",
+        "Use process stop for obsolete live processes and process clear for finished entries; by default failures trigger an agent turn, successes add context, and externally-killed processes add context unless notify overrides it.",
       ],
       parameters: ProcessesParams,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {

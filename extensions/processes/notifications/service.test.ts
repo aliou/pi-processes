@@ -204,12 +204,13 @@ describe("NotificationService", () => {
     service.dispose();
   });
 
-  it("does not emit for killed process with default config when not intentional", async () => {
+  it("emits a context notification for a killed process with default config when not intentional", async () => {
     const fakeManager = createFakeManager();
     const spy = createNotificationSpy();
     const registry = createNotificationRegistry();
 
-    // Default onKilled is "ignore", and killed is not forced display.
+    // External kills surface as context by default so the agent learns the
+    // process is gone rather than assuming it is still running.
     registry.register("proc_1", {});
 
     const service = createNotificationService({
@@ -231,7 +232,8 @@ describe("NotificationService", () => {
     });
     await flushQueuedMicrotasks();
 
-    expect(spy.emitted).toHaveLength(0);
+    expect(spy.emitted).toHaveLength(1);
+    expect(spy.emitted[0].attention).toBe("context");
 
     service.dispose();
   });

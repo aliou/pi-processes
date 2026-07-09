@@ -16,7 +16,11 @@ export const MAX_NOTIFY_PATTERN_LENGTH = MAX_LOG_MATCH_PATTERN_LENGTH;
 const DEFAULT_NOTIFY_CONFIG = {
   onSuccess: "context",
   onFailure: "turn",
-  onKilled: "ignore",
+  // External kills (outside this manager) surface as context by default so
+  // the agent and user learn that a managed process disappeared. Intentional
+  // stops via the tool/command path are classified separately and never reach
+  // this branch.
+  onKilled: "context",
 } as const satisfies Pick<NotifyConfig, "onSuccess" | "onFailure" | "onKilled">;
 
 export function normalizeNotifyConfig(input: unknown): NotifyConfig {
@@ -35,7 +39,8 @@ export function normalizeNotifyConfig(input: unknown): NotifyConfig {
       normalizeAttention(input.onSuccess, "notify.onSuccess") ?? "context",
     onFailure:
       normalizeAttention(input.onFailure, "notify.onFailure") ?? "turn",
-    onKilled: normalizeAttention(input.onKilled, "notify.onKilled") ?? "ignore",
+    onKilled:
+      normalizeAttention(input.onKilled, "notify.onKilled") ?? "context",
     logMatches: normalizeLogMatches(logMatches),
   };
 }

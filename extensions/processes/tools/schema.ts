@@ -131,7 +131,7 @@ const NotifyParams = Type.Object({
   onKilled: Type.Optional(
     StringEnum(PROCESS_NOTIFY_ATTENTIONS, {
       description:
-        "Agent attention when the process is killed. Defaults to ignore.",
+        "Agent attention when the process is killed. Defaults to context.",
     }),
   ),
   logMatches: Type.Optional(

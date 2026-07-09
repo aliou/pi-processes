@@ -75,7 +75,7 @@ describe("executeStart", () => {
     expect(details.notify).toEqual({
       onSuccess: "context",
       onFailure: "turn",
-      onKilled: "ignore",
+      onKilled: "context",
       logMatches: [
         {
           pattern: "ready",
@@ -110,7 +110,7 @@ describe("executeStart", () => {
     expect(registered).not.toBeNull();
     expect(registered?.onSuccess).toBe("context");
     expect(registered?.onFailure).toBe("turn");
-    expect(registered?.onKilled).toBe("ignore");
+    expect(registered?.onKilled).toBe("context");
     expect(registered?.logMatches).toHaveLength(1);
     expect(registered?.logMatches?.[0]?.pattern).toBe("ready");
   });

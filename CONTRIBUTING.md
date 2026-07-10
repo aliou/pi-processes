@@ -77,13 +77,13 @@ pnpm lint
 pnpm typecheck
 ```
 
-Useful manual process scripts:
+Useful manual process scripts live under `tests/e2e/scripts/`:
 
 ```bash
-./test/test-output.sh
-./test/test-exit-success.sh 5
-./test/test-exit-failure.sh 5
-./test/test-exit-crash.sh 5
+./tests/e2e/scripts/continuous-output.sh   # long-running stdout
+./tests/e2e/scripts/error-log.sh            # interleaved info/error on stdout+stderr
+./tests/e2e/scripts/exited-task.sh          # finite, exits 0
+./tests/e2e/scripts/crash-on-file.sh <name>  # waits for a marker file then crashes
 ```
 
 ## Docs conventions
@@ -121,16 +121,16 @@ The docs page is generated from `README.md` by an external build, not in this re
 
 ## Demo pattern
 
-For demo recording, use a small self-contained project with a realistic workflow.
+For demo recording, use a small self-contained project with a realistic workflow. The fixture scripts under `tests/e2e/scripts/` are good building blocks (for example `http-server.sh` for a dev server and `exited-task.sh` for a finite job).
 
-The best pattern used for this extension was a fake Northwind API project where Pi:
+A pattern that shows why background processes matter in a normal task instead of showing features one by one:
 
-1. starts a server in the background
-2. runs tests and sees failures
-3. runs migrations
-4. checks server logs
-5. updates seed data
-6. reruns tests
-7. cleans up the process
+1. Pi starts a server in the background
+2. Pi runs tests and sees failures
+3. Pi runs migrations
+4. Pi checks server logs
+5. Pi updates seed data
+6. Pi reruns tests
+7. Pi cleans up the process
 
-That pattern shows why background processes matter in a normal task instead of showing features one by one.
+See the `demo-setup` skill for the full demo recording workflow.

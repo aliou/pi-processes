@@ -1,1 +1,0 @@
-Start a background process named "http-server" that runs `bash ./tests/e2e/scripts/http-server.sh`. Use the process tool. Then use process output with an invalid regex pattern like "([", using regex mode. Confirm the tool reports a clear validation error about the invalid regular expression.

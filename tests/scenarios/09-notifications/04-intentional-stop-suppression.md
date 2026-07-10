@@ -1,1 +1,0 @@
-Start a long-running background process named "notify-stop" with the process tool. Then stop it with the process tool. Confirm that the stop result appears and that no extra killed process notification is sent for the intentional stop.

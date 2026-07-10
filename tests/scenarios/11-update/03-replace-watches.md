@@ -1,1 +1,0 @@
-Start a background process named "watcher" that prints "tick" every second with two log watches: one for "ready" and one for "error". Then use the process update action to replace all watches with a single watch for the pattern "done". Confirm that only the "done" watch is active after the update.

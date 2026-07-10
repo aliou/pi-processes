@@ -1,1 +1,0 @@
-Start a background process named "combined" that prints "tick" every second. Then use the process update action to rename it to "renamed-combined" and append a log watch for the pattern "error" -- all in a single update call. List processes to confirm the new name and check that the watch is active.

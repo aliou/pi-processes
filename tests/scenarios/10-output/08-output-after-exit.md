@@ -1,1 +1,0 @@
-Start a background process named "exited-task" that runs `bash ./tests/e2e/scripts/exited-task.sh`. Use the process tool. After it finishes, use process output to inspect its stdout. Confirm that output is still available after the process has exited.

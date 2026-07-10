@@ -13,84 +13,86 @@ description: Test workflows for the pi-processes extension. Use when validating 
   - provide a prompt the user sends to the agent, or
   - run automation via tmux.
 
-## Northwind Test Environment
+## Automated tests
 
-All process testing uses the **Northwind** fixture -- a fake Node.js project with shell scripts that simulate real behavior. See the `demo-setup` skill for the full Northwind reference.
+Unit and e2e tests cover behavior without needing a running Pi session.
 
-### Setting up a test environment
+- `pnpm test` runs unit tests (`src/**/*.test.ts`, `extensions/**/*.test.ts`). They mock child processes, the filesystem, timers, and Pi internals.
+- `pnpm test:e2e` runs end-to-end tests (`tests/e2e/**/*.e2e.ts`) against real child processes, real temp directories, and real log files.
 
-```bash
-test_dir="$HOME/tmp/$(date +%Y-%m-%d)-processes-test"
-mkdir -p "$test_dir/northwind/.pi/prompts"
-mkdir -p "$test_dir/northwind/scripts"
-```
+### E2E fixtures
 
-Register the extension in `northwind/.pi/settings.json`:
+E2E tests use `tests/e2e/fixtures.ts`. Each test gets a `cwd` temp directory that is removed on cleanup. Use the injected helpers:
 
-```json
-{
-  "packages": [
-    "/Users/alioudiallo/code/src/pi.dev/pi-processes"
-  ],
-  "defaultThinkingLevel": "off"
-}
-```
+- `addScript(name)` copies a fixture script from `tests/e2e/scripts/` into the test's `cwd` and makes it executable.
+- `addFile(name, content?)` creates a marker or input file in the test's `cwd`.
 
-### Key scripts for testing
+Write commands explicitly in tests, such as `./server.sh`, `bash ./crash-on-file.sh`, or `node ./watcher.mjs`.
 
-Copy from an existing Northwind fixture or create these:
+### Fixture scripts
+
+Available scripts under `tests/e2e/scripts/`:
 
 | Script | Behavior | Tests |
 |--------|----------|-------|
-| `server.sh` | Long-running with periodic stdout | Background process, dock logs, output action |
-| `dev.sh` | Long-running with HMR output | Multiple concurrent processes, dock interleaving |
-| `test.sh` | Stateful: fail/fail/pass cycle | alertOnFailure, output inspection, re-run |
-| `build.sh` | Finite, exits 0 | alertOnSuccess, process completion |
-| `migrate.sh` | Exits 0, creates marker file | Foreground execution |
-| `lint.sh` | Exits 1 with errors | Failure display, stderr |
-| `reset.sh` | Clears `/tmp/northwind-*` markers | Idempotent re-runs |
+| `continuous-output.sh` | Infinite stdout every 0.5s | Background process, dock logs, output action |
+| `combo-output.sh` | Mixed stdout/stderr | Stream filtering, output action |
+| `crash-on-file.sh` | Waits for a marker file, then exits non-zero | Crash handling, exit detection |
+| `error-log.sh` | Interleaved info/error lines | stderr filtering, log-match alerts |
+| `exited-task.sh` | Finite, exits 0 | Completion, alert-on-success |
+| `delayed-output.sh` | Waits before emitting | Readiness timing |
+| `emit-output.sh` | Emits a fixed set of lines | Output pagination |
+| `http-server.sh` | Minimal HTTP listener | Server lifecycle |
+| `mixed-output.sh` | Alternating streams | Stream selection |
+| `numbered-lines.sh` | Numbered lines | Scroll position, search |
+| `verbose-output.sh` | Large output volume | Truncation, tail behavior |
+| `wait-for-file.sh` | Blocks on a marker file | Synchronization |
+| `stateful-test-watcher.mjs` | Node script with state transitions | Watch mutations, update action |
 
-### Stateful test flow
+## Manual QA
 
-The test script checks marker files to determine behavior:
-1. No `/tmp/northwind-migrated` -> fails with missing table error
-2. No `/tmp/northwind-seeded` -> fails with missing seed data
-3. Both present -> all tests pass
+When a feature needs a human in the loop (visual layout, keybinding feel, widget placement), drive it through a prompt the user sends to the agent, or via tmux. Never ask the user to start processes in a shell.
 
-Always run `npm run reset` before a test session.
+### /ps panel
 
-## Prompt workflow
-
-1. Create a prompt file in `northwind/.pi/prompts/`:
-   - Name it after the scenario: `test-shipping-feature.md`, `concurrent-processes.md`
-   - Body: only the actionable steps, no headers or meta
-2. Prompt must instruct the agent to use npm scripts (not raw shell commands)
-3. Prompt should tell the agent to not wait for confirmation between steps
-
-## Manual QA checklist
-
-### /ps overlay
-
-- `/ps` opens full panel
-- `j/k` selects process
-- `J/K` scrolls logs
-- `enter` focuses selected process
-- `x` kills selected process
-- `c` clears finished processes
-- `q` quits
+- `/ps` opens the panel
+- `j/k` or arrow keys move selection
+- `J/K` scroll the preview
+- `enter` pins the selected process to the dock (or unpins if already pinned)
+- `x` kills the selected process
+- `c` clears finished entries
+- `q` or `esc` closes
 
 ### /ps:logs overlay
 
-- `/ps:logs` opens overlay directly
-- `Tab`/`Shift-Tab` switches tabs
-- `j/k` scrolls
+- `/ps:logs` opens the log overlay
+- `tab` / `shift+tab` switch process tabs (viewer state is cached per process)
+- `g/G` jump to top or bottom
+- `j/k` or arrow keys scroll
+- `s` switches between combined, stdout, and stderr
 - `f` toggles follow mode
-- Search: `/` enters search, `Enter` activates, `n/N` cycles, `Esc` clears
+- `/` enters search, `n/N` cycles matches, `esc` clears search
+- `q` or `esc` closes
+
+### Dock and pin
+
+- `/ps:dock expand|collapse|close` controls dock visibility
+- `/ps:pin [id|name]` focuses the dock on one process (picker with no args)
+
+### Kill and clear
+
+- `/ps:kill [id|name]` stops a running process (picker with no args)
+- `/ps:clear` removes finished entries and frees their log storage
+
+### Settings
+
+- `/ps:settings` opens the settings list, including the status widget toggle
 
 ## Reporting format
 
 When reporting test results:
-- Prompt file used
+
+- Test file or prompt used
 - Pass/fail per checklist item
 - Exact reproduction steps for failures
 - Expected vs actual behavior

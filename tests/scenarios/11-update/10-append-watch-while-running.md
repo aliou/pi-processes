@@ -1,1 +1,0 @@
-Start a background process named "delayed-notify" using the script at tests/e2e/scripts/delayed-output.sh. Do not set any log watches at start. After about 5 seconds, use the process update action to append a log watch for the pattern "finally". The watch should fire when the script eventually prints its output, and it should trigger an agent turn.

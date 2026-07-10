@@ -1,1 +1,0 @@
-Start a background process named "heartbeat" that prints "tick" every second. Stop it with the process tool. Then try to rename it to "should-fail" using the process update action. The update should fail because the process is no longer running.

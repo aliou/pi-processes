@@ -1,1 +1,0 @@
-Start a background process named "no-output-yet" that runs `bash ./tests/e2e/scripts/delayed-output.sh`. Use the process tool. Then immediately use process output before it has printed anything. Confirm the tool returns a "No output yet" message rather than an error.

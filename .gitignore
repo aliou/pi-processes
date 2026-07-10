@@ -38,5 +38,4 @@ result-*
 
 # Pi
 .pi/
-!.pi/extensions/dev-processes-scenarios.ts
 .agents/plans/*.md

@@ -1,1 +1,0 @@
-Start a background process named "verbose" that runs `bash ./tests/e2e/scripts/verbose-output.sh`. Use the process tool. Wait a few seconds for it to produce substantial output, then use process output with tailLines set to 10 to see only the most recent 10 lines. Then try with tailLines set to 50 to confirm more output is returned.

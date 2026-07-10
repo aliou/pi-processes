@@ -18,6 +18,11 @@ import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
 import { formatRuntime, truncateCmd } from "../../../src/utils/format";
 import { isRecord } from "../../../src/utils/is-record";
 import {
+  LineComponent,
+  LinesComponent,
+  processStatusTone,
+} from "../../shared/ui";
+import {
   type ProcessLogLine,
   requestClear,
   requestCombinedOutput,
@@ -60,7 +65,6 @@ const MIN_OVERVIEW_WIDTH = 40;
 const PREVIEW_HEIGHT = 8;
 
 type Mode = "normal" | "filter-typing";
-type ProcessStatusTone = "success" | "warning" | "error" | "muted";
 
 /**
  * Full-screen overview of managed processes. Replaces the editor while open.
@@ -651,45 +655,9 @@ export class OverviewComponent implements Component {
   }
 }
 
-// --- small helper components (mirror the logs overlay idiom) ---
-
-class LineComponent implements Component {
-  constructor(private readonly renderLine: (width: number) => string) {}
-  render(width: number): string[] {
-    return [this.renderLine(width)];
-  }
-  invalidate(): void {}
-}
-
-class LinesComponent implements Component {
-  constructor(private readonly renderLines: (width: number) => string[]) {}
-  render(width: number): string[] {
-    return this.renderLines(width);
-  }
-  invalidate(): void {}
-}
-
 // --- formatting helpers (pure, unit-testable) ---
 
-export function renderStatusDot(
-  process: ProcessInfo,
-  active: boolean,
-  theme: Theme,
-): string {
-  if (process.success === false && process.status !== "killed") {
-    return theme.fg("error", "!");
-  }
-  if (process.status === "terminating") {
-    return theme.fg("warning", "●");
-  }
-  if (LIVE_STATUSES.has(process.status)) {
-    return active ? theme.fg("accent", "●") : theme.fg("dim", "○");
-  }
-  if (process.status === "exited" && process.success) {
-    return theme.fg("success", "●");
-  }
-  return theme.fg("dim", "■");
-}
+export { statusDot as renderStatusDot } from "../../shared/ui";
 
 export function formatStatusShort(process: ProcessInfo): string {
   if (LIVE_STATUSES.has(process.status)) return process.status;
@@ -700,15 +668,7 @@ export function formatStatusShort(process: ProcessInfo): string {
 }
 
 function formatColoredStatusShort(process: ProcessInfo, theme: Theme): string {
-  return theme.fg(getProcessStatusTone(process), formatStatusShort(process));
-}
-
-function getProcessStatusTone(process: ProcessInfo): ProcessStatusTone {
-  if (process.status === "running") return "success";
-  if (process.status === "terminating") return "warning";
-  if (process.status === "terminate_timeout") return "error";
-  if (process.status === "killed") return "warning";
-  return process.success ? "muted" : "error";
+  return theme.fg(processStatusTone(process), formatStatusShort(process));
 }
 
 /** Sort + filter view used by the overview. Pure, unit-testable. */

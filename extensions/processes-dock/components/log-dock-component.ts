@@ -9,6 +9,7 @@ import type { ProcessInfo } from "../../../src/types";
 import { LIVE_STATUSES } from "../../../src/types";
 import { stripAnsi } from "../../../src/utils/ansi";
 import { renderProcessTab } from "../../process-tabs";
+import { LineComponent, LinesComponent, RuleComponent } from "../../shared/ui";
 import type { ProcessLogLine } from "../client";
 import type { DockState } from "../widget/types";
 
@@ -281,34 +282,4 @@ function centerLine(content: string, width: number, height: number): string[] {
 function padName(value: string, width: number): string {
   const name = truncateToWidth(value, width, "", true);
   return `${name}${" ".repeat(Math.max(0, width - visibleWidth(name)))}`;
-}
-
-class LineComponent implements Component {
-  constructor(private readonly renderLine: (width: number) => string) {}
-
-  render(width: number): string[] {
-    return [this.renderLine(width)];
-  }
-
-  invalidate(): void {}
-}
-
-class LinesComponent implements Component {
-  constructor(private readonly renderLines: (width: number) => string[]) {}
-
-  render(width: number): string[] {
-    return this.renderLines(width);
-  }
-
-  invalidate(): void {}
-}
-
-class RuleComponent implements Component {
-  constructor(private readonly theme: Theme) {}
-
-  render(width: number): string[] {
-    return [this.theme.fg("dim", "─".repeat(Math.max(0, width)))];
-  }
-
-  invalidate(): void {}
 }

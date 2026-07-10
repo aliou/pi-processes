@@ -1,6 +1,6 @@
 import type { EventBus } from "@earendil-works/pi-coding-agent";
 import type { AutocompleteItem } from "@earendil-works/pi-tui";
-import { formatStatus } from "../../src/utils/format";
+import { formatProcessSelectionDescription } from "../shared/ui";
 import { requestProcessList } from "./client";
 
 export function allProcessCompletions(
@@ -24,7 +24,7 @@ function buildCompletions(
     .map((process) => ({
       value: process.id,
       label: `${process.name} (${process.id})`,
-      description: `${formatStatus(process)} — ${process.command}`,
+      description: formatProcessSelectionDescription(process),
     }));
 
   return items.length > 0 ? items : null;

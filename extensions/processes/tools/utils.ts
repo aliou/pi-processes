@@ -7,13 +7,12 @@ import {
   formatStatus,
   formatTimestamp,
 } from "../../../src/utils";
+import { processStatusTone } from "../../shared/ui";
 import { truncateToWidth } from "../utils/truncate";
 
 export interface RenderOptions {
   expanded?: boolean;
 }
-
-export type ProcessStatusTone = "success" | "warning" | "error" | "muted";
 
 export function buildField(
   label: string,
@@ -100,15 +99,7 @@ export function formatColoredProcessStatus(
   process: ProcessInfo,
   theme: Theme,
 ): string {
-  return theme.fg(getProcessStatusTone(process), formatStatus(process));
-}
-
-export function getProcessStatusTone(process: ProcessInfo): ProcessStatusTone {
-  if (process.status === "running") return "success";
-  if (process.status === "terminating") return "warning";
-  if (process.status === "terminate_timeout") return "error";
-  if (process.status === "killed") return "warning";
-  return process.success ? "muted" : "error";
+  return theme.fg(processStatusTone(process), formatStatus(process));
 }
 
 export function plural(noun: string, count: number): string {

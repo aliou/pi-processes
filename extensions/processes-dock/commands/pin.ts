@@ -9,7 +9,7 @@ import {
   type SelectItem,
   SelectList,
 } from "@earendil-works/pi-tui";
-import { formatStatus } from "../../../src/utils/format";
+import { formatProcessSelectionDescription } from "../../shared/ui";
 import { requestProcess, requestProcessList } from "../client";
 import type { DockController } from "../widget/setup";
 
@@ -85,7 +85,10 @@ async function pickPinTarget(
     ...processes.map((process) => ({
       label: `${process.name} (${process.id})`,
       value: process.id,
-      description: `${formatStatus(process)} — ${process.command}${process.id === pinnedProcessId ? " — pinned" : ""}`,
+      description: formatProcessSelectionDescription(
+        process,
+        process.id === pinnedProcessId ? " — pinned" : "",
+      ),
     })),
   ];
 
@@ -147,7 +150,7 @@ function completions(
     .map((process) => ({
       value: process.id,
       label: `${process.name} (${process.id})`,
-      description: `${formatStatus(process)} — ${process.command}`,
+      description: formatProcessSelectionDescription(process),
     }));
   const items = [...clearItems, ...processItems];
   return items.length > 0 ? items : null;

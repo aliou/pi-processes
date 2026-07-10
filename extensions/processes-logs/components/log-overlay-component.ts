@@ -18,6 +18,12 @@ import {
 import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
 import { formatRuntime, truncateCmd } from "../../../src/utils/format";
 import { isRecord } from "../../../src/utils/is-record";
+import {
+  LineComponent,
+  LinesComponent,
+  RuleComponent,
+  statusDot,
+} from "../../shared/ui";
 import { requestProcessList } from "../client";
 import {
   connectToProcessLogs,
@@ -593,17 +599,7 @@ export class LogOverlayComponent implements Component {
   }
 
   private renderTabDot(process: ProcessInfo, active: boolean): string {
-    const t = this.opts.theme;
-    if (process.status === "running") {
-      return active ? t.fg("accent", "●") : t.fg("dim", "○");
-    }
-    if (process.status === "exited" && process.success) {
-      return t.fg("success", "●");
-    }
-    if (process.status === "terminating") {
-      return t.fg("warning", "●");
-    }
-    return t.fg("error", "●");
+    return statusDot(process, active, this.opts.theme);
   }
 
   private renderFooterKeys(width: number): string {
@@ -632,36 +628,6 @@ export class LogOverlayComponent implements Component {
       width,
     );
   }
-}
-
-class LineComponent implements Component {
-  constructor(private readonly renderLine: (width: number) => string) {}
-
-  render(width: number): string[] {
-    return [this.renderLine(width)];
-  }
-
-  invalidate(): void {}
-}
-
-class LinesComponent implements Component {
-  constructor(private readonly renderLines: (width: number) => string[]) {}
-
-  render(width: number): string[] {
-    return this.renderLines(width);
-  }
-
-  invalidate(): void {}
-}
-
-class RuleComponent implements Component {
-  constructor(private readonly theme: Theme) {}
-
-  render(width: number): string[] {
-    return [this.theme.fg("dim", "─".repeat(Math.max(0, width)))];
-  }
-
-  invalidate(): void {}
 }
 
 function isLogsConnectionError(

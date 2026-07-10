@@ -10,7 +10,7 @@ import {
   SelectList,
 } from "@earendil-works/pi-tui";
 import { LIVE_STATUSES } from "../../../src/types";
-import { formatStatus } from "../../../src/utils/format";
+import { formatProcessSelectionDescription } from "../../shared/ui";
 import { requestKill, requestProcess, requestProcessList } from "../client";
 
 /**
@@ -94,7 +94,7 @@ async function pickTarget(
     .map((process) => ({
       label: `${process.name} (${process.id})`,
       value: process.id,
-      description: `${formatStatus(process)} — ${process.command}`,
+      description: formatProcessSelectionDescription(process),
     }));
 
   if (items.length === 0) {
@@ -146,7 +146,7 @@ function completions(
     .map((process) => ({
       value: process.id,
       label: `${process.name} (${process.id})`,
-      description: `${formatStatus(process)} — ${process.command}`,
+      description: formatProcessSelectionDescription(process),
     }));
   return items.length > 0 ? items : null;
 }

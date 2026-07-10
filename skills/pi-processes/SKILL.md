@@ -16,7 +16,8 @@ Use the `process` tool for commands that should keep running while the agent con
 5. Use `process output` only for targeted recent inspection.
 6. Use `read` on the log file paths from `process list` or `process output` for deep log reads.
 7. Use `process update` to rename a process or change watches.
-8. Use `process stop` for obsolete live processes and `process clear` for finished entries.
+8. Use `process write` to send bytes to a running process's stdin.
+9. Use `process stop` for obsolete live processes and `process clear` for finished entries.
 
 ## Actions
 
@@ -33,6 +34,7 @@ Good:
   "action": "start",
   "name": "web-dev",
   "command": "pnpm dev",
+  "cwd": "/path/to/project",
   "notify": {
     "logMatches": [
       { "pattern": "ready", "mode": "literal", "stream": "both" },
@@ -41,6 +43,10 @@ Good:
   }
 }
 ```
+
+Optional `cwd` sets the working directory for the spawned command. Omit it to inherit the extension's process directory.
+
+Empty `logMatches` patterns (literal or regex) are rejected at start and update time. Use `mode: "regex"` only when literal matching is not enough, and scope by `stream` to cut noise.
 
 Bad:
 
@@ -131,6 +137,28 @@ Bad:
 
 ```text
 Stopping and restarting a server only to add a readiness matcher.
+```
+
+### `process write`
+
+Sends bytes to a running process's stdin.
+
+Use it to drive interactive servers, REPLs, and CLIs that expect input after they start. Pass `input` for the bytes to write, and set `end: true` to close stdin (for example to signal EOF to a waiting process).
+
+Good:
+
+```json
+{ "action": "write", "id": "proc_1", "input": "quit\n" }
+```
+
+```json
+{ "action": "write", "id": "proc_1", "end": true }
+```
+
+Bad:
+
+```text
+Writing with no `input` and no `end` (a no-op). The tool rejects it.
 ```
 
 ### `process stop`
@@ -267,9 +295,11 @@ Stop live processes that are no longer useful, especially duplicate dev servers 
 
 Users can inspect and control processes with:
 
-- `/ps` for overview/control.
+- `/ps` for overview and control.
 - `/ps:logs` for focused logs.
 - `/ps:dock` and `/ps:pin` when the dock extension is loaded.
+- `/ps:kill` to stop a running process.
+- `/ps:clear` to remove finished entries.
 - `/ps:settings` for package settings.
 
 Do not ask the user to start long-running commands manually. If a process needs to run, use the `process` tool.

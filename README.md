@@ -10,6 +10,8 @@ This extension lets Pi keep long-running commands alive while the conversation c
 
 When a task needs a long-running command, Pi can start it in the background by itself and keep helping with the rest of the work.
 
+[![Pi starts a long-running process and keeps working](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/agent-starts-processes.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/agent-starts-processes.mp4)
+
 That means Pi can, for example:
 
 - start a dev server and keep coding
@@ -17,32 +19,13 @@ That means Pi can, for example:
 - run a local API while it inspects logs
 - watch build output without blocking the conversation
 
-You can then inspect, pin, or stop those processes from the UI.
-
-<!-- VIDEO: {"id":"agent-starts-processes","title":"Pi starts a long-running process and keeps working"} -->
-
-## Installation
-
-Requirements:
-
-- Pi `0.80.3` or newer
-- Node.js `22.19.0` or newer for local development
-
-From npm:
-
-```bash
-pi install npm:@aliou/pi-processes
-```
-
-From git:
-
-```bash
-pi install git:github.com/aliou/pi-processes
-```
+You can then inspect, pin, stop, or clear those processes from the UI.
 
 ## Open the process panel
 
-Use `/ps` to open the main process panel.
+Use `/ps` to open the main process panel. It shows running and finished processes, with the most recent output preview. The preview opens on the newest page so you can see live activity without scrolling.
+
+[![Browse and manage processes from the panel](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/process-panel.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/process-panel.mp4)
 
 From there you can:
 
@@ -61,11 +44,11 @@ Keys:
 - `c`: clear finished processes
 - `q` or `esc`: close
 
-<!-- VIDEO: {"id":"process-panel","title":"Browse and manage processes from the panel"} -->
-
 ## Inspect logs
 
-Use `/ps:logs [id|name]` to open the log overlay for one process.
+Use `/ps:logs [id|name]` to open the log overlay for one process. The viewer is cached per process, so switching tabs preserves scroll position and follow mode.
+
+[![Open the log overlay and inspect output](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/inspect-logs.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/inspect-logs.mp4)
 
 This is useful when Pi started a server, watcher, or local API and you want to follow what it is doing in more detail.
 
@@ -80,29 +63,55 @@ Keys:
 - `n/N`: move between search matches
 - `q` or `esc`: close
 
-<!-- VIDEO: {"id":"inspect-logs","title":"Open the log overlay and inspect output"} -->
-
 ## Pin one process
 
 Use `/ps:pin [id|name]` to keep the dock focused on one process.
+
+[![Pin the dock to one process](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/pin-process.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/pin-process.mp4)
 
 This is useful when one process matters more than the others, such as a dev server or a test watcher.
 
 Without arguments, Pi shows a picker.
 
-<!-- VIDEO: {"id":"pin-process","title":"Pin the dock to one process"} -->
-
 ## Control the dock
 
 Use `/ps:dock [expand|collapse|close]` to control dock visibility.
 
+[![Show, hide, and use the dock](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/dock-control.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/dock-control.mp4)
+
 The dock gives you a compact live view without leaving the conversation.
 
-<!-- VIDEO: {"id":"dock-control","title":"Show, hide, and use the dock"} -->
+## Stop and clear processes
+
+Use `/ps:kill [id|name]` to stop a running process, and `/ps:clear` to remove finished entries from the panel and free their log storage.
+
+[![Stop and clear processes](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/stop-and-clear.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/stop-and-clear.mp4)
+
+`/ps:kill` waits for the process to actually exit (or time out), so the result it reports reflects what happened. Without arguments, Pi shows a picker.
+
+`/ps:clear` never touches live processes.
+
+## Keep a status line in view
+
+Enable the status widget in `/ps:settings` to show a compact line of running processes below the editor. Each process shows a status dot, its name, and its state, with `+N more` overflow when the line does not fit.
+
+[![Status widget below the editor](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/status-widget.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/status-widget.mp4)
+
+It is disabled by default. The widget reflows on resize and clears itself when the process list is empty.
+
+## Send input to a process
+
+Use the `process` tool with `action: "write"` to send bytes to a running process's stdin. This is how you drive interactive servers, REPLs, and CLIs that expect input after they start.
+
+[![Send input to a running process](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/send-input.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/send-input.mp4)
+
+Pass `input` for the bytes to write, and set `end: true` to close stdin (for example to signal EOF to a waiting process).
 
 ## Adjust settings
 
 Use `/ps:settings` to configure the extension.
+
+[![Adjust process extension settings](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/settings.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/settings.mp4)
 
 Available settings include:
 
@@ -111,9 +120,8 @@ Available settings include:
 - shell path override
 - dock defaults
 - follow mode behavior
+- status widget toggle
 - optional background command interception
-
-<!-- VIDEO: {"id":"settings","title":"Adjust process extension settings"} -->
 
 ## Platform support
 
@@ -123,7 +131,7 @@ Available settings include:
 
 ## Runtime log watch alerts
 
-Use `process` tool `start` with `notify.logMatches` to trigger immediate alerts while the process is still running.
+Use the `process` tool `start` action with `notify.logMatches` to trigger immediate alerts while the process is still running.
 
 - default behavior: each watch fires once (`repeat: false`)
 - set `repeat: true` to trigger on every match
@@ -136,6 +144,7 @@ Example: server ready marker (one-time default)
   "action": "start",
   "name": "dev-server",
   "command": "pnpm dev",
+  "cwd": "/path/to/project",
   "notify": {
     "logMatches": [
       { "pattern": "ready on http://localhost:3000" }
@@ -178,7 +187,7 @@ Example: repeatable watch on stdout only
 }
 ```
 
-Invalid regex patterns fail fast at process start with a clear error.
+Empty patterns (literal or regex) are rejected at start and update time. Invalid regex patterns fail fast with a clear error.
 
 ## Troubleshooting
 

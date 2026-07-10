@@ -31,12 +31,12 @@ pnpm test:e2e
 ## Repository layout
 
 - `src/` - Pi-agnostic process management, types, protocol, and utilities
-- `extensions/processes/` - core extension, process tool, settings, lifecycle hooks, notifications, protocol handlers, `/ps`, and `/ps:settings`
+- `extensions/processes/` - core extension, process tool (start, list, output, update, write, stop, clear), settings, lifecycle hooks, notifications, protocol handlers, `/ps`, `/ps:kill`, `/ps:clear`, and `/ps:settings`
 - `extensions/processes-logs/` - `/ps:logs` command and log overlay
-- `extensions/processes-dock/` - `/ps:dock`, `/ps:pin`, and the dock widget
+- `extensions/processes-dock/` - `/ps:dock`, `/ps:pin`, the dock widget, and the status widget
+- `extensions/shared/` - shared UI helpers (`statusDot`, `processStatusTone`, `LineComponent`, etc.) used across all three extensions
 - `skills/` - shipped package skills
 - `.agents/skills/` - local repo-only skills for development workflows
-- `.github/docs-site/` - isolated docs page build
 
 ## Package metadata
 
@@ -107,23 +107,17 @@ Avoid putting these in `README.md`:
 
 ### Video placeholders
 
-Use HTML comments in `README.md`:
+Use markdown link thumbnails with a GIF poster that links to the MP4, matching the `pi-ts-aperture` convention:
 
 ```md
-<!-- VIDEO: {"id":"process-panel","title":"Browse and manage processes from the panel"} -->
+[![Browse and manage processes from the panel](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/process-panel.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/process-panel.mp4)
 ```
 
-GitHub ignores these comments. The docs page build turns them into video blocks.
-
-Add one placeholder for each feature section.
+Assets live under `https://assets.aliou.me/pi-extensions/demos/processes/<version>/<slug>.{gif,mp4}`. Add one link per feature section.
 
 ## Docs page build
 
-The generated docs page lives under `.github/docs-site/` and is isolated from the extension source.
-
-It reads `README.md`, converts markdown into structured content, replaces video placeholders, highlights code with Shiki, and builds a static page with Vite and Tailwind.
-
-The GitHub Actions workflow for this lives in `.github/workflows/docs-page.yml`.
+The docs page is generated from `README.md` by an external build, not in this repo. Keep `README.md` self-contained: only standard markdown and the demo link pattern above.
 
 ## Demo pattern
 

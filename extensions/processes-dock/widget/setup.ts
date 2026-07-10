@@ -21,9 +21,11 @@ import {
 import { renderLogDock } from "../components/log-dock-component";
 import { createDockState } from "../dock-state";
 import { connectToProcessLogs, type LogsConnection } from "../logs-client";
+import { renderStatusWidget } from "./status";
 import type { DockActions, DockState } from "./types";
 
 const DOCK_WIDGET_KEY = "processes-dock";
+const STATUS_WIDGET_KEY = "processes-status";
 const MAX_NOTIFY_MARKERS_PER_PROCESS = 100;
 const MAX_PREVIEW_PROCESSES = 8;
 const REFRESH_THROTTLE_MS = 125;
@@ -114,6 +116,33 @@ export function setupDockWidgets(
     );
   };
 
+  const renderStatus = () => {
+    if (disposed) return;
+    if (!config.widget.showStatusWidget) {
+      ctx.ui.setWidget(STATUS_WIDGET_KEY, undefined, {
+        placement: "belowEditor",
+      });
+      return;
+    }
+    if (processes.length === 0) {
+      ctx.ui.setWidget(STATUS_WIDGET_KEY, undefined, {
+        placement: "belowEditor",
+      });
+      return;
+    }
+    // The width is only known at render time, so hand Pi a factory that
+    // renders against the actual belowEditor column count instead of baking a
+    // static width from process.stdout.columns (which drifts on resize / splits).
+    ctx.ui.setWidget(
+      STATUS_WIDGET_KEY,
+      (_tui, theme: Theme) => ({
+        render: (width: number) => renderStatusWidget(processes, theme, width),
+        invalidate: () => undefined,
+      }),
+      { placement: "belowEditor" },
+    );
+  };
+
   const hardRefresh = () => {
     if (disposed) return;
     processes = sortProcesses(requestProcessList(events));
@@ -147,6 +176,7 @@ export function setupDockWidgets(
     }
 
     render();
+    renderStatus();
   };
 
   const scheduleRefresh = () => {
@@ -356,6 +386,9 @@ export function setupDockWidgets(
       for (const dispose of disposers.splice(0)) dispose();
       ctx.ui.setWidget(DOCK_WIDGET_KEY, undefined, {
         placement: "aboveEditor",
+      });
+      ctx.ui.setWidget(STATUS_WIDGET_KEY, undefined, {
+        placement: "belowEditor",
       });
     },
   };

@@ -31,6 +31,7 @@ export interface FollowConfig {
 }
 
 export interface WidgetConfig {
+  showStatusWidget?: boolean;
   dockDefaultState?: "closed" | "collapsed" | "expanded";
   dockHeight?: number;
 }

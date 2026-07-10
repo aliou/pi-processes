@@ -20,6 +20,7 @@ export const DEFAULT_CONFIG: ProcessProtocolConfig = {
     autoHideOnFinish: false,
   },
   widget: {
+    showStatusWidget: false,
     dockDefaultState: "closed",
     dockHeight: 12,
   },

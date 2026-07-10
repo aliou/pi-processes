@@ -32,7 +32,11 @@ describe("001 v0.9.4 to v0.10.0 config migration", () => {
       execution: { shellPath: "/bin/zsh" },
       interception: { blockBackgroundCommands: false },
       follow: { enabledByDefault: true, autoHideOnFinish: true },
-      widget: { dockDefaultState: "closed", dockHeight: 9 },
+      widget: {
+        showStatusWidget: true,
+        dockDefaultState: "closed",
+        dockHeight: 9,
+      },
     });
   });
 
@@ -57,6 +61,14 @@ describe("001 v0.9.4 to v0.10.0 config migration", () => {
     expect(
       needsConfigV094ToV0100Migration({
         widget: { showStatusWidget: false } as unknown as never,
+      }),
+    ).toBe(false);
+    expect(
+      needsConfigV094ToV0100Migration({
+        widget: {
+          showStatusWidget: true,
+          dockDefaultState: "hidden" as "closed",
+        } as unknown as never,
       }),
     ).toBe(true);
   });

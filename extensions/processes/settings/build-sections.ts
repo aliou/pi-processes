@@ -46,6 +46,13 @@ export function buildSections(
   const logsSection: SettingsSection = {
     label: "Interfaces",
     items: [
+      boolItem(
+        "widget.showStatusWidget",
+        "Status widget",
+        "Show a one-line summary of managed processes below the editor.",
+        scopedConfig.widget?.showStatusWidget,
+        resolved.widget.showStatusWidget,
+      ),
       buildOverviewDetailItem(scopedConfig, resolved, ctx),
       buildLogsDetailItem(scopedConfig, resolved, ctx),
       buildDockDetailItem(scopedConfig, resolved, ctx),

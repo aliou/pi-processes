@@ -8,7 +8,10 @@ import { setNestedValue } from "@aliou/pi-utils-settings";
 
 import type { ProcessConfig } from "../config";
 
-const BOOLEAN_FIELDS = new Set(["interception.blockBackgroundCommands"]);
+const BOOLEAN_FIELDS = new Set([
+  "interception.blockBackgroundCommands",
+  "widget.showStatusWidget",
+]);
 
 export function applySettingChange(
   id: string,

@@ -55,6 +55,7 @@ export interface ConfigV0100 {
     autoHideOnFinish?: boolean;
   };
   widget?: {
+    showStatusWidget?: boolean;
     dockDefaultState?: DockDefaultStateV0100;
     dockHeight?: number;
   };
@@ -67,17 +68,13 @@ export interface ConfigV0100 {
  * execution, interception, processList, output, and follow.
  *
  * Widget settings changed:
- * - widget.showStatusWidget was removed with the status widget.
  * - widget.dockDefaultState "hidden" became "closed".
  * - widget.dockHeight keeps the same key but means dock log rows.
+ * - widget.showStatusWidget is preserved (still controls the status widget).
  */
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function hasOwn(record: Record<string, unknown>, key: string): boolean {
-  return Object.hasOwn(record, key);
 }
 
 function setIfDefined<T extends object, K extends keyof T>(
@@ -104,10 +101,7 @@ export function needsConfigV094ToV0100Migration(
   const root = config as Record<string, unknown>;
   const widget = isRecord(root.widget) ? root.widget : undefined;
 
-  return (
-    Boolean(widget && hasOwn(widget, "showStatusWidget")) ||
-    widget?.dockDefaultState === "hidden"
-  );
+  return widget?.dockDefaultState === "hidden";
 }
 
 export function migrateConfigV094ToV0100(config: ConfigV094): ConfigV0100 {
@@ -160,6 +154,7 @@ export function migrateConfigV094ToV0100(config: ConfigV094): ConfigV0100 {
 
   if (config.widget) {
     const widget: NonNullable<ConfigV0100["widget"]> = {};
+    setIfDefined(widget, "showStatusWidget", config.widget.showStatusWidget);
     setIfDefined(
       widget,
       "dockDefaultState",
@@ -185,5 +180,5 @@ export const configV094ToV0100Migration: Migration<ProcessConfig> = {
   shouldRun: (config) => needsConfigV094ToV0100Migration(config),
   run: (config) => migrateConfigV094ToV0100(config as ConfigV094),
   message:
-    "Migrated pi-processes settings to the current schema. Removed stale status-widget settings and mapped dock hidden state to closed.",
+    "Migrated pi-processes settings to the current schema. Mapped the dock hidden state to closed.",
 };

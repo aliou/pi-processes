@@ -272,39 +272,6 @@ describe("NotificationService", () => {
     service.dispose();
   });
 
-  it("forces emit for timeout even when attention is ignore", async () => {
-    const fakeManager = createFakeManager();
-    const spy = createNotificationSpy();
-    const registry = createNotificationRegistry();
-
-    registry.register("proc_1", { onFailure: "ignore" });
-
-    const service = createNotificationService({
-      events: spy.events,
-      manager: fakeManager as never,
-      registry,
-      getProcess: (id) => processes.get(id) ?? null,
-    });
-
-    fakeManager.emit({
-      type: "process_ended",
-      info: makeInfo({
-        id: "proc_1",
-        status: "terminate_timeout",
-        success: false,
-        endReason: "kill_timeout",
-        exitCode: null,
-      }),
-    });
-    await flushQueuedMicrotasks();
-
-    expect(spy.emitted).toHaveLength(1);
-    expect(spy.emitted[0].kind).toBe("timeout");
-    expect(spy.emitted[0].attention).toBe("context");
-
-    service.dispose();
-  });
-
   it("emits log match notification on output changed", () => {
     const fakeManager = createFakeManager();
     const spy = createNotificationSpy();

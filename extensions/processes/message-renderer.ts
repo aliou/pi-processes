@@ -88,8 +88,6 @@ function summaryVerb(details: ProcessNotificationDetails): string {
       return details.exitCode === null || details.exitCode === undefined
         ? "failed"
         : `failed exit(${details.exitCode})`;
-    case "timeout":
-      return "timed out while stopping";
     case "killed":
       return "killed";
     case "log_match":
@@ -106,7 +104,6 @@ function colorKind(
     case "success":
       return theme.fg("success", text);
     case "killed":
-    case "timeout":
       return theme.fg("warning", text);
     case "failure":
     case "crash":

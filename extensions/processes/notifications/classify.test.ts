@@ -31,18 +31,6 @@ describe("classifyProcessEnd", () => {
     );
   });
 
-  it("classifies terminate_timeout as timeout", () => {
-    expect(
-      classifyProcessEnd(
-        makeInfo({
-          status: "terminate_timeout",
-          success: false,
-          endReason: "kill_timeout",
-        }),
-      ),
-    ).toBe("timeout");
-  });
-
   it("classifies killed status as killed", () => {
     expect(
       classifyProcessEnd(
@@ -96,18 +84,6 @@ describe("classifyProcessEnd", () => {
   it("classifies exit code 0 with false success as success (success field takes precedence)", () => {
     // success=true with exitCode 0 is the normal path
     expect(classifyProcessEnd(makeInfo({ success: true }))).toBe("success");
-  });
-
-  it("prioritizes timeout over other classifications", () => {
-    expect(
-      classifyProcessEnd(
-        makeInfo({
-          status: "terminate_timeout",
-          success: false,
-          endReason: "kill_timeout",
-        }),
-      ),
-    ).toBe("timeout");
   });
 
   it("prioritizes killed status before success check", () => {

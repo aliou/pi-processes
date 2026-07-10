@@ -95,8 +95,7 @@ export function createNotificationService(deps: NotificationServiceDeps): {
     const config = registry.get(info.id);
     const attention = resolveAttention(kind, config);
 
-    const shouldForceDisplay =
-      kind === "crash" || kind === "failure" || kind === "timeout";
+    const shouldForceDisplay = kind === "crash" || kind === "failure";
 
     if (attention === "ignore" && !shouldForceDisplay) {
       cleanupMatcherState(info.id);
@@ -159,8 +158,6 @@ export function createNotificationService(deps: NotificationServiceDeps): {
         return config?.onFailure ?? DEFAULT_ATTENTION.onFailure;
       case "killed":
         return config?.onKilled ?? DEFAULT_ATTENTION.onKilled;
-      case "timeout":
-        return config?.onFailure ?? DEFAULT_ATTENTION.onFailure;
       case "log_match":
         return "turn";
     }
@@ -188,8 +185,6 @@ export function createNotificationService(deps: NotificationServiceDeps): {
           ? ""
           : ` (${info.signal.number}, ${info.signal.description})`;
       summary = `Process "${info.name}" ended after receiving ${info.signal.name}${number}.`;
-    } else if (kind === "timeout") {
-      summary = `Process "${info.name}" did not terminate within the kill timeout.`;
     } else if (info.exitCode !== null && info.exitCode !== 0) {
       summary =
         elapsed !== null

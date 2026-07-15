@@ -58,9 +58,13 @@ When a feature needs a human in the loop (visual layout, keybinding feel, widget
 - `/ps` opens the panel
 - `j/k` or arrow keys move selection
 - `J/K` scroll the preview
+- `g/G` jump the preview to top/bottom
 - `enter` pins the selected process to the dock (or unpins if already pinned)
 - `x` kills the selected process
 - `c` clears finished entries
+- `s` cycles sort (status, started, name)
+- `f` cycles filter (all, running, finished)
+- `/` opens a name quick filter; `enter` applies, `esc` clears
 - `q` or `esc` closes
 
 ### /ps:logs overlay

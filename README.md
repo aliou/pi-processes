@@ -21,6 +21,20 @@ That means Pi can, for example:
 
 You can then inspect, pin, stop, or clear those processes from the UI.
 
+## Installation
+
+From npm:
+
+```bash
+pi install npm:@aliou/pi-processes
+```
+
+From git:
+
+```bash
+pi install git:github.com/aliou/pi-processes
+```
+
 ## Open the process panel
 
 Use `/ps` to open the main process panel. It shows running and finished processes, with the most recent output preview. The preview opens on the newest page so you can see live activity without scrolling.

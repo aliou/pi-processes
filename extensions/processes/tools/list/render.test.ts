@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
@@ -38,6 +39,7 @@ describe("formatExpandedProcessLines", () => {
     const lines = formatExpandedProcessLines(
       [
         makeProcess({
+          cwd: `${homedir()}/repo`,
           watches: [
             { pattern: "ready|started" },
             { pattern: "ERROR\nretry with a long suffix that is truncated" },
@@ -48,10 +50,13 @@ describe("formatExpandedProcessLines", () => {
       80,
     );
 
-    expect(lines[0]).toBe("dev pid: 123 running 5s (proc_1)");
+    expect(lines[0]).toBe(
+      "dev pid: 123 running 5s (1970-01-01 00:00:01) proc_1",
+    );
     expect(lines[1]).toContain("$ pnpm dev");
-    expect(lines[2]).toContain("↳ [both] ready|started");
-    expect(lines[3]).toContain("↳ [both] ERROR\\nretry");
+    expect(lines[2]).toContain("cwd ~/repo");
+    expect(lines[3]).toContain("↳ [both] ready|started");
+    expect(lines[4]).toContain("↳ [both] ERROR\\nretry");
   });
 
   it("uses the render width instead of a fixed truncation width", () => {

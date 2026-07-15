@@ -1,5 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Text, visibleWidth } from "@earendil-works/pi-tui";
+import { formatTimestamp, shortenPath } from "../../../../src/utils";
 import { LinesComponent } from "../../../shared/ui";
 import { truncateToWidth } from "../../utils/truncate";
 import { formatPatternForDisplay, ProcessActionTitle } from "../components";
@@ -183,12 +184,15 @@ export function formatExpandedProcessLines(
       `${theme.fg("muted", "pid:")} ${process.pid}`,
       formatColoredProcessStatus(process, theme),
       theme.fg("muted", process.duration),
-      `${theme.fg("muted", "(")}${theme.fg("accent", process.id)}${theme.fg("muted", ")")}`,
+      theme.fg("muted", `(${formatTimestamp(process.startTime)})`),
+      theme.fg("accent", process.id),
     ].join(" ");
     lines.push(fitStyledLine(summary, width));
 
     const command = `${theme.fg("muted", "  $")} ${theme.fg("text", formatPatternForDisplay(process.command))}`;
     lines.push(fitStyledLine(command, width));
+    const cwd = `${theme.fg("muted", "    cwd")} ${theme.fg("text", formatPatternForDisplay(shortenPath(process.cwd)))}`;
+    lines.push(fitStyledLine(cwd, width));
 
     for (const matcher of process.watches) {
       const stream = matcher.stream ?? "both";

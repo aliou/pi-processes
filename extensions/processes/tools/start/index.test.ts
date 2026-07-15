@@ -179,7 +179,7 @@ describe("executeStart", () => {
 });
 
 describe("formatStartDetails", () => {
-  it("adds a watch guidance sentence when log matches are active", () => {
+  it("includes matcher details and watch guidance", () => {
     const text = formatStartDetails({
       action: "start",
       process: processInfo,
@@ -201,6 +201,29 @@ describe("formatStartDetails", () => {
 
     expect(text).toContain(
       "Continue other work; watch notifications will trigger follow-up.",
+    );
+    expect(text).toContain('[both] literal turn "ready"');
+  });
+
+  it("keeps matcher control characters on one logical line", () => {
+    const text = formatStartDetails({
+      action: "start",
+      process: processInfo,
+      notify: {
+        logMatches: [
+          {
+            pattern: 'ERROR\nretry\t"quoted"',
+            mode: "regex",
+            stream: "stderr",
+            repeat: true,
+            on: "context",
+          },
+        ],
+      },
+    });
+
+    expect(text).toContain(
+      '[stderr] regex context (repeat) "ERROR\\nretry\\t\\"quoted\\""',
     );
   });
 });

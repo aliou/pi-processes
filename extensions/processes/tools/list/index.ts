@@ -1,11 +1,16 @@
 import type { ProcessManager } from "../../../../src/manager";
-import type { ProcessInfo } from "../../../../src/types";
+import { LIVE_STATUSES, type ProcessInfo } from "../../../../src/types";
+import type {
+  LogMatcherConfig,
+  NotificationRegistry,
+} from "../../notifications/registry";
 import type {
   ProcessesParamsType,
   ProcessListSort,
   ProcessListStatusFilter,
 } from "../schema";
 import { formatProcessRuntime } from "../utils";
+import { formatPatternsForModel } from "../watch-format";
 
 /**
  * A process plus its duration computed when the list was produced.
@@ -15,6 +20,7 @@ import { formatProcessRuntime } from "../utils";
  */
 export interface ListProcess extends ProcessInfo {
   duration: string;
+  watches: LogMatcherConfig[];
 }
 
 export interface ListDetails {
@@ -39,6 +45,7 @@ export interface ProcessListCounts {
 export function executeList(
   manager: ProcessManager,
   params: ProcessesParamsType,
+  notifications: NotificationRegistry,
 ): ListDetails {
   const filters = resolveListFilters(params);
   const allProcesses = manager.list();
@@ -55,6 +62,9 @@ export function executeList(
   const processes: ListProcess[] = limited.map((process) => ({
     ...process,
     duration: formatProcessRuntime(process, now),
+    watches: LIVE_STATUSES.has(process.status)
+      ? (notifications.getWatchState(process.id)?.logMatches ?? [])
+      : [],
   }));
 
   return {
@@ -73,7 +83,7 @@ export function formatListDetails(details: ListDetails): string {
   return details.processes
     .map(
       (process) =>
-        `${process.id}\t${process.status}\t${process.name}\t${process.command}\t${process.stdoutFile}\t${process.stderrFile}`,
+        `${process.id}\t${process.status}\t${process.name}\t${process.command}\t${process.stdoutFile}\t${process.stderrFile}\tpatterns=${formatPatternsForModel(process.watches)}`,
     )
     .join("\n");
 }

@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ProcessManager } from "../../../../src/manager";
 import type { ProcessInfo } from "../../../../src/types";
-import { executeList } from ".";
+import { createNotificationRegistry } from "../../notifications/registry";
+import { executeUpdate } from "../update";
+import { executeList, formatListDetails } from ".";
 
 function makeInfo(overrides: Partial<ProcessInfo> = {}): ProcessInfo {
   return {
@@ -26,7 +28,10 @@ function makeInfo(overrides: Partial<ProcessInfo> = {}): ProcessInfo {
 }
 
 function makeManager(processes: ProcessInfo[]): ProcessManager {
-  return { list: () => processes } as unknown as ProcessManager;
+  return {
+    list: () => processes,
+    get: (id: string) => processes.find((process) => process.id === id) ?? null,
+  } as unknown as ProcessManager;
 }
 
 describe("executeList duration", () => {
@@ -46,7 +51,11 @@ describe("executeList duration", () => {
       makeInfo({ startTime: now - 5000, endTime: null, status: "running" }),
     ]);
 
-    const details = executeList(manager, { action: "list" });
+    const details = executeList(
+      manager,
+      { action: "list" },
+      createNotificationRegistry(),
+    );
 
     expect(details.processes[0].duration).toBe("5s");
   });
@@ -65,7 +74,11 @@ describe("executeList duration", () => {
       }),
     ]);
 
-    const details = executeList(manager, { action: "list" });
+    const details = executeList(
+      manager,
+      { action: "list" },
+      createNotificationRegistry(),
+    );
 
     expect(details.processes[0].duration).toBe("1m 30s");
   });
@@ -79,7 +92,11 @@ describe("executeList duration", () => {
       makeInfo({ id: "b", startTime: now - 3000, endTime: null }),
     ]);
 
-    const details = executeList(manager, { action: "list" });
+    const details = executeList(
+      manager,
+      { action: "list" },
+      createNotificationRegistry(),
+    );
 
     const durations = details.processes.map((p) => p.duration);
     expect(durations).toEqual(["3s", "3s"]);
@@ -94,8 +111,107 @@ describe("executeList duration", () => {
       makeInfo({ startTime: now + 50, endTime: null, status: "running" }),
     ]);
 
-    const details = executeList(manager, { action: "list" });
+    const details = executeList(
+      manager,
+      { action: "list" },
+      createNotificationRegistry(),
+    );
 
     expect(details.processes[0].duration).toBe("0s");
+  });
+});
+
+describe("executeList watches", () => {
+  it("includes current watches for live processes", () => {
+    const manager = makeManager([makeInfo()]);
+    const registry = createNotificationRegistry();
+    registry.register("proc_1", {
+      logMatches: [{ pattern: "ready" }, { pattern: "ERROR\nretry" }],
+    });
+
+    const details = executeList(manager, { action: "list" }, registry);
+
+    expect(details.processes[0].watches).toEqual([
+      { pattern: "ready" },
+      { pattern: "ERROR\nretry" },
+    ]);
+    expect(formatListDetails(details)).toContain(
+      'patterns=["ready","ERROR\\nretry"]',
+    );
+  });
+
+  it("hides registered watches for finished processes", () => {
+    const manager = makeManager([
+      makeInfo({ status: "exited", success: true, endTime: 2000 }),
+    ]);
+    const registry = createNotificationRegistry();
+    registry.register("proc_1", { logMatches: [{ pattern: "stale" }] });
+
+    const details = executeList(manager, { action: "list" }, registry);
+
+    expect(details.processes[0].watches).toEqual([]);
+    expect(formatListDetails(details)).toContain("patterns=[]");
+  });
+
+  it("reflects append, replace, remove, and clear updates", () => {
+    const process = makeInfo();
+    const manager = makeManager([process]);
+    const registry = createNotificationRegistry();
+    registry.register(process.id, { logMatches: [{ pattern: "initial" }] });
+
+    executeUpdate(
+      {
+        action: "update",
+        id: process.id,
+        watches: { mode: "append", items: [{ pattern: "appended" }] },
+      },
+      manager,
+      registry,
+    );
+    expect(
+      formatListDetails(executeList(manager, { action: "list" }, registry)),
+    ).toContain('patterns=["initial","appended"]');
+
+    executeUpdate(
+      {
+        action: "update",
+        id: process.id,
+        watches: {
+          mode: "replace",
+          items: [{ pattern: "first" }, { pattern: "second" }],
+        },
+      },
+      manager,
+      registry,
+    );
+    expect(
+      formatListDetails(executeList(manager, { action: "list" }, registry)),
+    ).toContain('patterns=["first","second"]');
+
+    executeUpdate(
+      {
+        action: "update",
+        id: process.id,
+        watches: { mode: "remove", items: [{ index: 0 }] },
+      },
+      manager,
+      registry,
+    );
+    expect(
+      formatListDetails(executeList(manager, { action: "list" }, registry)),
+    ).toContain('patterns=["second"]');
+
+    executeUpdate(
+      {
+        action: "update",
+        id: process.id,
+        watches: { mode: "clear" },
+      },
+      manager,
+      registry,
+    );
+    expect(
+      formatListDetails(executeList(manager, { action: "list" }, registry)),
+    ).toContain("patterns=[]");
   });
 });

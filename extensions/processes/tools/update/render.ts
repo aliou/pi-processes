@@ -1,6 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
-import { ProcessActionHeader } from "../components";
+import type { LogMatcherConfig } from "../../notifications/registry";
+import { buildMatcherLine, ProcessActionHeader } from "../components";
 import type { ProcessesParamsType } from "../schema";
 import { buildField } from "../utils";
 import type { UpdateDetails } from ".";
@@ -92,7 +93,7 @@ function buildWatchSummary(details: UpdateDetails, theme: Theme): Container {
     container.addChild(
       buildField(
         "watches",
-        `+${applied.length} appended; ${count} active`,
+        `${theme.fg("success", `appended ${applied.length}`)}; ${count} active`,
         theme,
       ),
     );
@@ -100,18 +101,26 @@ function buildWatchSummary(details: UpdateDetails, theme: Theme): Container {
     container.addChild(
       buildField(
         "watches",
-        `replaced ${before.length} with ${applied.length}; ${count} active`,
+        `${theme.fg("accent", `replaced ${before.length} with ${applied.length}`)}; ${count} active`,
         theme,
       ),
     );
   } else if (mode === "remove") {
     const removed = before.length - count;
     container.addChild(
-      buildField("watches", `-${removed} removed; ${count} active`, theme),
+      buildField(
+        "watches",
+        `${theme.fg("error", `removed ${removed}`)}; ${count} active`,
+        theme,
+      ),
     );
   } else if (mode === "clear") {
     container.addChild(
-      buildField("watches", `cleared ${before.length}; ${count} active`, theme),
+      buildField(
+        "watches",
+        `${theme.fg("error", `cleared ${before.length}`)}; ${count} active`,
+        theme,
+      ),
     );
   }
 
@@ -172,47 +181,71 @@ function buildWatchSection(details: UpdateDetails, theme: Theme): Container {
     );
   }
 
-  // Show applied/added matchers for append and replace
-  if (mode === "append" || mode === "replace") {
-    for (let i = 0; i < applied.length; i++) {
-      container.addChild(buildMatcherLine(applied[i], i, theme, "+ "));
+  if (mode === "append") {
+    for (const matcher of applied) {
+      container.addChild(
+        buildMatcherLine(matcher, theme, theme.fg("success", "+ ")),
+      );
     }
   }
 
-  // Show remaining matchers after remove/clear
-  if (mode === "remove" || mode === "clear") {
-    const items = details.watches.items;
-    for (let i = 0; i < items.length; i++) {
-      container.addChild(buildMatcherLine(items[i], i, theme, "  "));
+  if (mode === "replace") {
+    for (const matcher of before) {
+      container.addChild(
+        buildMatcherLine(matcher, theme, theme.fg("error", "- ")),
+      );
+    }
+    for (const matcher of details.watches.items) {
+      container.addChild(
+        buildMatcherLine(matcher, theme, theme.fg("success", "+ ")),
+      );
+    }
+  }
+
+  if (mode === "remove") {
+    for (const matcher of findRemovedMatchers(before, details.watches.items)) {
+      container.addChild(
+        buildMatcherLine(matcher, theme, theme.fg("error", "- ")),
+      );
+    }
+  }
+
+  if (mode === "clear") {
+    for (const matcher of before) {
+      container.addChild(
+        buildMatcherLine(matcher, theme, theme.fg("error", "- ")),
+      );
     }
   }
 
   return container;
 }
 
-function buildMatcherLine(
-  matcher: {
-    pattern: string;
-    mode?: string;
-    stream?: string;
-    repeat?: boolean;
-    on?: string;
-  },
-  index: number,
-  theme: Theme,
-  prefix: string,
-): Text {
-  const m = matcher.mode ?? "literal";
-  const stream = matcher.stream ?? "both";
-  const repeat = matcher.repeat ? " (repeat)" : "";
-  const on = matcher.on ?? "turn";
+export function findRemovedMatchers(
+  before: LogMatcherConfig[],
+  after: LogMatcherConfig[],
+): LogMatcherConfig[] {
+  const remaining = new Map<string, number>();
+  for (const matcher of after) {
+    const key = matcherKey(matcher);
+    remaining.set(key, (remaining.get(key) ?? 0) + 1);
+  }
 
-  return new Text(
-    theme.fg(
-      "muted",
-      `${prefix}${index}: [${stream}] ${m} "${matcher.pattern}" -> ${on}${repeat}`,
-    ),
-    0,
-    0,
-  );
+  return before.filter((matcher) => {
+    const key = matcherKey(matcher);
+    const count = remaining.get(key) ?? 0;
+    if (count === 0) return true;
+    remaining.set(key, count - 1);
+    return false;
+  });
+}
+
+function matcherKey(matcher: LogMatcherConfig): string {
+  return JSON.stringify([
+    matcher.pattern,
+    matcher.mode ?? "literal",
+    matcher.stream ?? "both",
+    matcher.repeat ?? false,
+    matcher.on ?? "turn",
+  ]);
 }

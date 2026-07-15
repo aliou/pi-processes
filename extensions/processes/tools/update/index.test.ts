@@ -203,6 +203,10 @@ describe("executeUpdate", () => {
 
       expect(details.ok).toBe(true);
       expect(details.watches.mode).toBe("replace");
+      expect(details.watches.before).toEqual([
+        { pattern: "ready" },
+        { pattern: "listening" },
+      ]);
       expect(details.watches.count).toBe(1);
       expect(details.watches.items[0].pattern).toBe("error");
     });

@@ -1,16 +1,14 @@
-import { getMarkdownTheme, type Theme } from "@earendil-works/pi-coding-agent";
-import { Container, Markdown, Text } from "@earendil-works/pi-tui";
-import { ProcessActionTitle } from "../components";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { Container, Text, visibleWidth } from "@earendil-works/pi-tui";
+import { LinesComponent } from "../../../shared/ui";
+import { truncateToWidth } from "../../utils/truncate";
+import { formatPatternForDisplay, ProcessActionTitle } from "../components";
 import type {
   ProcessesParamsType,
   ProcessListSort,
   ProcessListStatusFilter,
 } from "../schema";
-import {
-  buildProcessSummaryRow,
-  formatColoredProcessStatus,
-  formatCount,
-} from "../utils";
+import { formatColoredProcessStatus, formatCount } from "../utils";
 import type { ListDetails, ListProcess, ProcessListCounts } from ".";
 
 type CountStatusItem = {
@@ -64,11 +62,8 @@ export function buildHeader(
 export function buildExpanded(details: ListDetails, theme: Theme): Container {
   const container = new Container();
   container.addChild(
-    new Markdown(
-      formatProcessTable(details.processes, theme),
-      0,
-      0,
-      getMarkdownTheme(),
+    new LinesComponent((width) =>
+      formatExpandedProcessLines(details.processes, theme, width),
     ),
   );
   return container;
@@ -78,7 +73,17 @@ export function buildCollapsed(details: ListDetails, theme: Theme): Container {
   const container = new Container();
 
   for (const process of details.processes.slice(0, 2)) {
-    container.addChild(buildProcessSummaryRow(process, theme));
+    const parts = [
+      process.name,
+      theme.fg("accent", process.id),
+      `pid ${process.pid}`,
+      formatColoredProcessStatus(process, theme),
+      theme.fg(
+        "muted",
+        `${process.watches.length} ${process.watches.length === 1 ? "watch" : "watches"}`,
+      ),
+    ];
+    container.addChild(new Text(parts.join("  "), 0, 0));
   }
 
   return container;
@@ -159,29 +164,44 @@ function formatCounts(details: ListDetails, theme: Theme): string {
     .join(theme.fg("dim", " / "));
 }
 
-function formatProcessTable(processes: ListProcess[], theme: Theme): string {
+export function formatExpandedProcessLines(
+  processes: ListProcess[],
+  theme: Theme,
+  width: number,
+): string[] {
   if (processes.length === 0) {
-    return "No matching background processes.";
+    return ["No matching background processes."];
   }
 
-  const rows = processes.map((process) =>
-    [
-      escapeTableCell(process.name),
-      process.id,
-      String(process.pid),
-      formatColoredProcessStatus(process, theme),
-      process.duration,
-      escapeTableCell(process.command),
-    ].join(" | "),
-  );
+  const lines: string[] = [];
 
-  return [
-    "| Name | ID | PID | Status | Duration | Command |",
-    "| --- | --- | ---: | --- | --- | --- |",
-    ...rows.map((row) => `| ${row} |`),
-  ].join("\n");
+  for (const process of processes) {
+    if (lines.length > 0) lines.push("");
+
+    const summary = [
+      theme.bold(theme.fg("text", formatPatternForDisplay(process.name))),
+      `${theme.fg("muted", "pid:")} ${process.pid}`,
+      formatColoredProcessStatus(process, theme),
+      theme.fg("muted", process.duration),
+      `${theme.fg("muted", "(")}${theme.fg("accent", process.id)}${theme.fg("muted", ")")}`,
+    ].join(" ");
+    lines.push(fitStyledLine(summary, width));
+
+    const command = `${theme.fg("muted", "  $")} ${theme.fg("text", formatPatternForDisplay(process.command))}`;
+    lines.push(fitStyledLine(command, width));
+
+    for (const matcher of process.watches) {
+      const stream = matcher.stream ?? "both";
+      const watch = `${theme.fg("muted", "  ↳")} ${theme.fg("muted", `[${stream}]`)} ${theme.fg("accent", formatPatternForDisplay(matcher.pattern))}`;
+      lines.push(fitStyledLine(watch, width));
+    }
+  }
+
+  return lines;
 }
 
-function escapeTableCell(value: string): string {
-  return value.replace(/\|/g, "\\|").replace(/\n/g, " ");
+function fitStyledLine(line: string, width: number): string {
+  if (width <= 0) return "";
+  if (visibleWidth(line) <= width) return line;
+  return `${truncateToWidth(line, width)}\u001b[0m`;
 }

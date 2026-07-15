@@ -87,7 +87,7 @@ async function execute(
     case "start":
       return executeStart(params, manager, ctx, notifications);
     case "list":
-      return executeList(manager, params);
+      return executeList(manager, params, notifications);
     case "stop":
       return executeStop(params, manager, notifications);
     case "output":

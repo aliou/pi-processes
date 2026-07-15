@@ -8,6 +8,7 @@ import type {
 } from "../../notifications/registry";
 import { normalizeNotifyConfig } from "../notify";
 import type { ProcessesParamsType } from "../schema";
+import { formatMatcherForModel } from "../watch-format";
 
 export interface StartDetails {
   action: "start";
@@ -49,6 +50,11 @@ export function formatStartDetails(details: StartDetails): string {
   ];
 
   if (details.notify.logMatches && details.notify.logMatches.length > 0) {
+    parts.push(
+      `Watches:\n${details.notify.logMatches
+        .map((matcher) => formatMatcherForModel(matcher))
+        .join("\n")}`,
+    );
     parts.push(
       "Continue other work; watch notifications will trigger follow-up.",
     );

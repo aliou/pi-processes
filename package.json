@@ -33,7 +33,9 @@
   },
   "files": [
     "src",
+    "!src/**/*.test.ts",
     "extensions",
+    "!extensions/**/*.test.ts",
     "skills",
     "README.md",
     "CONTRIBUTING.md"

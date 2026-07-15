@@ -19,6 +19,14 @@ Use the `process` tool for commands that should keep running while the agent con
 8. Use `process write` to send bytes to a running process's stdin.
 9. Use `process stop` for obsolete live processes and `process clear` for finished entries.
 
+Notifications can also request attention on process exit:
+
+- `notify.onSuccess` — defaults to `context`
+- `notify.onFailure` — defaults to `turn`
+- `notify.onKilled` — defaults to `context`
+
+Each `logMatches` entry can also set `on` to `turn`, `context`, or `ignore` to override the default attention for that watch.
+
 ## Actions
 
 ### `process start`
@@ -36,9 +44,11 @@ Good:
   "command": "pnpm dev",
   "cwd": "/path/to/project",
   "notify": {
+    "onSuccess": "context",
+    "onFailure": "turn",
     "logMatches": [
       { "pattern": "ready", "mode": "literal", "stream": "both" },
-      { "pattern": "EADDRINUSE", "mode": "literal", "stream": "stderr" }
+      { "pattern": "EADDRINUSE", "mode": "literal", "stream": "stderr", "on": "turn" }
     ]
   }
 }
@@ -46,7 +56,7 @@ Good:
 
 Optional `cwd` sets the working directory for the spawned command. Omit it to inherit the extension's process directory.
 
-Empty `logMatches` patterns (literal or regex) are rejected at start and update time. Use `mode: "regex"` only when literal matching is not enough, and scope by `stream` to cut noise.
+Empty `logMatches` patterns (literal or regex) are rejected at start and update time. Use `mode: "regex"` only when literal matching is not enough, scope by `stream` to cut noise, and use `repeat: true` when a matcher should fire more than once.
 
 Bad:
 
@@ -61,10 +71,20 @@ Shows managed processes and log file paths.
 
 Use it before `process start` when a duplicate process would be harmful or noisy. Do not repeat the visible process table back to the user unless you need to explain a decision.
 
+Optional filters:
+
+- `statuses`: `all`, `running`, `finished`, `failed`, `terminating`, `terminate_timeout`, `killed`
+- `sortBy`: `startTime_desc`, `startTime_asc`, `name_asc`, `name_desc`, `status_asc`
+- `limit`: maximum number of processes to return
+
 Good:
 
 ```json
 { "action": "list", "statuses": ["running"] }
+```
+
+```json
+{ "action": "list", "statuses": ["failed", "killed"], "sortBy": "startTime_desc", "limit": 10 }
 ```
 
 Bad:
@@ -114,7 +134,7 @@ Use watches instead:
 
 Renames a running process or changes its watches.
 
-Use it instead of restarting a process just to add, remove, or replace watch patterns.
+Use it instead of restarting a process just to add, remove, or replace watch patterns. You can change `name` and `watches` in the same call. Update only works while the process is running.
 
 Good:
 

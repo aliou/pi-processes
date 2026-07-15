@@ -8,6 +8,12 @@ The `process` tool and all `/ps:*` commands are for **LLM use only**, not for us
 
 During UI tests that require processes to be running, either give the user a prompt to send to the agent (which will start the processes via the `process` tool), or use tmux to drive it programmatically. Never instruct the user to run shell commands manually.
 
+## Platform support
+
+- macOS: supported
+- Linux: supported
+- Windows: not supported (the manager relies on POSIX process groups)
+
 ## Stack
 
 - TypeScript (strict mode), Node.js >=22.19.0, pnpm 10.26.1, Biome, Changesets
@@ -15,8 +21,18 @@ During UI tests that require processes to be running, either give the user a pro
 
 ## Scripts
 
-- `pnpm typecheck`, `pnpm lint`, `pnpm format`, `pnpm test`, `pnpm test:e2e`, `pnpm changeset`
-- Run `pnpm install` after package metadata changes and check Pi package resolution with `pnpm why @earendil-works/pi-tui` and `pnpm why @earendil-works/pi-ai`.
+- `pnpm typecheck` — TypeScript check
+- `pnpm lint` — Biome check
+- `pnpm format` — Biome check with write
+- `pnpm test` — Unit tests
+- `pnpm test:e2e` — End-to-end tests
+- `pnpm changeset` — Add a changeset
+- `pnpm version` — Apply changeset versions
+- `pnpm release` — Publish the package
+- `pnpm check:lockfile` — Verify `pnpm-lock.yaml` is up to date
+- `pnpm prepare` — Husky install (git hooks)
+
+Run `pnpm install` after package metadata changes and check Pi package resolution with `pnpm why @earendil-works/pi-tui` and `pnpm why @earendil-works/pi-ai`.
 
 ## Testing
 
@@ -37,6 +53,9 @@ Avoid fixed sleeps in both unit and e2e tests. Prefer event-driven helpers that 
 - `extensions/processes/config/migrations/` - ordered settings migrations. Each migration lives in its own file prefixed with its index, such as `001-v0-9-4-to-v0-10-0-config.ts`.
 - `extensions/processes-logs/` - `/ps:logs` command and log overlay
 - `extensions/processes-dock/` - `/ps:dock`, `/ps:pin` commands, dock widget, status widget, `COMMAND_PIN` handler
+- `extensions/shared/` - shared UI helpers (`statusDot`, `processStatusTone`, `LineComponent`, etc.) used across all three extensions
+- `skills/` - shipped package skills consumed by Pi
+- `.agents/skills/` - local repo-only skills for development workflows
 
 Future design notes live in `docs/future-persistent-manager.md` and `docs/future-cleanup-hooks.md`. Keep implemented behavior in living docs and put new active plans under `.agents/plans/`.
 

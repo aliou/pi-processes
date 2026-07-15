@@ -9,11 +9,13 @@ describe("stripAnsi", () => {
   it("strips terminal escape sequences", () => {
     const input = [
       `${ESC}[31mred${ESC}[0m`,
+      `${ESC}[?25lhidden cursor${ESC}[?25h`,
+      `${ESC}[1 qsteady cursor`,
       `${ESC}]0;window title${BEL}text`,
       `${ESC}_cursor marker${BEL}done`,
     ].join(" ");
 
-    expect(stripAnsi(input)).toBe("red text done");
+    expect(stripAnsi(input)).toBe("red hidden cursor steady cursor text done");
     expect(hasAnsi(input)).toBe(true);
   });
 

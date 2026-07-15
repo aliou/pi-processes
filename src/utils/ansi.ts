@@ -12,7 +12,7 @@ const BEL = String.fromCodePoint(0x0007);
 
 const ANSI_REPLACEMENTS: RegExp[] = [
   // CSI sequences: SGR, cursor movement, erase, scroll, etc.
-  new RegExp(`${ESC}\\[[0-9;]*[A-Za-z]`, "gu"),
+  new RegExp(`${ESC}\\[[\\x30-\\x3f]*[\\x20-\\x2f]*[\\x40-\\x7e]`, "gu"),
   // OSC sequences: ESC]...<BEL> or ESC]...<ESC>\\.
   new RegExp(`${ESC}\\][^${BEL}${ESC}]*(?:${BEL}|${ESC}\\\\)`, "gu"),
   // APC sequences: ESC_...<BEL> or ESC_...<ESC>\\.

@@ -38,4 +38,5 @@ result-*
 
 # Pi
 .pi/
+.agents/demos/
 .agents/plans/*.md

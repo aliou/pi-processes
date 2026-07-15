@@ -6,6 +6,7 @@ import {
   formatRuntime,
   formatStatus,
   formatTimestamp,
+  shortenPath,
 } from "../../../src/utils";
 import { processStatusTone } from "../../shared/ui";
 import { truncateToWidth } from "../utils/truncate";
@@ -57,7 +58,7 @@ export function buildProcessDetails(
   container.addChild(
     buildField("started", formatTimestamp(process.startTime), theme),
   );
-  container.addChild(buildField("cwd", process.cwd, theme));
+  container.addChild(buildField("cwd", shortenPath(process.cwd), theme));
   container.addChild(buildCommandField(process.command, theme));
   container.addChild(buildField("stdout", process.stdoutFile, theme));
   container.addChild(buildField("stderr", process.stderrFile, theme));

@@ -1,5 +1,35 @@
 # @aliou/pi-processes
 
+## 0.9.4
+
+### Patch Changes
+
+- 96bbcd3: Fix cwd parameter being ignored on process start
+
+  The process tool always used the session working directory (ctx.cwd)
+  when spawning processes, ignoring the cwd parameter passed by the LLM.
+  This caused commands with relative paths to fail when a different
+  working directory was specified.
+
+## 0.9.3
+
+### Patch Changes
+
+- e812981: Relax Pi peer dependency ranges to avoid npm update conflicts in extension environments with older Pi package peers.
+
+## 0.9.2
+
+### Patch Changes
+
+- c2287ac: Leave one terminal column unused in the collapsed log dock so long process output does not wrap into the editor.
+
+## 0.9.1
+
+### Patch Changes
+
+- fbdf652: Refresh dependencies and migrate Pi imports to the `@earendil-works` namespace.
+- 7ccfa67: Sanitize terminal control characters before rendering process logs in the UI.
+
 ## 0.9.0
 
 ### Minor Changes

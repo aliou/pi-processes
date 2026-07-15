@@ -98,7 +98,7 @@ const ProcessesParams = Type.Object({
           stream: Type.Optional(
             StringEnum(["stdout", "stderr", "both"] as const, {
               description:
-                "Which stream to watch (default: both). Use stdout/stderr to reduce noise.",
+                "Which stream to watch (default both). Use stdout/stderr to reduce noise.",
             }),
           ),
           repeat: Type.Optional(
@@ -141,7 +141,7 @@ ${
     ? "- debug_preview: Temporary renderer preview for process tool UIs (no process side effects)\n  - preview: start | list | output | logs | error (default: start)\n"
     : ""
 }
-Important: You DON'T need to poll or wait for processes. Notifications arrive automatically based on your preferences. Start processes and continue with other work - you'll be informed if something requires attention.
+Important: You DON'T need to poll or wait for processes. Notifications arrive automatically based on your preferences. Start processes and continue other work - you'll be informed if something requires attention.
 
 Note: User always sees process updates in the UI. The notify flags control whether YOU (the agent) get a turn to react (e.g. check results, fix code, restart).`,
     promptSnippet:
@@ -159,8 +159,16 @@ Note: User always sees process updates in the UI. The notify flags control wheth
       return executeAction(params, manager, ctx);
     },
 
-    renderCall(args: ProcessesParamsType, theme: Theme, _context) {
-      return renderActionCall(args, theme);
+    renderCall(
+      args: ProcessesParamsType,
+      theme: Theme,
+      options: ToolRenderResultOptions,
+    ) {
+      const resolvedTheme =
+        typeof theme.bold === "function"
+          ? theme
+          : (options as unknown as Theme);
+      return renderActionCall(args, resolvedTheme);
     },
 
     renderResult(

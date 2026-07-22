@@ -6,6 +6,7 @@
  */
 
 import type { ProcessProtocolConfig } from "../../../src/protocol";
+import type { CodexExecConfig } from "../../codex-unified-exec/config/types";
 
 export interface ExecutionConfig {
   shellPath?: string;
@@ -44,6 +45,8 @@ export interface ProcessConfig {
   output?: OutputConfig;
   follow?: FollowConfig;
   widget?: WidgetConfig;
+  /** codex-unified-exec gate; edited via /ps:settings. */
+  codexExec?: CodexExecConfig;
 }
 
 export type { ProcessProtocolConfig };

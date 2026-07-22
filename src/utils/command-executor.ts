@@ -44,6 +44,7 @@ export function spawnCommand(
   command: string,
   cwd: string,
   configuredShell?: string,
+  env?: NodeJS.ProcessEnv,
 ): ChildProcess {
   const shellExecutable = resolveShellExecutable({
     configuredShell,
@@ -52,7 +53,7 @@ export function spawnCommand(
 
   return spawn(shellExecutable, ["-lc", command], {
     cwd,
-    env: process.env,
+    env: env ?? process.env,
     stdio: ["pipe", "pipe", "pipe"],
     detached: true,
   });

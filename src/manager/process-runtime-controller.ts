@@ -1,4 +1,5 @@
 import type { ChildProcess } from "node:child_process";
+import { EventEmitter } from "node:events";
 
 import type { KillResult, ManagerEvent, WriteResult } from "../types";
 import { LIVE_STATUSES } from "../types";
@@ -26,6 +27,8 @@ export class ProcessRuntimeController {
   private emit: (event: ManagerEvent) => void;
   private getConfiguredShellPath: () => string | undefined;
 
+  private rawEmitter: EventEmitter = new EventEmitter();
+
   private watcher: ReturnType<typeof setInterval> | null = null;
 
   constructor(deps: ProcessRuntimeControllerDeps) {
@@ -36,11 +39,24 @@ export class ProcessRuntimeController {
     this.getConfiguredShellPath = deps.getConfiguredShellPath;
   }
 
-  start(name: string, command: string, cwd: string): ManagedProcessRecord {
+  start(
+    name: string,
+    command: string,
+    cwd: string,
+    opts?: {
+      shellPath?: string;
+      env?: NodeJS.ProcessEnv;
+    },
+  ): ManagedProcessRecord {
     const id = this.registry.nextId();
     const logPaths = this.logs.createLogs(id);
 
-    const child = spawnCommand(command, cwd, this.getConfiguredShellPath());
+    const child = spawnCommand(
+      command,
+      cwd,
+      opts?.shellPath ?? this.getConfiguredShellPath(),
+      opts?.env,
+    );
     // Spawned commands run in detached process groups so TERM/KILL can target
     // the whole tree. `unref()` keeps the manager's Node process from staying
     // alive only because a managed child still exists; extension shutdown and
@@ -287,6 +303,11 @@ export class ProcessRuntimeController {
     }
   }
 
+  onRawOutput(listener: (id: string, chunk: Buffer) => void): () => void {
+    this.rawEmitter.on("raw", listener);
+    return () => this.rawEmitter.off("raw", listener);
+  }
+
   /**
    * Kill all live processes (used by cleanup on actual pi exit).
    */
@@ -311,11 +332,13 @@ export class ProcessRuntimeController {
     child: ChildProcess,
   ): void {
     child.stdout?.on("data", (data: Buffer) => {
+      this.rawEmitter.emit("raw", managed.id, data);
       this.logs.appendStdout(managed.stdoutFile, data);
       this.output.onStdoutChunk(managed, data);
     });
 
     child.stderr?.on("data", (data: Buffer) => {
+      this.rawEmitter.emit("raw", managed.id, data);
       this.logs.appendStderr(managed.stderrFile, data);
       this.output.onStderrChunk(managed, data);
     });

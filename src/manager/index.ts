@@ -52,8 +52,26 @@ export class ProcessManager {
     return () => this.events.off("event", listener);
   }
 
-  start(name: string, command: string, cwd: string): ProcessInfo {
-    const managed = this.runtime.start(name, command, cwd);
+  /**
+   * Subscribe to raw stdout/stderr chunks before they are line-split or
+   * throttled by ProcessOutput. Fires once per `data` event with the original
+   * Buffer and the process id. Additive: the existing line-based
+   * `process_output_changed` path is unchanged.
+   */
+  onRawOutput(listener: (id: string, chunk: Buffer) => void): () => void {
+    return this.runtime.onRawOutput(listener);
+  }
+
+  start(
+    name: string,
+    command: string,
+    cwd: string,
+    opts?: {
+      shellPath?: string;
+      env?: NodeJS.ProcessEnv;
+    },
+  ): ProcessInfo {
+    const managed = this.runtime.start(name, command, cwd, opts);
     return formatProcess(managed);
   }
 

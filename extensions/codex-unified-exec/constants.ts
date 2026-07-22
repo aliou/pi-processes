@@ -105,3 +105,36 @@ export function generateChunkId(): string {
   }
   return id;
 }
+
+/**
+ * Environment overrides codex applies to every unified-exec spawned process.
+ * Direct port of `UNIFIED_EXEC_ENV` in
+ * `codex-rs/core/src/unified_exec/process_manager.rs`. These suppress color,
+ * pagers, and terminal detection so captured output stays deterministic for
+ * the model.
+ */
+export const UNIFIED_EXEC_ENV: ReadonlyArray<readonly [string, string]> = [
+  ["NO_COLOR", "1"],
+  ["TERM", "dumb"],
+  ["LANG", "C.UTF-8"],
+  ["LC_CTYPE", "C.UTF-8"],
+  ["LC_ALL", "C.UTF-8"],
+  ["COLORTERM", ""],
+  ["PAGER", "cat"],
+  ["GIT_PAGER", "cat"],
+  ["GH_PAGER", "cat"],
+  ["CODEX_CI", "1"],
+];
+
+/**
+ * Merge `UNIFIED_EXEC_ENV` into a base environment (the parent `process.env`).
+ * Mirrors codex `apply_unified_exec_env`, which inserts each override into the
+ * inherited environment map.
+ */
+export function applyCodexExecEnv(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...base };
+  for (const [key, value] of UNIFIED_EXEC_ENV) {
+    env[key] = value;
+  }
+  return env;
+}

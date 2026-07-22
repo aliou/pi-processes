@@ -2,6 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getManager } from "../../src/get-manager";
 import { isWindowsPlatform } from "../../src/utils/platform";
 import { configLoader } from "../processes/config";
+import { SessionManager } from "./session";
 import { registerCodexExecTools } from "./tools";
 
 /**
@@ -39,21 +40,23 @@ export default async function codexUnifiedExecExtension(
     return;
   }
 
-  // Own ProcessManager instance for isolation: codex sessions live in a
-  // separate registry from the processes extension's /ps sessions. The
-  // extension owns shutdown and must killAll + cleanup.
-  const manager = getManager();
+  // Own ProcessManager + SessionManager for isolation: codex sessions live in a
+  // separate registry from the processes extension's /ps sessions. The default
+  // shell follows the user's pi-processes `execution.shellPath` so codex's
+  // "defaults to the user's default shell" is honored; a model-provided `shell`
+  // overrides per-spawn.
+  const resolvedShellPath = configLoader.getConfig().execution.shellPath;
+  const manager = getManager({
+    getConfiguredShellPath: () => resolvedShellPath,
+  });
+  const sessions = new SessionManager(manager);
 
   let disposed = false;
   pi.on("session_shutdown", async () => {
     if (disposed) return;
     disposed = true;
-    manager.killAll();
-    manager.cleanup();
+    sessions.dispose();
   });
 
-  // Chunk 1: tools are a no-op stub. Chunk 2 wires exec_command + write_stdin
-  // to a session wrapper around this manager + HeadTailBuffer +
-  // collectOutputUntilDeadline.
-  registerCodexExecTools(pi, manager);
+  registerCodexExecTools(pi, sessions);
 }

@@ -1,16 +1,17 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getManager } from "../../src/get-manager";
 import { isWindowsPlatform } from "../../src/utils/platform";
-import { configLoader, loadCodexExecConfig } from "./config";
-import { registerCodexExecSettings } from "./settings";
+import { configLoader } from "../processes/config";
 import { registerCodexExecTools } from "./tools";
 
 /**
  * codex-unified-exec extension.
  *
- * Emulates OpenAI Codex's unified_exec session model (exec_command +
- * write_stdin) over pi-processes's ProcessManager. Disabled by default; toggle
- * on via /codex-exec:settings. POSIX-only, like the rest of pi-processes.
+ * Emulates OpenAI Codex's unified_exec session model (exec_command + write_stdin)
+ * over pi-processes's ProcessManager. Disabled by default; toggle on via
+ * /ps:settings (the `codexExec.enabled` field, shared with the processes settings
+ * rather than a separate settings command). POSIX-only, like the rest of
+ * pi-processes.
  */
 export default async function codexUnifiedExecExtension(
   pi: ExtensionAPI,
@@ -28,13 +29,13 @@ export default async function codexUnifiedExecExtension(
     return;
   }
 
-  // Settings are always registered so users can toggle the extension on even
-  // while it is disabled.
-  await loadCodexExecConfig();
-  registerCodexExecSettings(pi);
-
-  const config = configLoader.getConfig();
-  if (!config.enabled) {
+  // `enabled` is part of the pi-processes config (edited via /ps:settings), so
+  // the processes extension's ConfigLoader owns it. Processes is listed before
+  // this extension in package.json pi.extensions and pi loads extensions
+  // sequentially with await, so loadProcessConfig() has already completed by
+  // the time this factory runs and getConfig() is safe here.
+  const enabled = configLoader.getConfig().codexExec.enabled;
+  if (!enabled) {
     return;
   }
 

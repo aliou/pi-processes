@@ -18,12 +18,8 @@ import {
 import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
 import { formatRuntime, truncateCmd } from "../../../src/utils/format";
 import { isRecord } from "../../../src/utils/is-record";
-import {
-  LineComponent,
-  LinesComponent,
-  RuleComponent,
-  statusDot,
-} from "../../shared/ui";
+import { renderProcessTab } from "../../process-tabs";
+import { LineComponent, LinesComponent, RuleComponent } from "../../shared/ui";
 import { requestProcessList } from "../client";
 import {
   connectToProcessLogs,
@@ -48,7 +44,6 @@ const MIN_LOG_ROWS = 5;
 const MIN_OVERLAY_WIDTH = 80;
 const MIN_OVERLAY_HEIGHT = 12;
 const OVERLAY_FRACTION = 0.9;
-const MAX_TAB_NAME = 12;
 const MAX_NOTIFY_MARKERS_PER_PROCESS = 100;
 /** Cap retained viewers so a long session does not hold unbounded buffers. */
 const MAX_CACHED_VIEWERS = 12;
@@ -469,7 +464,7 @@ export class LogOverlayComponent implements Component {
       return this.opts.theme.fg("dim", "No processes");
 
     const parts = this.processes.map((process, index) =>
-      this.renderTab(process, index === this.selectedIndex),
+      renderProcessTab(process, index === this.selectedIndex, this.opts.theme),
     );
 
     const separator = " ";
@@ -478,16 +473,6 @@ export class LogOverlayComponent implements Component {
 
     const window = this.renderTabWindow(parts, separator, width);
     return truncateToWidth(window, width, "", true);
-  }
-
-  private renderTab(process: ProcessInfo, active: boolean): string {
-    const t = this.opts.theme;
-    const dot = this.renderTabDot(process, active);
-    const label = truncateCmd(process.name, MAX_TAB_NAME);
-    const tab = active
-      ? t.bg("selectedBg", ` ${dot} ${t.fg("accent", label)} `)
-      : ` ${dot} ${t.fg("dim", label)} `;
-    return tab;
   }
 
   private renderTabWindow(
@@ -596,10 +581,6 @@ export class LogOverlayComponent implements Component {
       Math.max(1, width - visibleWidth(prefix)),
     );
     return truncateToWidth(`${prefix}${keys}`, width);
-  }
-
-  private renderTabDot(process: ProcessInfo, active: boolean): string {
-    return statusDot(process, active, this.opts.theme);
   }
 
   private renderFooterKeys(width: number): string {

@@ -171,8 +171,9 @@ describe("renderLogDock", () => {
     );
 
     // Chrome is added on top of the configured log rows:
-    // top border + process strip + rule + 2 log rows + bottom border.
-    expect(lines).toHaveLength(6);
+    // top border + process strip + rule + 2 log rows (no bottom border —
+    // the dock opens into the editor below).
+    expect(lines).toHaveLength(5);
     expect(lines.join("\n")).toContain("line two");
     expect(lines.join("\n")).toContain("line three");
     expect(lines.join("\n")).not.toContain("line one");

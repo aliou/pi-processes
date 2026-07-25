@@ -1,4 +1,4 @@
-import { Panel, Stack } from "@aliou/pi-utils-ui";
+import { Stack } from "@aliou/pi-utils-ui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import {
   type Component,
@@ -53,14 +53,48 @@ export function renderLogDock(
       ? buildExpandedBody(snapshot, theme, Math.max(1, logRows))
       : buildCollapsedBody(snapshot, theme);
 
-  return new Panel({
-    title: "Processes",
-    body,
-    border: "round",
-    padding: 0,
-    borderStyle: (text) => theme.fg("dim", text),
-    titleStyle: (text) => theme.fg("accent", theme.bold(text)),
-  }).render(width);
+  return renderTitledBox("Processes", body, theme, width);
+}
+
+/**
+ * Render the dock as a top-bordered box with side rails and no bottom
+ * border, so it opens into the editor (or the next widget) below — matching
+ * the leaner old look without dropping the frame entirely.
+ */
+function renderTitledBox(
+  title: string,
+  body: Component,
+  theme: Theme,
+  width: number,
+): string[] {
+  const dim = (text: string) => theme.fg("dim", text);
+  const innerWidth = Math.max(0, width - 2);
+
+  const lines: string[] = [];
+
+  // Top border with a centered, accent title.
+  const styledTitle = theme.fg("accent", theme.bold(` ${title} `));
+  const titleWidth = visibleWidth(styledTitle);
+  const fill = Math.max(0, width - 1 - titleWidth - 1);
+  const leftFill = Math.floor(fill / 2);
+  const rightFill = fill - leftFill;
+  lines.push(
+    dim("╭") +
+      dim("─".repeat(leftFill)) +
+      styledTitle +
+      dim("─".repeat(rightFill)) +
+      dim("╮"),
+  );
+
+  // Body lines with side rails, no bottom border.
+  const bodyLines = body.render(innerWidth);
+  for (const line of bodyLines) {
+    // truncateToWidth with pad=true truncates AND pads to innerWidth in one call.
+    const inner = truncateToWidth(line, innerWidth, "", true);
+    lines.push(dim("│") + inner + dim("│"));
+  }
+
+  return lines;
 }
 
 function buildCollapsedBody(

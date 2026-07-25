@@ -48,6 +48,7 @@ interface ProcessRuntimeState {
   stdin: Writable | null;
   stdinClosed: boolean;
   lastSignalSent: NodeJS.Signals | null;
+  completionSequence: number | null;
 }
 
 /**

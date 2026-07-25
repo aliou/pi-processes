@@ -7,3 +7,7 @@ export const MAX_LINES_PER_EMIT = 2000;
 /** Max bytes read when tailing a log file. */
 export const MAX_TAIL_READ_BYTES = 2 * 1024 * 1024;
 export const TRUNCATION_SUFFIX = " … [line truncated]";
+/** Max finished process records retained after the grace period. */
+export const MAX_FINISHED_RECORDS = 50;
+/** Keep recently finished records available to the UI before reaping. */
+export const FINISHED_RECORD_GRACE_MS = 5 * 60 * 1000;

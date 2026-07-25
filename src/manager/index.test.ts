@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 
-import { vol } from "memfs";
+import { fs, vol } from "memfs";
 import {
   afterEach,
   assert,
@@ -14,6 +14,7 @@ import {
 import type { ManagerEvent } from "../types";
 import { LIVE_STATUSES } from "../types";
 import { ProcessManager } from ".";
+import { FINISHED_RECORD_GRACE_MS, MAX_FINISHED_RECORDS } from "./limits";
 
 const fakeProcesses = new Map<number, FakeChildProcess>();
 let nextPid = 10_000;
@@ -738,6 +739,59 @@ describe("clearFinished", () => {
 
     const changed = events.filter((e) => e.type === "processes_changed");
     expect(changed).toHaveLength(1);
+  });
+});
+
+describe("finished record reaping", () => {
+  it("keeps recent records then reaps the oldest records after the grace period", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    using manager = new ProcessManager();
+    const infos = [];
+    const stdoutFiles: string[] = [];
+
+    for (let index = 0; index < MAX_FINISHED_RECORDS + 10; index++) {
+      const info = manager.start(`task-${index}`, "true", "/tmp");
+      const ended = waitForEnd(manager, info.id);
+      await ended;
+      infos.push(info);
+      stdoutFiles.push(info.stdoutFile);
+      vi.advanceTimersByTime(1);
+    }
+
+    expect(manager.list()).toHaveLength(MAX_FINISHED_RECORDS + 10);
+    expect(fs.existsSync(stdoutFiles[0] ?? "")).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(FINISHED_RECORD_GRACE_MS + 10);
+
+    const survivors = manager.list();
+    expect(survivors).toHaveLength(MAX_FINISHED_RECORDS);
+    expect(survivors.map((info) => info.id)).toEqual(
+      infos.slice(-MAX_FINISHED_RECORDS).map((info) => info.id),
+    );
+    expect(fs.existsSync(stdoutFiles[0] ?? "")).toBe(false);
+  });
+
+  it("uses completion order when end times are equal", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    using manager = new ProcessManager();
+    const infos = Array.from({ length: MAX_FINISHED_RECORDS + 2 }, (_, index) =>
+      manager.start(`task-${index}`, "sleep 60", "/tmp"),
+    );
+    const ended = waitForEndedCount(manager, infos.length);
+
+    for (const info of [...infos].reverse()) {
+      const child = fakeProcesses.get(info.pid);
+      assert(child, "fake child should exist");
+      child.finish(0);
+    }
+    await ended;
+    await vi.advanceTimersByTimeAsync(FINISHED_RECORD_GRACE_MS);
+
+    expect(manager.list().map((info) => info.id)).toEqual(
+      infos.slice(0, MAX_FINISHED_RECORDS).map((info) => info.id),
+    );
   });
 });
 

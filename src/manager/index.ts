@@ -161,6 +161,7 @@ export class ProcessManager {
   }
 
   cleanup(): void {
+    this.runtime.beginShutdown();
     this.runtime.stopWatcher();
     this.output.clearAll();
     this.runtime.killAllLive();

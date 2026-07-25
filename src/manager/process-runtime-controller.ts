@@ -7,6 +7,7 @@ import { spawnCommand } from "../utils/command-executor";
 import { formatSignalInfo } from "../utils/signals";
 import type { ManagedProcessRecord } from "./internal-types";
 import { formatProcess } from "./internal-types";
+import { FINISHED_RECORD_GRACE_MS, MAX_FINISHED_RECORDS } from "./limits";
 import type { ProcessLogStore } from "./process-log-store";
 import type { ProcessOutput } from "./process-output";
 import type { ProcessRegistry } from "./process-registry";
@@ -27,6 +28,9 @@ export class ProcessRuntimeController {
   private getConfiguredShellPath: () => string | undefined;
 
   private watcher: ReturnType<typeof setInterval> | null = null;
+  private finishedReapTimer: ReturnType<typeof setTimeout> | null = null;
+  private completionSequence = 0;
+  private shuttingDown = false;
 
   constructor(deps: ProcessRuntimeControllerDeps) {
     this.registry = deps.registry;
@@ -67,6 +71,7 @@ export class ProcessRuntimeController {
       stdin: child.stdin,
       stdinClosed: false,
       lastSignalSent: null,
+      completionSequence: null,
       stdoutPendingLine: Buffer.alloc(0),
       stderrPendingLine: Buffer.alloc(0),
       stdoutLineOverflowed: false,
@@ -84,6 +89,7 @@ export class ProcessRuntimeController {
       managed.endReason = "missing_pid";
       managed.errorMessage = "Spawn error: missing pid";
       managed.endTime = Date.now();
+      this.releaseRuntimeHandles(managed);
       this.transition(managed, "exited");
       return managed;
     }
@@ -101,7 +107,10 @@ export class ProcessRuntimeController {
     managed.status = next;
 
     if (next === "exited" || next === "killed") {
+      managed.completionSequence ??= ++this.completionSequence;
       this.emit({ type: "process_ended", info: formatProcess(managed) });
+      this.reapOldestFinished();
+      this.scheduleFinishedReap();
     }
 
     this.ensureWatcherRunning();
@@ -197,6 +206,7 @@ export class ProcessRuntimeController {
     }
 
     this.output.flush(managed);
+    this.releaseRuntimeHandles(managed);
     this.transition(managed, "killed");
     return { ok: true, info: formatProcess(managed) };
   }
@@ -258,19 +268,12 @@ export class ProcessRuntimeController {
 
   clearFinished(): number {
     let cleared = 0;
-    for (const [id, managed] of this.registry.entries()) {
+    for (const managed of this.registry.values()) {
       if (LIVE_STATUSES.has(managed.status)) {
         continue;
       }
 
-      this.logs.removeLogs({
-        stdoutFile: managed.stdoutFile,
-        stderrFile: managed.stderrFile,
-        combinedFile: managed.combinedFile,
-      });
-
-      this.output.clear(id);
-      this.registry.delete(id);
+      this.removeFinishedRecord(managed);
       cleared++;
     }
 
@@ -278,6 +281,7 @@ export class ProcessRuntimeController {
       this.emit({ type: "processes_changed" });
     }
 
+    this.scheduleFinishedReap();
     this.stopWatcherIfIdle();
     return cleared;
   }
@@ -287,6 +291,17 @@ export class ProcessRuntimeController {
       clearInterval(this.watcher);
       this.watcher = null;
     }
+  }
+
+  stopFinishedReaper(): void {
+    if (!this.finishedReapTimer) return;
+    clearTimeout(this.finishedReapTimer);
+    this.finishedReapTimer = null;
+  }
+
+  beginShutdown(): void {
+    this.shuttingDown = true;
+    this.stopFinishedReaper();
   }
 
   /**
@@ -305,6 +320,7 @@ export class ProcessRuntimeController {
 
   [Symbol.dispose](): void {
     this.stopWatcher();
+    this.beginShutdown();
     this.killAllLive();
   }
 
@@ -323,6 +339,7 @@ export class ProcessRuntimeController {
     });
 
     child.on("close", (code, signal) => {
+      this.releaseRuntimeHandles(managed);
       if (managed.endTime) return;
 
       managed.exitCode = code;
@@ -350,6 +367,7 @@ export class ProcessRuntimeController {
       );
 
       if (!managed.endTime) {
+        this.releaseRuntimeHandles(managed);
         managed.exitCode = -1;
         managed.success = false;
         managed.endReason = "spawn_error";
@@ -398,6 +416,7 @@ export class ProcessRuntimeController {
       }
 
       this.output.flush(managed);
+      this.releaseRuntimeHandles(managed);
 
       managed.success = false;
       managed.exitCode = null;
@@ -411,5 +430,70 @@ export class ProcessRuntimeController {
         this.transition(managed, "exited");
       }
     }
+  }
+
+  private releaseRuntimeHandles(managed: ManagedProcessRecord): void {
+    managed.stdin = null;
+    managed.stdinClosed = true;
+  }
+
+  private reapOldestFinished(): void {
+    const finished = this.finishedRecordsByAge();
+    if (finished.length <= MAX_FINISHED_RECORDS) return;
+
+    const cutoff = Date.now() - FINISHED_RECORD_GRACE_MS;
+    let remaining = finished.length;
+    let reaped = 0;
+    for (const record of finished) {
+      if (remaining <= MAX_FINISHED_RECORDS) break;
+      if ((record.endTime ?? Number.POSITIVE_INFINITY) > cutoff) break;
+      this.removeFinishedRecord(record);
+      remaining--;
+      reaped++;
+    }
+
+    if (reaped > 0) this.emit({ type: "processes_changed" });
+  }
+
+  private scheduleFinishedReap(): void {
+    this.stopFinishedReaper();
+    if (this.shuttingDown) return;
+    const finished = this.finishedRecordsByAge();
+    if (finished.length <= MAX_FINISHED_RECORDS) return;
+
+    const oldest = finished[0];
+    const delay = Math.max(
+      0,
+      (oldest.endTime ?? Date.now()) + FINISHED_RECORD_GRACE_MS - Date.now(),
+    );
+    this.finishedReapTimer = setTimeout(() => {
+      this.finishedReapTimer = null;
+      this.reapOldestFinished();
+      this.scheduleFinishedReap();
+    }, delay);
+    this.finishedReapTimer.unref?.();
+  }
+
+  private finishedRecordsByAge(): ManagedProcessRecord[] {
+    return [...this.registry.values()]
+      .filter(
+        (record) =>
+          !LIVE_STATUSES.has(record.status) && record.endTime !== null,
+      )
+      .sort(
+        (a, b) =>
+          (a.endTime ?? 0) - (b.endTime ?? 0) ||
+          (a.completionSequence ?? 0) - (b.completionSequence ?? 0),
+      );
+  }
+
+  private removeFinishedRecord(record: ManagedProcessRecord): void {
+    this.logs.removeLogs({
+      stdoutFile: record.stdoutFile,
+      stderrFile: record.stderrFile,
+      combinedFile: record.combinedFile,
+    });
+    this.output.clear(record.id);
+    this.registry.delete(record.id);
   }
 }

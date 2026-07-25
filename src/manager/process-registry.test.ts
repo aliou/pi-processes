@@ -23,6 +23,7 @@ const managedDefaults = {
   stdin: null,
   stdinClosed: false,
   lastSignalSent: null,
+  completionSequence: null,
   stdoutPendingLine: Buffer.alloc(0),
   stderrPendingLine: Buffer.alloc(0),
   stdoutLineOverflowed: false,

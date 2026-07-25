@@ -47,6 +47,9 @@ const OVERLAY_FRACTION = 0.9;
 const MAX_NOTIFY_MARKERS_PER_PROCESS = 100;
 /** Cap retained viewers so a long session does not hold unbounded buffers. */
 const MAX_CACHED_VIEWERS = 12;
+/** Throttle chunk-driven renders so the editor under the overlay is not
+ * re-rendered at the framework's 60fps cadence on every output burst. */
+const RENDER_THROTTLE_MS = 100;
 
 interface NotifyMatchMark {
   pattern: string;
@@ -66,6 +69,7 @@ export class LogOverlayComponent implements Component {
   private mode: OverlayMode = "normal";
   private searchInput = new Input();
   private hasSeenRunningProcess = false;
+  private renderTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly disposers: Array<() => void> = [];
   private disposed = false;
   /** Per-process notify log-match markers, capped per process. */
@@ -200,9 +204,28 @@ export class LogOverlayComponent implements Component {
     return;
   }
 
+  /**
+   * Throttle render requests driven by streaming output. The viewer's buffer
+   * accumulates every line regardless; this only coalesces the visual update
+   * so a fast producer does not force the framework to re-render the editor
+   * beneath the overlay 60 times a second. User input and search still call
+   * requestRender directly for immediate feedback.
+   */
+  private scheduleRender(): void {
+    if (this.disposed || this.renderTimer) return;
+    this.renderTimer = setTimeout(() => {
+      this.renderTimer = null;
+      this.opts.tui.requestRender();
+    }, RENDER_THROTTLE_MS);
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    if (this.renderTimer) {
+      clearTimeout(this.renderTimer);
+      this.renderTimer = null;
+    }
     this.connection?.unsubscribe();
     this.connection = null;
     this.viewer = null;
@@ -434,7 +457,7 @@ export class LogOverlayComponent implements Component {
       // The active viewer may have changed by the time a chunk arrives; only
       // feed the one that is still current.
       this.viewer?.appendLines(lines);
-      this.opts.tui.requestRender();
+      this.scheduleRender();
     });
   }
 

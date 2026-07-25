@@ -78,17 +78,25 @@ describe("renderLogDock", () => {
     expect(lines).toEqual([]);
   });
 
-  it("renders collapsed summary and preview", () => {
+  it("renders collapsed log preview only", () => {
     const lines = renderLogDock(snapshot(), makeTheme(), 100, 4);
 
+    expect(lines).toHaveLength(3);
     expect(lines[0]).toContain("─");
-    expect(lines.join("\n")).toContain("api-server");
     expect(lines.join("\n")).toContain("ready");
+    expect(lines.join("\n")).not.toContain("api-server");
   });
 
-  it("shows notification badges in collapsed mode", () => {
+  it("shows notification badges in expanded mode", () => {
     const lines = renderLogDock(
-      snapshot({ notifyCounts: new Map([["proc_1", 2]]) }),
+      snapshot({
+        notifyCounts: new Map([["proc_1", 2]]),
+        state: {
+          visibility: "expanded",
+          followEnabled: true,
+          focusedProcessId: "proc_1",
+        },
+      }),
       makeTheme(),
       100,
       4,

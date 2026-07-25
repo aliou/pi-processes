@@ -222,7 +222,7 @@ export function setupDockWidgets(
 
   const seedProcessLogStream = () => {
     const current = state.getState();
-    if (current.visibility !== "expanded" || current.focusedProcessId) {
+    if (current.visibility === "closed" || current.focusedProcessId) {
       processLogStream = [];
       return;
     }

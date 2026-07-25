@@ -13,7 +13,6 @@ import {
   clampNameColumn,
   LineComponent,
   LinesComponent,
-  RuleComponent,
   statusDot,
 } from "../../shared/ui";
 import type { ProcessLogLine } from "../client";
@@ -59,45 +58,67 @@ export function renderLogDock(
       ? buildExpandedBody(snapshot, theme, Math.max(1, logRows))
       : buildCollapsedBody(snapshot, theme);
 
-  return renderTitledBox("Processes", body, theme, width);
+  return renderMinimalBox(
+    "Processes",
+    body,
+    theme,
+    width,
+    snapshot.state.visibility === "expanded",
+  );
 }
 
+const SIDE_PADDING = 1;
+
 /**
- * Render the dock as a top-bordered box with side rails and no bottom
- * border, so it opens into the editor (or the next widget) below — matching
- * the leaner old look without dropping the frame entirely.
+ * Render the dock as a minimal panel: a top bar with the title (no side
+ * padding), an optional full-width rule between the process strip and the
+ * logs, and a single space of side padding for the body lines. No bottom
+ * border so the dock opens cleanly into the editor below.
  */
-function renderTitledBox(
+function renderMinimalBox(
   title: string,
   body: Component,
   theme: Theme,
   width: number,
+  withProcessStrip: boolean,
 ): string[] {
   const dim = (text: string) => theme.fg("dim", text);
-  const innerWidth = Math.max(0, width - 2);
-
   const lines: string[] = [];
 
-  // Top border with a centered, accent title.
-  const styledTitle = theme.fg("accent", theme.bold(` ${title} `));
-  const titleWidth = visibleWidth(styledTitle);
-  const fill = Math.max(0, width - 1 - titleWidth - 1);
-  const leftFill = Math.floor(fill / 2);
-  const rightFill = fill - leftFill;
-  lines.push(
-    dim("╭") +
-      dim("─".repeat(leftFill)) +
-      styledTitle +
-      dim("─".repeat(rightFill)) +
-      dim("╮"),
-  );
+  // Top bar: no side padding, title sits after a small "── " flourish.
+  const label = `── ${title} `;
+  const labelWidth = visibleWidth(label);
+  if (labelWidth >= width) {
+    lines.push(dim("─".repeat(Math.max(0, width))));
+  } else {
+    lines.push(dim(label) + dim("─".repeat(width - labelWidth)));
+  }
 
-  // Body lines with side rails, no bottom border.
+  const innerWidth = Math.max(0, width - SIDE_PADDING * 2);
+  const pad = " ".repeat(SIDE_PADDING);
   const bodyLines = body.render(innerWidth);
-  for (const line of bodyLines) {
-    // truncateToWidth with pad=true truncates AND pads to innerWidth in one call.
-    const inner = truncateToWidth(line, innerWidth, "", true);
-    lines.push(dim("│") + inner + dim("│"));
+
+  if (!withProcessStrip) {
+    // Collapsed mode: body is just log preview lines.
+    for (const line of bodyLines) {
+      const log = truncateToWidth(line, innerWidth, "", true);
+      lines.push(`${pad}${log}${pad}`);
+    }
+    return lines;
+  }
+
+  // Expanded mode: first body line is the process strip, the rest are logs.
+  if (bodyLines.length > 0) {
+    const strip = truncateToWidth(bodyLines[0], innerWidth, "", true);
+    lines.push(`${pad}${strip}${pad}`);
+  }
+
+  if (bodyLines.length > 1) {
+    lines.push(dim("─".repeat(Math.max(0, width))));
+    for (let i = 1; i < bodyLines.length; i++) {
+      const log = truncateToWidth(bodyLines[i], innerWidth, "", true);
+      lines.push(`${pad}${log}${pad}`);
+    }
   }
 
   return lines;
@@ -107,17 +128,11 @@ function buildCollapsedBody(
   snapshot: LogDockSnapshot,
   theme: Theme,
 ): Component {
-  const body = new Stack({ gap: 0 });
-  body.addChild(
-    new LineComponent((width) => renderProcessStrip(snapshot, theme, width)),
+  // Collapsed dock is intentionally minimal: just the header and a short
+  // log preview. No process strip.
+  return new LinesComponent((width) =>
+    renderCollapsedLogLines(snapshot, theme, width),
   );
-  body.addChild(new RuleComponent(theme));
-  body.addChild(
-    new LinesComponent((width) =>
-      renderCollapsedLogLines(snapshot, theme, width),
-    ),
-  );
-  return body;
 }
 
 function buildExpandedBody(
@@ -129,7 +144,6 @@ function buildExpandedBody(
   body.addChild(
     new LineComponent((width) => renderProcessStrip(snapshot, theme, width)),
   );
-  body.addChild(new RuleComponent(theme));
   body.addChild(
     new LinesComponent((width) => {
       const contentLines = snapshot.pinnedProcess
@@ -156,6 +170,25 @@ function renderCollapsedLogLines(
 
   if (lines.length === 0) return ["", ""];
   return Array.from({ length: height }, (_, index) => lines[index] ?? "");
+}
+
+function renderCollapsedPinnedLogLines(
+  snapshot: LogDockSnapshot,
+  theme: Theme,
+  width: number,
+  height: number,
+): string[] {
+  if (snapshot.pinnedLines.length > 0) {
+    return renderLogLines(snapshot.pinnedLines, snapshot, theme, width, height);
+  }
+
+  const processId = snapshot.pinnedProcess?.id;
+  const lines = processId
+    ? snapshot.processLogStream
+        .filter((entry) => entry.processId === processId)
+        .map((entry) => entry.line)
+    : [];
+  return renderLogLines(lines, snapshot, theme, width, height);
 }
 
 function renderProcessStrip(
@@ -207,25 +240,6 @@ function renderProcessStrip(
     parts.join(" ") || theme.fg("dim", "No running processes"),
     width,
   );
-}
-
-function renderCollapsedPinnedLogLines(
-  snapshot: LogDockSnapshot,
-  theme: Theme,
-  width: number,
-  height: number,
-): string[] {
-  if (snapshot.pinnedLines.length > 0) {
-    return renderLogLines(snapshot.pinnedLines, snapshot, theme, width, height);
-  }
-
-  const processId = snapshot.pinnedProcess?.id;
-  const lines = processId
-    ? snapshot.processLogStream
-        .filter((entry) => entry.processId === processId)
-        .map((entry) => entry.line)
-    : [];
-  return renderLogLines(lines, snapshot, theme, width, height);
 }
 
 function renderPinnedLogLines(

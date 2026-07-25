@@ -112,6 +112,14 @@ describe("ProcessLogStore", () => {
     ]);
   });
 
+  it("readTailLines preserves a leading empty line without duplication", () => {
+    using store = new ProcessLogStore("/tmp/test-logs");
+    const paths = store.createLogs("proc_1");
+    fs.writeFileSync(paths.stdoutFile, "\nhello\n");
+
+    expect(store.readTailLines(paths.stdoutFile, 3)).toEqual(["", "hello"]);
+  });
+
   it("readTailLines handles empty and zero-line requests", () => {
     using store = new ProcessLogStore("/tmp/test-logs");
     const paths = store.createLogs("proc_1");

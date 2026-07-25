@@ -297,7 +297,7 @@ function tailLineBuffersNewestFirst(buffer: Buffer, count: number): Buffer[] {
   if (buffer[end - 1] === 0x0a) end--;
 
   while (result.length < count && end >= 0) {
-    const newline = buffer.lastIndexOf(0x0a, end - 1);
+    const newline = end > 0 ? buffer.lastIndexOf(0x0a, end - 1) : -1;
     const start = newline + 1;
     let lineEnd = end;
     if (lineEnd > start && buffer[lineEnd - 1] === 0x0d) lineEnd--;

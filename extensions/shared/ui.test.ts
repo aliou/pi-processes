@@ -5,8 +5,8 @@ import {
   formatProcessSelectionDescription,
   LineComponent,
   LinesComponent,
-  processStatusTone,
   RuleComponent,
+  statusColor,
   statusDot,
 } from "./ui";
 
@@ -67,41 +67,38 @@ describe("RuleComponent", () => {
   });
 });
 
-describe("processStatusTone", () => {
-  it("returns success for running", () => {
-    expect(processStatusTone(makeProcess({ status: "running" }))).toBe(
-      "success",
-    );
+describe("statusColor", () => {
+  it("returns accent for running", () => {
+    expect(statusColor(makeProcess({ status: "running" }))).toBe("accent");
   });
 
-  it("returns warning for terminating and killed", () => {
-    expect(processStatusTone(makeProcess({ status: "terminating" }))).toBe(
-      "warning",
-    );
-    expect(
-      processStatusTone(makeProcess({ status: "killed", success: false })),
-    ).toBe("warning");
+  it("returns warning for terminating", () => {
+    expect(statusColor(makeProcess({ status: "terminating" }))).toBe("warning");
   });
 
-  it("returns error for terminate_timeout and failed exits", () => {
+  it("returns error for failed non-killed processes", () => {
     expect(
-      processStatusTone(
-        makeProcess({ status: "terminate_timeout", success: false }),
-      ),
-    ).toBe("error");
-    expect(
-      processStatusTone(
+      statusColor(
         makeProcess({ status: "exited", success: false, exitCode: 1 }),
       ),
     ).toBe("error");
+    expect(
+      statusColor(makeProcess({ status: "terminate_timeout", success: false })),
+    ).toBe("error");
   });
 
-  it("returns muted for a successful exit", () => {
+  it("returns success for a clean exit", () => {
     expect(
-      processStatusTone(
+      statusColor(
         makeProcess({ status: "exited", success: true, exitCode: 0 }),
       ),
-    ).toBe("muted");
+    ).toBe("success");
+  });
+
+  it("returns dim for killed", () => {
+    expect(statusColor(makeProcess({ status: "killed", success: false }))).toBe(
+      "dim",
+    );
   });
 });
 
@@ -122,6 +119,28 @@ describe("statusDot", () => {
     ).toBe("{accent:●}");
   });
 
+  it("uses dim circle for an inactive running process", () => {
+    expect(
+      statusDot(makeProcess({ status: "running" }), false, theme as never),
+    ).toBe("{dim:○}");
+  });
+
+  it("uses warning dot for terminating", () => {
+    expect(
+      statusDot(makeProcess({ status: "terminating" }), true, theme as never),
+    ).toBe("{warning:●}");
+  });
+
+  it("uses success check for a clean exit", () => {
+    expect(
+      statusDot(
+        makeProcess({ status: "exited", success: true, exitCode: 0 }),
+        false,
+        theme as never,
+      ),
+    ).toBe("{success:✓}");
+  });
+
   it("uses dim square for killed processes (not '!')", () => {
     expect(
       statusDot(
@@ -131,6 +150,32 @@ describe("statusDot", () => {
       ),
     ).toBe("{dim:■}");
   });
+});
+
+describe("statusColor and statusDot agree", () => {
+  const states: Array<{
+    status: ProcessInfo["status"];
+    success: boolean | null;
+  }> = [
+    { status: "running", success: null },
+    { status: "running", success: true },
+    { status: "terminating", success: null },
+    { status: "exited", success: true },
+    { status: "exited", success: false },
+    { status: "killed", success: false },
+    { status: "terminate_timeout", success: false },
+  ];
+
+  for (const { status, success } of states) {
+    it(`${status}/${success} uses the same color from both`, () => {
+      const process = makeProcess({ status, success });
+      const dotColor = statusDot(process, true, theme as never).match(
+        /^\{(\w+):/,
+      )?.[1];
+      const color = statusColor(process);
+      expect(dotColor).toBe(color);
+    });
+  }
 });
 
 describe("formatProcessSelectionDescription", () => {

@@ -221,7 +221,7 @@ describe("renderStatusDot", () => {
       false,
       theme,
     );
-    expect(dot).toBe("{success:●}");
+    expect(dot).toBe("{success:✓}");
   });
 
   it("uses warning dot for terminating processes", () => {

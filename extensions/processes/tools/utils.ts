@@ -8,7 +8,7 @@ import {
   formatTimestamp,
   shortenPath,
 } from "../../../src/utils";
-import { processStatusTone } from "../../shared/ui";
+import { statusColor } from "../../shared/ui";
 import { truncateToWidth } from "../utils/truncate";
 
 export interface RenderOptions {
@@ -100,7 +100,7 @@ export function formatColoredProcessStatus(
   process: ProcessInfo,
   theme: Theme,
 ): string {
-  return theme.fg(processStatusTone(process), formatStatus(process));
+  return theme.fg(statusColor(process), formatStatus(process));
 }
 
 export function plural(noun: string, count: number): string {

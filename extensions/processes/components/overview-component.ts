@@ -17,11 +17,7 @@ import {
 import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
 import { formatRuntime, truncateCmd } from "../../../src/utils/format";
 import { isRecord } from "../../../src/utils/is-record";
-import {
-  LineComponent,
-  LinesComponent,
-  processStatusTone,
-} from "../../shared/ui";
+import { LineComponent, LinesComponent, statusColor } from "../../shared/ui";
 import {
   type ProcessLogLine,
   requestClear,
@@ -668,7 +664,7 @@ export function formatStatusShort(process: ProcessInfo): string {
 }
 
 function formatColoredStatusShort(process: ProcessInfo, theme: Theme): string {
-  return theme.fg(processStatusTone(process), formatStatusShort(process));
+  return theme.fg(statusColor(process), formatStatusShort(process));
 }
 
 /** Sort + filter view used by the overview. Pure, unit-testable. */

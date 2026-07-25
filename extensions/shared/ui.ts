@@ -8,7 +8,7 @@
  * extensions.
  */
 
-import type { Theme } from "@earendil-works/pi-coding-agent";
+import type { Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
 
 import { LIVE_STATUSES, type ProcessInfo } from "../../src/types";
@@ -55,28 +55,34 @@ export class RuleComponent implements Component {
 // Status formatting
 // ---------------------------------------------------------------------------
 
-export type ProcessStatusTone = "success" | "warning" | "error" | "muted";
-
 /**
- * Resolve the tone for a process's current status. Shared so the overview,
- * dock, and output tool agree on coloring.
+ * The color a process's status should render in. Shared by the status dot
+ * and process name so the dot and the name always agree on color.
  */
-export function processStatusTone(process: ProcessInfo): ProcessStatusTone {
-  if (process.status === "running") return "success";
-  if (process.status === "terminating") return "warning";
-  if (process.status === "terminate_timeout") return "error";
-  if (process.status === "killed") return "warning";
-  return process.success ? "muted" : "error";
+export function statusColor(process: ProcessInfo): ThemeColor {
+  if (process.success === false && process.status !== "killed") {
+    return "error";
+  }
+  if (process.status === "terminating") {
+    return "warning";
+  }
+  if (LIVE_STATUSES.has(process.status)) {
+    return "accent";
+  }
+  if (process.status === "exited" && process.success) {
+    return "success";
+  }
+  return "dim";
 }
 
 /**
  * Render the status indicator dot for a process.
  *
- * - `!` (error) for failures/crashes, unless the process was intentionally
- *   killed.
+ * Glyph carries state class; color refines:
+ * - `!` (error) for failures/crashes, unless intentionally killed.
  * - `●` (warning) for terminating.
  * - `●`/`○` (accent/dim) for live processes, depending on `active`.
- * - `●` (success) for a clean exit.
+ * - `✓` (success) for a clean exit.
  * - `■` (dim) for other terminal states (e.g. killed).
  */
 export function statusDot(
@@ -94,7 +100,7 @@ export function statusDot(
     return active ? theme.fg("accent", "●") : theme.fg("dim", "○");
   }
   if (process.status === "exited" && process.success) {
-    return theme.fg("success", "●");
+    return theme.fg("success", "✓");
   }
   return theme.fg("dim", "■");
 }

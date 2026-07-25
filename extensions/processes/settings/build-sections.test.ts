@@ -51,7 +51,7 @@ describe("buildSections", () => {
       .find((s) => s.label === "Interfaces")
       ?.items.find((item) => item.id === "logs.details");
 
-    expect(logsItem?.currentValue).toBe("500 lines · 12 rows · manual");
+    expect(logsItem?.currentValue).toBe("500 lines · 4 MB · 12 rows · manual");
     expect(logsItem?.submenu).toBeTypeOf("function");
   });
 });

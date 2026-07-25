@@ -7,6 +7,7 @@ import {
   type LogsUnsubscribePayload,
 } from "../../../src/protocol";
 import { isRecord } from "../../../src/utils/is-record";
+import { buildDroppedOutputLine } from "../../shared/line-buffer";
 
 interface LogSubscriber {
   subscriberId: string;
@@ -67,7 +68,13 @@ export function registerLogSubscriptions(
     }
 
     if (event.type !== "process_output_changed") return;
-    if (!event.appendedText || event.appendedText.length === 0) return;
+    const lines = [
+      ...(event.droppedLines
+        ? [buildDroppedOutputLine(event.droppedLines)]
+        : []),
+      ...(event.appendedText ?? []),
+    ];
+    if (lines.length === 0) return;
 
     for (const subscriber of subscribers.values()) {
       if (subscriber.processId !== event.id) continue;
@@ -75,7 +82,7 @@ export function registerLogSubscriptions(
       events.emit(CHANNELS.LOGS_CHUNK, {
         subscriberId: subscriber.subscriberId,
         processId: subscriber.processId,
-        lines: event.appendedText,
+        lines,
       });
     }
   });

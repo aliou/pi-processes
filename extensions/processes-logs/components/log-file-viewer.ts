@@ -1,5 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { trimToBudget } from "../../shared/line-buffer";
 import type { ProcessLogLine } from "../logs-client";
 
 export type StreamFilter = "both" | "stdout" | "stderr";
@@ -7,6 +8,7 @@ export type StreamFilter = "both" | "stdout" | "stderr";
 interface LogFileViewerOptions {
   followEnabled: boolean;
   maxBufferLines: number;
+  maxBufferBytes?: number;
 }
 
 export class LogFileViewer {
@@ -26,16 +28,22 @@ export class LogFileViewer {
     private readonly options: LogFileViewerOptions,
   ) {
     this.follow = options.followEnabled;
-    this.lines = initialLines.slice(-options.maxBufferLines);
+    this.lines = trimToBudget(
+      initialLines,
+      options.maxBufferLines,
+      options.maxBufferBytes ?? Number.MAX_SAFE_INTEGER,
+    );
     this.refreshMatches();
   }
 
   appendLines(lines: ProcessLogLine[]): void {
     if (lines.length === 0) return;
     this.lines.push(...lines);
-    if (this.lines.length > this.options.maxBufferLines) {
-      this.lines = this.lines.slice(-this.options.maxBufferLines);
-    }
+    this.lines = trimToBudget(
+      this.lines,
+      this.options.maxBufferLines,
+      this.options.maxBufferBytes ?? Number.MAX_SAFE_INTEGER,
+    );
     this.refreshMatches();
     if (this.follow) this.anchorEnd = null;
   }

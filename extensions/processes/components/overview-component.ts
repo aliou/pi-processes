@@ -9,14 +9,11 @@ import {
   truncateToWidth,
   visibleWidth,
 } from "@earendil-works/pi-tui";
-import {
-  CHANNELS,
-  type ProcessesOutputChangedPayload,
-  type ProcessProtocolConfig,
-} from "../../../src/protocol";
+import { CHANNELS, type ProcessProtocolConfig } from "../../../src/protocol";
 import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
 import { formatRuntime, truncateCmd } from "../../../src/utils/format";
-import { isRecord } from "../../../src/utils/is-record";
+import { buildDroppedOutputLine, trimToBudget } from "../../shared/line-buffer";
+import { isOutputChangedPayload } from "../../shared/output-payload";
 import { LineComponent, LinesComponent, statusColor } from "../../shared/ui";
 import {
   type ProcessLogLine,
@@ -197,7 +194,38 @@ export class OverviewComponent implements Component {
     if (!isOutputChangedPayload(payload)) return;
     const selected = this.selectedProcess();
     if (!selected || selected.id !== payload.id) return;
-    this.refreshPreview();
+    const appended = [
+      ...(payload.droppedLines
+        ? [buildDroppedOutputLine(payload.droppedLines)]
+        : []),
+      ...(payload.appendedText ?? []),
+    ];
+    if (appended.length === 0) return;
+
+    const follow = this.isFollowingTail();
+    const oldLength = this.previewLines.length;
+    this.previewLines.push(...appended);
+    const combinedLength = this.previewLines.length;
+    this.previewLines = trimToBudget(
+      this.previewLines,
+      MAX_PREVIEW_LINES,
+      this.opts.config.output.maxOutputBytes,
+    );
+    if (follow) {
+      this.previewOffset = Math.max(
+        0,
+        this.previewLines.length - this.previewHeight(),
+      );
+    } else {
+      const removedFromHead = Math.min(
+        oldLength,
+        combinedLength - this.previewLines.length,
+      );
+      this.previewOffset = Math.min(
+        Math.max(0, this.previewOffset - removedFromHead),
+        Math.max(0, this.previewLines.length - 1),
+      );
+    }
     this.requestRender();
   }
 
@@ -287,18 +315,18 @@ export class OverviewComponent implements Component {
     // caller asked for newest), keep it there after reloading so new output
     // scrolls into view. Otherwise preserve the user's scroll position so a
     // deliberate K-scroll-up is not yanked back by the next output batch.
-    const oldTotal = this.previewLines.length;
-    const follow =
-      align === "newest" ||
-      oldTotal === 0 ||
-      this.previewOffset >= oldTotal - available;
+    const follow = align === "newest" || this.isFollowingTail();
 
     const lines = requestCombinedOutput(
       this.opts.events,
       selected.id,
       this.opts.config.output.defaultTailLines,
     );
-    this.previewLines = lines.slice(-MAX_PREVIEW_LINES);
+    this.previewLines = trimToBudget(
+      lines,
+      MAX_PREVIEW_LINES,
+      this.opts.config.output.maxOutputBytes,
+    );
     const newTotal = this.previewLines.length;
 
     if (follow) {
@@ -311,6 +339,13 @@ export class OverviewComponent implements Component {
         Math.max(0, newTotal - 1),
       );
     }
+  }
+
+  private isFollowingTail(): boolean {
+    return (
+      this.previewLines.length === 0 ||
+      this.previewOffset >= this.previewLines.length - this.previewHeight()
+    );
   }
 
   private cycleSort(): void {
@@ -586,13 +621,10 @@ export class OverviewComponent implements Component {
     const start = this.previewOffset;
     const slice = this.previewLines.slice(start, start + available);
     for (const line of slice) {
+      const text =
+        line.type === "stderr" ? t.fg("warning", line.text) : line.text;
       body.push(
-        truncateToWidth(
-          `${dim(PREVIEW_LOG_PREFIX)}${line.text}`,
-          width,
-          "",
-          true,
-        ),
+        truncateToWidth(`${dim(PREVIEW_LOG_PREFIX)}${text}`, width, "", true),
       );
     }
     while (body.length < available + 1) body.push("");
@@ -699,12 +731,4 @@ export function applyOverviewView(
     copy.sort((a, b) => a.name.localeCompare(b.name));
   }
   return copy;
-}
-
-// --- payload guards ---
-
-function isOutputChangedPayload(
-  payload: unknown,
-): payload is ProcessesOutputChangedPayload {
-  return isRecord(payload) && typeof payload.id === "string";
 }

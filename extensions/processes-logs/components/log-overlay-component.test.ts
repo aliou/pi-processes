@@ -45,7 +45,11 @@ function makeProcess(overrides: Partial<ProcessInfo> = {}): ProcessInfo {
  */
 function makeConfig() {
   return {
-    output: { defaultTailLines: 100, maxOutputLines: 2000 },
+    output: {
+      defaultTailLines: 100,
+      maxOutputLines: 2000,
+      maxOutputBytes: 4 * 1024 * 1024,
+    },
     follow: { enabledByDefault: true, autoHideOnFinish: false },
     processList: { maxPreviewLines: 24, maxVisibleProcesses: 12 },
   } as never;

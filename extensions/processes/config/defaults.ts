@@ -14,6 +14,7 @@ export const DEFAULT_CONFIG: ProcessProtocolConfig = {
   output: {
     defaultTailLines: 100,
     maxOutputLines: 2000,
+    maxOutputBytes: 4 * 1024 * 1024,
   },
   follow: {
     enabledByDefault: true,

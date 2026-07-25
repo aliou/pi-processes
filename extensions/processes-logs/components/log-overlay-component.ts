@@ -415,6 +415,7 @@ export class LogOverlayComponent implements Component {
       viewer = new LogFileViewer(connection.initialLines, this.opts.theme, {
         followEnabled: this.opts.config.follow.enabledByDefault,
         maxBufferLines: this.opts.config.output.maxOutputLines,
+        maxBufferBytes: this.opts.config.output.maxOutputBytes,
       });
       this.viewers.set(selected.id, viewer);
       this.pruneCachedViewers();

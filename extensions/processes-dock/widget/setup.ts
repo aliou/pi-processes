@@ -6,11 +6,12 @@ import type {
 import {
   CHANNELS,
   type CommandPinPayload,
-  type ProcessesOutputChangedPayload,
   type ProcessProtocolNotificationPayload,
 } from "../../../src/protocol";
 import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
 import { isRecord } from "../../../src/utils/is-record";
+import { buildDroppedOutputLine, trimToBudget } from "../../shared/line-buffer";
+import { isOutputChangedPayload } from "../../shared/output-payload";
 import {
   type ProcessLogLine,
   requestCombinedOutput,
@@ -152,6 +153,13 @@ export function setupDockWidgets(
   const hardRefresh = () => {
     if (disposed) return;
     processes = sortProcesses(requestProcessList(events));
+    const liveIds = new Set(processes.map((process) => process.id));
+    for (const id of previews.keys()) {
+      if (!liveIds.has(id)) previews.delete(id);
+    }
+    for (const id of notifyMarkers.keys()) {
+      if (!liveIds.has(id)) notifyMarkers.delete(id);
+    }
     if (processes.some((process) => process.status === "running")) {
       hasSeenRunningProcess = true;
     }
@@ -201,15 +209,19 @@ export function setupDockWidgets(
     }
     if (processLogStream.length > 0) return;
 
-    processLogStream = processes
-      .filter((process) => LIVE_STATUSES.has(process.status))
-      .flatMap((process) =>
-        requestCombinedOutput(events, process.id, 4).map((line) => ({
-          processId: process.id,
-          line,
-        })),
-      )
-      .slice(-config.output.maxOutputLines);
+    processLogStream = trimToBudget(
+      processes
+        .filter((process) => LIVE_STATUSES.has(process.status))
+        .flatMap((process) =>
+          requestCombinedOutput(events, process.id, 4).map((line) => ({
+            processId: process.id,
+            line,
+          })),
+        ),
+      config.output.maxOutputLines,
+      config.output.maxOutputBytes,
+      (entry) => entry.line.text,
+    );
   };
 
   const syncPinnedConnection = () => {
@@ -221,13 +233,17 @@ export function setupDockWidgets(
       pinnedConnection?.unsubscribe();
       pinnedConnection = null;
       pinnedConnectionId = null;
-      pinnedLines = pinned
-        ? requestCombinedOutput(
-            events,
-            pinned.id,
-            config.output.defaultTailLines,
-          )
-        : [];
+      pinnedLines = trimToBudget(
+        pinned
+          ? requestCombinedOutput(
+              events,
+              pinned.id,
+              config.output.defaultTailLines,
+            )
+          : [],
+        config.output.maxOutputLines,
+        config.output.maxOutputBytes,
+      );
       return;
     }
 
@@ -241,24 +257,35 @@ export function setupDockWidgets(
       tailLines: config.output.defaultTailLines,
     });
     if (isLogsConnectionError(connection)) {
-      pinnedLines = requestCombinedOutput(
-        events,
-        pinned.id,
-        config.output.defaultTailLines,
+      pinnedLines = trimToBudget(
+        requestCombinedOutput(
+          events,
+          pinned.id,
+          config.output.defaultTailLines,
+        ),
+        config.output.maxOutputLines,
+        config.output.maxOutputBytes,
       );
       return;
     }
 
     pinnedConnection = connection;
     pinnedConnectionId = pinned.id;
-    pinnedLines = connection.initialLines;
+    pinnedLines = trimToBudget(
+      connection.initialLines,
+      config.output.maxOutputLines,
+      config.output.maxOutputBytes,
+    );
 
     connection.onChunk((lines: ProcessLogLine[]) => {
       if (disposed) return;
       const id = pinnedConnectionId;
       if (!id) return;
-      pinnedLines = [...pinnedLines, ...lines].slice(
-        -config.output.maxOutputLines,
+      pinnedLines.push(...lines);
+      pinnedLines = trimToBudget(
+        pinnedLines,
+        config.output.maxOutputLines,
+        config.output.maxOutputBytes,
       );
       const last = lines.at(-1);
       if (last) previews.set(id, last);
@@ -308,16 +335,30 @@ export function setupDockWidgets(
       scheduleRefresh();
       return;
     }
-    if (!payload.appendedText || payload.appendedText.length === 0) {
+    if (
+      (!payload.appendedText || payload.appendedText.length === 0) &&
+      !payload.droppedLines
+    ) {
       scheduleRefresh();
       return;
     }
 
-    for (const line of payload.appendedText) {
+    const appended = [
+      ...(payload.droppedLines
+        ? [buildDroppedOutputLine(payload.droppedLines)]
+        : []),
+      ...(payload.appendedText ?? []),
+    ];
+    for (const line of appended) {
       previews.set(payload.id, line);
       processLogStream.push({ processId: payload.id, line });
     }
-    processLogStream = processLogStream.slice(-config.output.maxOutputLines);
+    processLogStream = trimToBudget(
+      processLogStream,
+      config.output.maxOutputLines,
+      config.output.maxOutputBytes,
+      (entry) => entry.line.text,
+    );
     render();
   };
 
@@ -423,16 +464,6 @@ function isLogsConnectionError(
   connection: LogsConnection | { ok: false; error: string },
 ): connection is { ok: false; error: string } {
   return "ok" in connection && connection.ok === false;
-}
-
-function isOutputChangedPayload(
-  payload: unknown,
-): payload is ProcessesOutputChangedPayload {
-  return (
-    isRecord(payload) &&
-    typeof payload.id === "string" &&
-    (payload.appendedText === undefined || Array.isArray(payload.appendedText))
-  );
 }
 
 function isLogMatchNotification(

@@ -158,6 +158,36 @@ describe("registerLogSubscriptions", () => {
     });
   });
 
+  it("prepends a visible marker when output lines were dropped", () => {
+    const events = createEventBus();
+    const fake = createFakeManager();
+    const chunk = vi.fn();
+
+    registerLogSubscriptions(events, fake.manager);
+    events.on(CHANNELS.LOGS_CHUNK, chunk);
+    events.emit(CHANNELS.LOGS_SUBSCRIBE, {
+      subscriberId: "sub_1",
+      processId: "proc_1",
+      reply: vi.fn(),
+    });
+
+    fake.emit({
+      type: "process_output_changed",
+      id: "proc_1",
+      appendedText: [{ type: "stdout", text: "latest" }],
+      droppedLines: 4,
+    });
+
+    expect(chunk).toHaveBeenCalledWith({
+      subscriberId: "sub_1",
+      processId: "proc_1",
+      lines: [
+        { type: "stderr", text: "… 4 lines dropped (output too fast)" },
+        { type: "stdout", text: "latest" },
+      ],
+    });
+  });
+
   it("purges subscribers when processes end or disappear", () => {
     const events = createEventBus();
     const fake = createFakeManager();

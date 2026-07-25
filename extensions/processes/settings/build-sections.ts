@@ -185,35 +185,49 @@ function buildLogsDetailItem(
     resolved.processList.maxPreviewLines;
   const historyLines =
     scopedConfig.output?.maxOutputLines ?? resolved.output.maxOutputLines;
+  const historyBudgetMb = Math.max(
+    1,
+    Math.round(
+      (scopedConfig.output?.maxOutputBytes ?? resolved.output.maxOutputBytes) /
+        (1024 * 1024),
+    ),
+  );
   const followByDefault =
     scopedConfig.follow?.enabledByDefault ?? resolved.follow.enabledByDefault;
 
   return {
     id: "logs.details",
     label: "Logs overlay",
-    currentValue: `${historyLines} lines · ${viewportRows} rows · ${followByDefault ? "follow" : "manual"}`,
+    currentValue: `${historyLines} lines · ${historyBudgetMb} MB · ${viewportRows} rows · ${followByDefault ? "follow" : "manual"}`,
     description:
       "Open focused settings for /ps:logs tabs, history, viewport, and follow behavior.",
     submenu: (_current, done) => {
       const current = scopedConfig;
       let nextViewportRows = String(viewportRows);
       let nextHistoryLines = String(historyLines);
+      let nextHistoryBudgetMb = String(historyBudgetMb);
+      let historyBudgetEdited = false;
       let nextFollowByDefault = followByDefault;
       let nextAutoHideOnFinish =
         scopedConfig.follow?.autoHideOnFinish ??
         resolved.follow.autoHideOnFinish;
 
       const syncDraft = () => {
+        const output = {
+          ...current.output,
+          maxOutputLines: parsePositiveInt(nextHistoryLines),
+        };
+        if (historyBudgetEdited) {
+          output.maxOutputBytes =
+            parsePositiveInt(nextHistoryBudgetMb) * 1024 * 1024;
+        }
         const updated: ProcessConfig = {
           ...current,
           processList: {
             ...current.processList,
             maxPreviewLines: parsePositiveInt(nextViewportRows),
           },
-          output: {
-            ...current.output,
-            maxOutputLines: parsePositiveInt(nextHistoryLines),
-          },
+          output,
           follow: {
             ...current.follow,
             enabledByDefault: nextFollowByDefault,
@@ -254,6 +268,20 @@ function buildLogsDetailItem(
             validate: positiveIntegerError,
           },
           {
+            id: "logs.historyBudgetMb",
+            type: "text",
+            label: "History budget (MB)",
+            description:
+              "Maximum in-memory log history retained per process view.",
+            getValue: () => nextHistoryBudgetMb,
+            setValue: (value) => {
+              nextHistoryBudgetMb = value;
+              historyBudgetEdited = true;
+              syncDraft();
+            },
+            validate: positiveIntegerError,
+          },
+          {
             id: "logs.followByDefault",
             type: "boolean",
             label: "Follow by default",
@@ -278,7 +306,7 @@ function buildLogsDetailItem(
           },
         ],
         getDoneSummary: () =>
-          `${parsePositiveInt(nextHistoryLines)} lines · ${parsePositiveInt(nextViewportRows)} rows · ${nextFollowByDefault ? "follow" : "manual"}`,
+          `${parsePositiveInt(nextHistoryLines)} lines · ${parsePositiveInt(nextHistoryBudgetMb)} MB · ${parsePositiveInt(nextViewportRows)} rows · ${nextFollowByDefault ? "follow" : "manual"}`,
         onDone: (summary) => done(summary),
       });
     },

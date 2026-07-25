@@ -23,7 +23,11 @@ function makeConfig() {
     execution: { shellPath: undefined },
     interception: { blockBackgroundCommands: true },
     processList: { maxPreviewLines: 24, maxVisibleProcesses: 12 },
-    output: { defaultTailLines: 100, maxOutputLines: 2000 },
+    output: {
+      defaultTailLines: 100,
+      maxOutputLines: 2000,
+      maxOutputBytes: 4 * 1024 * 1024,
+    },
     follow: { enabledByDefault: true, autoHideOnFinish: false },
     widget: { dockDefaultState: "closed" as const, dockHeight: 12 },
   };
@@ -91,6 +95,11 @@ function makeEvents(processes: ProcessInfo[] = [], outputLines: string[] = []) {
         return;
       }
     }),
+    dispatch(channel: string, payload: unknown) {
+      for (const listener of listeners[channel] ?? []) {
+        listener(payload as never);
+      }
+    },
     pinCalls,
   };
 }
@@ -447,5 +456,39 @@ describe("overview panel render width safety", () => {
     // The oldest lines (1-4) are off the newest page.
     expect(body).not.toContain("out line 4");
     expect(body).not.toContain("out line 1 ");
+  });
+
+  it("appends output events without re-reading the log tail", () => {
+    const processes = [makeProcess({ id: "proc_1" })];
+    const events = makeEvents(processes, ["initial"]);
+    const tui = {
+      requestRender: vi.fn(),
+      terminal: { rows: 24, columns: 112 },
+    } as unknown;
+    const component = new OverviewComponent({
+      events: events as never,
+      tui: tui as never,
+      theme: theme as never,
+      config: makeConfig() as never,
+      onClose: () => {},
+    });
+    const requestsBefore = events.emit.mock.calls.filter(
+      ([channel]) => channel === CHANNELS.REQUEST_COMBINED_OUTPUT,
+    ).length;
+
+    events.dispatch(CHANNELS.OUTPUT_CHANGED, {
+      id: "proc_1",
+      droppedLines: 2,
+      appendedText: [{ type: "stdout", text: "live line" }],
+    });
+
+    const body = component.render(112).map(stripAnsi).join("\n");
+    expect(body).toContain("… 2 lines dropped (output too fast)");
+    expect(body).toContain("live line");
+    expect(
+      events.emit.mock.calls.filter(
+        ([channel]) => channel === CHANNELS.REQUEST_COMBINED_OUTPUT,
+      ),
+    ).toHaveLength(requestsBefore);
   });
 });

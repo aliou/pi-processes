@@ -58,6 +58,7 @@ export interface ProcessProtocolConfig {
   output: {
     defaultTailLines: number;
     maxOutputLines: number;
+    maxOutputBytes: number;
   };
   follow: {
     enabledByDefault: boolean;

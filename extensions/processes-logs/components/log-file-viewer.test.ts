@@ -61,6 +61,19 @@ describe("LogFileViewer", () => {
     expect(lines).toEqual(["", "", "second", "third", "fourth"]);
   });
 
+  it("trims the buffer by text budget", () => {
+    const viewer = new LogFileViewer(
+      [
+        { type: "stdout", text: "old" },
+        { type: "stdout", text: "keep" },
+      ],
+      makeTheme(),
+      { followEnabled: false, maxBufferLines: 10, maxBufferBytes: 4 },
+    );
+
+    expect(trimLines(viewer.render(20, 3))).toEqual(["", "", "keep"]);
+  });
+
   it("filters by stream", () => {
     const viewer = new LogFileViewer(
       [

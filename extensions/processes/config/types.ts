@@ -23,6 +23,7 @@ export interface ProcessListConfig {
 export interface OutputConfig {
   defaultTailLines?: number;
   maxOutputLines?: number;
+  maxOutputBytes?: number;
 }
 
 export interface FollowConfig {

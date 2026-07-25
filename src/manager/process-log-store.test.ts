@@ -1,3 +1,4 @@
+import { tmpdir } from "node:os";
 import { fs, vol } from "memfs";
 import { assert, beforeEach, describe, expect, it } from "vitest";
 
@@ -308,5 +309,126 @@ describe("ProcessLogStore", () => {
     store.cleanup();
 
     expect(fs.existsSync("/tmp/test-logs")).toBe(false);
+  });
+
+  describe("lazy log directory creation", () => {
+    const piProcessesDirs = (): string[] => {
+      try {
+        return fs
+          .readdirSync(tmpdir())
+          .map((name) => String(name))
+          .filter((name) => name.startsWith("pi-processes-"));
+      } catch (_error) {
+        return [];
+      }
+    };
+
+    it("does not create a temp directory until the store is used", () => {
+      const before = piProcessesDirs();
+
+      {
+        using _store = new ProcessLogStore();
+        // Constructing the store must not touch the filesystem.
+        expect(piProcessesDirs().filter((d) => !before.includes(d))).toEqual(
+          [],
+        );
+      }
+
+      // Disposing an unused store leaves nothing behind.
+      expect(piProcessesDirs().filter((d) => !before.includes(d))).toEqual([]);
+    });
+
+    it("creates and removes the directory around createLogs", () => {
+      using store = new ProcessLogStore();
+      const dir = store.getLogDir();
+
+      expect(fs.existsSync(dir)).toBe(true);
+
+      store.cleanup();
+
+      expect(fs.existsSync(dir)).toBe(false);
+      // The store is reusable after cleanup.
+      const next = store.getLogDir();
+      expect(fs.existsSync(next)).toBe(true);
+      expect(next).not.toEqual(dir);
+    });
+  });
+
+  describe("per-file size cap", () => {
+    it("truncates a stream file once it exceeds the cap", () => {
+      using store = new ProcessLogStore("/tmp/test-logs", {
+        maxFileBytes: 4096,
+      });
+      const paths = store.createLogs("proc_1");
+
+      for (let index = 0; index < 2000; index++) {
+        store.appendStdout(paths.stdoutFile, Buffer.from("hello world\n"));
+      }
+
+      const size = store.getFileSize(paths).stdout;
+      expect(size).toBeLessThanOrEqual(4096);
+
+      const content = fs.readFileSync(paths.stdoutFile, "utf-8") as string;
+      expect(content.startsWith("[log truncated at 64 MB")).toBe(true);
+    });
+
+    it("keeps recent lines readable after truncation", () => {
+      using store = new ProcessLogStore("/tmp/test-logs", {
+        maxFileBytes: 4096,
+      });
+      const paths = store.createLogs("proc_1");
+
+      for (let index = 0; index < 2000; index++) {
+        store.appendCombinedLine(paths.combinedFile, "stdout", `line-${index}`);
+      }
+      store.appendCombinedLine(paths.combinedFile, "stdout", "final line");
+
+      const tail = store.readTailLines(paths.combinedFile, 10000);
+      expect(tail).toContain("1:final line");
+
+      const combined = store.getCombinedOutput(paths.combinedFile, 10000);
+      const marker = combined.find((entry) => entry.type === "stderr");
+      expect(marker?.text).toMatch(/log truncated at 64 MB/);
+    });
+
+    it("writes a single oversized append as marker plus the entry", () => {
+      using store = new ProcessLogStore("/tmp/test-logs", {
+        maxFileBytes: 4096,
+      });
+      const paths = store.createLogs("proc_1");
+
+      const big = Buffer.from("x".repeat(8000));
+      store.appendStdout(paths.stdoutFile, big);
+
+      const size = store.getFileSize(paths).stdout;
+      const markerBytes = Buffer.byteLength(
+        "[log truncated at 64 MB — earlier output discarded]\n",
+      );
+      expect(size).toBe(markerBytes + 8000);
+
+      const content = fs.readFileSync(paths.stdoutFile, "utf-8") as string;
+      expect(content.startsWith("[log truncated at 64 MB")).toBe(true);
+      expect(content.endsWith("x".repeat(8000))).toBe(true);
+    });
+
+    it("seeds the counter from pre-existing file content", () => {
+      fs.mkdirSync("/tmp/test-logs", { recursive: true });
+      fs.writeFileSync("/tmp/test-logs/proc_1-stdout.log", "x".repeat(4000));
+
+      using store = new ProcessLogStore("/tmp/test-logs", {
+        maxFileBytes: 4096,
+      });
+      const paths = store.createLogs("proc_1");
+
+      // 4000 pre-existing + 200 new would breach the 4096 cap, so the file is
+      // truncated and restarted from the marker.
+      store.appendStdout(paths.stdoutFile, Buffer.from("y".repeat(200)));
+
+      const size = store.getFileSize(paths).stdout;
+      expect(size).toBeLessThanOrEqual(4096);
+
+      const content = fs.readFileSync(paths.stdoutFile, "utf-8") as string;
+      expect(content.startsWith("[log truncated at 64 MB")).toBe(true);
+    });
   });
 });

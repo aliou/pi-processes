@@ -81,3 +81,7 @@ UI helper functions return a `Component`; they never mutate a passed-in containe
 - `ProcessManager` / `ProcessRegistry` return insertion order. No sorting, filtering, or formatting.
 - Process IDs are opaque strings. Do not assume they are numerical or monotonically increasing.
 - Display concerns (sorting, truncation, color) belong in the tool/UI layer only.
+
+## Disk usage
+
+Process output is stored twice on disk: once in the per-stream file (`stdout.log` / `stderr.log`) and again in `combined.log`. Each file is capped at 64 MB (`MAX_LOG_FILE_BYTES`) via truncate-and-restart, so budget ~128 MB per process for a stdout-only process and ~192 MB for one using both streams. The log directory is created lazily on first process start, so sessions that never start a process leave no temp directory behind.

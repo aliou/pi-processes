@@ -9,62 +9,91 @@ import {
   readSync,
   rmSync,
   statSync,
+  truncateSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { ProcessLogPaths } from "./internal-types";
-import { MAX_TAIL_READ_BYTES } from "./limits";
+import { MAX_LOG_FILE_BYTES, MAX_TAIL_READ_BYTES } from "./limits";
 
 const TAIL_CHUNK_BYTES = 64 * 1024;
 const MAX_FULL_FILE_BYTES = MAX_TAIL_READ_BYTES * 8;
 const TAIL_TRUNCATION_PREFIX = "[… truncated] ";
+const STDOUT_TRUNCATION_MARKER =
+  "[log truncated at 64 MB — earlier output discarded]\n";
+const STDERR_TRUNCATION_MARKER =
+  "[log truncated at 64 MB — earlier output discarded]\n";
+const COMBINED_TRUNCATION_MARKER =
+  "2:[log truncated at 64 MB — earlier output discarded]\n";
 
+/**
+ * Stores process log files on disk and enforces a per-file size cap.
+ *
+ * The log directory is created lazily: constructing a store without an
+ * explicit `logDir` does not touch the filesystem, so a session that never
+ * starts a process leaves no temp directory behind. An explicit `logDir` is
+ * also no longer created eagerly at construction; it is created on first use.
+ *
+ * Each file holds a single window of history. When a file exceeds
+ * {@link MAX_LOG_FILE_BYTES} it is truncated to zero and writing restarts
+ * from a marker line, so `stdout.log`, `stderr.log`, and `combined.log` can
+ * hold different windows of history after a breach. `combined.log` is what
+ * the UI reads; the per-stream files are what the agent greps.
+ */
 export class ProcessLogStore {
-  private logDir: string;
+  private logDir: string | null = null;
+  private readonly explicitLogDir: string | undefined;
+  private readonly maxFileBytes: number;
+  private readonly fileBytes = new Map<string, number>();
 
-  constructor(logDir?: string) {
-    if (logDir) {
-      this.logDir = logDir;
-      mkdirSync(this.logDir, { recursive: true });
-      return;
+  constructor(logDir?: string, options?: { maxFileBytes?: number }) {
+    this.explicitLogDir = logDir;
+    this.maxFileBytes = options?.maxFileBytes ?? MAX_LOG_FILE_BYTES;
+  }
+
+  private ensureLogDir(): string {
+    if (this.logDir) return this.logDir;
+    if (this.explicitLogDir) {
+      mkdirSync(this.explicitLogDir, { recursive: true });
+      this.logDir = this.explicitLogDir;
+      return this.logDir;
     }
-
     const tempParent = tmpdir();
     mkdirSync(tempParent, { recursive: true });
     this.logDir = mkdtempSync(join(tempParent, "pi-processes-"));
-  }
-
-  getLogDir(): string {
     return this.logDir;
   }
 
-  createLogs(processId: string): ProcessLogPaths {
-    const stdoutFile = join(this.logDir, `${processId}-stdout.log`);
-    const stderrFile = join(this.logDir, `${processId}-stderr.log`);
-    const combinedFile = join(this.logDir, `${processId}-combined.log`);
+  getLogDir(): string {
+    return this.ensureLogDir();
+  }
 
+  createLogs(processId: string): ProcessLogPaths {
+    const dir = this.ensureLogDir();
+    const stdoutFile = join(dir, `${processId}-stdout.log`);
+    const stderrFile = join(dir, `${processId}-stderr.log`);
+    const combinedFile = join(dir, `${processId}-combined.log`);
+
+    // `appendFileSync("", ...)` does not truncate, so a reused explicit logDir
+    // can hold pre-existing content. Seed the counters from the actual file
+    // sizes so the cap accounts for those bytes.
     appendFileSync(stdoutFile, "");
     appendFileSync(stderrFile, "");
     appendFileSync(combinedFile, "");
+    this.fileBytes.set(stdoutFile, this.sizeOf(stdoutFile));
+    this.fileBytes.set(stderrFile, this.sizeOf(stderrFile));
+    this.fileBytes.set(combinedFile, this.sizeOf(combinedFile));
 
     return { stdoutFile, stderrFile, combinedFile };
   }
 
   appendStdout(file: string, data: Buffer): void {
-    try {
-      appendFileSync(file, data);
-    } catch (_error) {
-      void _error; // Intentionally ignored
-    }
+    this.appendCapped(file, data, STDOUT_TRUNCATION_MARKER);
   }
 
   appendStderr(file: string, data: Buffer): void {
-    try {
-      appendFileSync(file, data);
-    } catch (_error) {
-      void _error; // Intentionally ignored
-    }
+    this.appendCapped(file, data, STDERR_TRUNCATION_MARKER);
   }
 
   appendCombinedLine(
@@ -73,19 +102,15 @@ export class ProcessLogStore {
     line: string,
   ): void {
     const tag = source === "stdout" ? "1" : "2";
-    try {
-      appendFileSync(file, `${tag}:${line}\n`);
-    } catch (_error) {
-      void _error; // Intentionally ignored
-    }
+    const data = `${tag}:${line}\n`;
+    // The marker must carry a stream tag, or getCombinedOutput will parse it
+    // as untagged stdout. Use the stderr tag so it renders with the warning
+    // tone in the dock and overlay.
+    this.appendCapped(file, data, COMBINED_TRUNCATION_MARKER);
   }
 
   appendErrorLine(file: string, message: string): void {
-    try {
-      appendFileSync(file, `${message}\n`);
-    } catch (_error) {
-      void _error; // Intentionally ignored
-    }
+    this.appendCapped(file, `${message}\n`, STDERR_TRUNCATION_MARKER);
   }
 
   readTailLines(filePath: string, lines: number): string[] {
@@ -226,15 +251,54 @@ export class ProcessLogStore {
   }
 
   cleanup(): void {
+    if (!this.logDir) return;
     try {
       rmSync(this.logDir, { recursive: true, force: true });
     } catch (_error) {
       void _error; // Intentionally ignored
     }
+    this.logDir = null;
+    this.fileBytes.clear();
   }
 
   [Symbol.dispose](): void {
     this.cleanup();
+  }
+
+  /**
+   * Append `data` to `file`, enforcing the per-file size cap. When the cap
+   * would be exceeded, the file is truncated to zero and restarted with
+   * `marker`, then `data` is written. Returns silently on any fs error,
+   * matching the existing best-effort append behavior. Each file is capped
+   * independently, so the per-stream and combined files can hold different
+   * windows of history after a breach.
+   */
+  private appendCapped(
+    file: string,
+    data: string | Buffer,
+    marker: string,
+  ): void {
+    try {
+      const size = Buffer.byteLength(data as never);
+      const current = this.fileBytes.get(file) ?? 0;
+      if (current + size > this.maxFileBytes) {
+        truncateSync(file, 0);
+        appendFileSync(file, marker);
+        this.fileBytes.set(file, Buffer.byteLength(marker));
+      }
+      appendFileSync(file, data);
+      this.fileBytes.set(file, (this.fileBytes.get(file) ?? 0) + size);
+    } catch (_error) {
+      void _error; // Intentionally ignored
+    }
+  }
+
+  private sizeOf(file: string): number {
+    try {
+      return statSync(file).size;
+    } catch (_error) {
+      return 0;
+    }
   }
 
   private readFileSuffix(filePath: string, maxBytes: number): string {

@@ -14,6 +14,7 @@ import {
   LineComponent,
   LinesComponent,
   RuleComponent,
+  statusDot,
 } from "../../shared/ui";
 import type { ProcessLogLine } from "../client";
 import type { DockState } from "../widget/types";
@@ -172,11 +173,36 @@ function renderProcessStrip(
       !LIVE_STATUSES.has(process.status) &&
       snapshot.pinnedProcess?.id !== process.id,
   );
-  const parts = liveOrVisible.map((process) =>
+
+  // Show live and failed/killed processes individually; collapse only
+  // exited-success into a single summary token.
+  const exitedSuccess: ProcessInfo[] = [];
+  const shown: ProcessInfo[] = [];
+  for (const process of finished) {
+    if (process.status === "exited" && process.success) {
+      exitedSuccess.push(process);
+    } else {
+      shown.push(process);
+    }
+  }
+
+  const ordered = [...liveOrVisible, ...shown];
+  const parts = ordered.map((process) =>
     renderProcessToken(process, snapshot, theme),
   );
-  if (finished.length > 0)
-    parts.push(theme.fg("dim", `■ ${finished.length} done`));
+  if (exitedSuccess.length > 0) {
+    const summary = {
+      id: "_summary",
+      name: "",
+      status: "exited",
+      success: true,
+      exitCode: 0,
+    } as ProcessInfo;
+    parts.push(
+      `${statusDot(summary, false, theme)} ${theme.fg("dim", `${exitedSuccess.length} done`)}`,
+    );
+  }
+
   return truncateToWidth(
     parts.join(" ") || theme.fg("dim", "No running processes"),
     width,

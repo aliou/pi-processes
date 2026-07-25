@@ -2,59 +2,86 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
-import { statusDot } from "../../shared/ui";
+import { statusColor, statusDot } from "../../shared/ui";
 
 const MAX_PROCESS_NAME = 20;
 const DEFAULT_MAX_WIDTH = 200;
 
-function formatProcessName(name: string, theme: Theme): string {
+/**
+ * Color a process name by its status, matching the dot's color so the dot
+ * and the name always agree.
+ */
+function formatProcessName(process: ProcessInfo, theme: Theme): string {
   const trimmed =
-    name.length > MAX_PROCESS_NAME
-      ? `${name.slice(0, MAX_PROCESS_NAME - 3)}...`
-      : name;
-  return theme.fg("accent", trimmed);
+    process.name.length > MAX_PROCESS_NAME
+      ? `${process.name.slice(0, MAX_PROCESS_NAME - 3)}...`
+      : process.name;
+  return theme.fg(statusColor(process), trimmed);
 }
 
+/**
+ * Render one process as `dot name`. The dot glyph carries the status, so the
+ * trailing state word is dropped — it only duplicated what the dot already
+ * encodes and wasted columns.
+ */
 function formatProcessLabel(process: ProcessInfo, theme: Theme): string {
-  const name = formatProcessName(process.name, theme);
   const dot = statusDot(process, true, theme);
-
-  switch (process.status) {
-    case "running":
-      return `${dot} ${name} ${theme.fg("dim", "running")}`;
-    case "terminating":
-      return `${dot} ${name} ${theme.fg("dim", "stopping")}`;
-    case "terminate_timeout":
-      return `${dot} ${name} ${theme.fg("error", "unresponsive")}`;
-    case "killed":
-      return `${dot} ${name} ${theme.fg("dim", "killed")}`;
-    case "exited":
-      if (process.success) {
-        return `${dot} ${name} ${theme.fg("success", "done")}`;
-      }
-      return `${dot} ${name} ${theme.fg("error", `exit(${process.exitCode ?? "?"})`)}`;
-    default:
-      return `${dot} ${name} ${theme.fg("dim", process.status)}`;
-  }
+  const name = formatProcessName(process, theme);
+  return `${dot} ${name}`;
 }
 
-function sortForStatusLine(processes: ProcessInfo[]): ProcessInfo[] {
-  const aliveish = processes.filter((process) =>
-    LIVE_STATUSES.has(process.status),
-  );
-  const finished = processes.filter(
-    (process) => !LIVE_STATUSES.has(process.status),
-  );
+/**
+ * Build the summary token for exited-success processes: `✓ N done`.
+ * Uses a synthetic exited-success ProcessInfo so statusDot agrees with the
+ * rest of the UI.
+ */
+function formatDoneSummary(count: number, theme: Theme): string {
+  const summary: ProcessInfo = {
+    id: "_summary",
+    name: "",
+    status: "exited",
+    success: true,
+    exitCode: 0,
+  } as ProcessInfo;
+  return `${statusDot(summary, false, theme)} ${theme.fg("dim", `${count} done`)}`;
+}
+
+/**
+ * Partition processes into:
+ * - individual: live, failed, killed (shown one-by-one)
+ * - exitedSuccess: clean exits (collapsed into one `✓ N done` token)
+ */
+function partitionForStatusLine(processes: ProcessInfo[]): {
+  individual: ProcessInfo[];
+  exitedSuccess: ProcessInfo[];
+} {
+  const individual: ProcessInfo[] = [];
+  const exitedSuccess: ProcessInfo[] = [];
+
+  // Live first, then failed/killed, ordered naturally.
+  const live = processes.filter((p) => LIVE_STATUSES.has(p.status));
+  const finished = processes.filter((p) => !LIVE_STATUSES.has(p.status));
   finished.sort((a, b) => (b.endTime ?? 0) - (a.endTime ?? 0));
-  return [...aliveish, ...finished];
+
+  for (const p of [...live, ...finished]) {
+    if (p.status === "exited" && p.success) {
+      exitedSuccess.push(p);
+    } else {
+      individual.push(p);
+    }
+  }
+
+  return { individual, exitedSuccess };
 }
 
 /**
  * Render the single-line status widget shown below the editor.
  *
- * Lists managed processes (dot + name + state), fit to width with a
- * "+N more" overflow marker. Returns an empty array when there are no
- * processes so the caller can clear the widget.
+ * Lists managed processes (dot + name). Live and failed processes are shown
+ * individually; successfully-exited processes collapse into a single
+ * `✓ N done` summary. The dot glyph encodes status; the name is colored by
+ * status tone. Returns an empty array when there are no processes so the
+ * caller can clear the widget.
  */
 export function renderStatusWidget(
   processes: ProcessInfo[],
@@ -63,24 +90,32 @@ export function renderStatusWidget(
 ): string[] {
   if (processes.length === 0) return [];
 
-  const ordered = sortForStatusLine(processes);
+  const { individual, exitedSuccess } = partitionForStatusLine(processes);
 
-  const prefix = theme.fg("dim", "processes: ");
+  const prefix = theme.fg("dim", "ps: ");
   const prefixLen = visibleWidth(prefix);
-  const separator = theme.fg("dim", " | ");
+  const separator = theme.fg("dim", "  ");
   const separatorLen = visibleWidth(separator);
 
+  // Build the full ordered list of display tokens: individual processes
+  // followed by the done-summary (if any).
+  const tokens: string[] = [];
+  for (const process of individual) {
+    tokens.push(formatProcessLabel(process, theme));
+  }
+  if (exitedSuccess.length > 0) {
+    tokens.push(formatDoneSummary(exitedSuccess.length, theme));
+  }
+
+  // Fit tokens to width, with "+N more" overflow.
   const parts: string[] = [];
   let currentLen = prefixLen;
   let includedCount = 0;
 
-  for (const process of ordered) {
-    const formatted = formatProcessLabel(process, theme);
-    const formattedLen = visibleWidth(formatted);
-    const remaining = ordered.length - includedCount - 1;
-    const needed =
-      includedCount > 0 ? separatorLen + formattedLen : formattedLen;
-
+  for (const token of tokens) {
+    const tokenLen = visibleWidth(token);
+    const remaining = tokens.length - includedCount - 1;
+    const needed = includedCount > 0 ? separatorLen + tokenLen : tokenLen;
     const reservedForSuffix =
       remaining > 0 ? separatorLen + visibleWidth(`+${remaining} more`) : 0;
 
@@ -88,21 +123,21 @@ export function renderStatusWidget(
       currentLen + needed + reservedForSuffix > maxWidth &&
       includedCount > 0
     ) {
-      const hiddenCount = ordered.length - includedCount;
+      const hiddenCount = tokens.length - includedCount;
       if (hiddenCount > 0) {
         parts.push(theme.fg("dim", `+${hiddenCount} more`));
       }
       break;
     }
 
-    parts.push(formatted);
+    parts.push(token);
     currentLen += needed;
     includedCount++;
   }
 
-  // Width too small for even one entry: show the first process anyway.
+  // Width too small for even one entry: show the first token anyway.
   if (includedCount === 0) {
-    parts.push(formatProcessLabel(ordered[0] as ProcessInfo, theme));
+    parts.push(tokens[0] as string);
   }
 
   if (parts.length === 0) return [];

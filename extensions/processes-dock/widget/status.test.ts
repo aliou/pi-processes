@@ -37,33 +37,73 @@ describe("renderStatusWidget", () => {
     expect(renderStatusWidget([], theme)).toEqual([]);
   });
 
-  it("renders a single running process with a dot, name, and state", () => {
+  it("renders a single running process as dot + name", () => {
     const lines = renderStatusWidget(
       [makeProcess({ status: "running" })],
       theme,
     );
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toContain("{dim:processes: }");
+    expect(lines[0]).toContain("{dim:ps: }");
     expect(lines[0]).toContain("{accent:dev}");
-    expect(lines[0]).toContain("{dim:running}");
+    // No trailing state word: the dot carries the status.
+    expect(lines[0]).not.toContain("running");
   });
 
-  it("renders a successful exit as done", () => {
+  it("collapses exited-success into a summary token with a check glyph", () => {
     const lines = renderStatusWidget(
       [
         makeProcess({
+          id: "proc_1",
+          status: "running",
+          name: "dev",
+        }),
+        makeProcess({
+          id: "proc_2",
           status: "exited",
           success: true,
           exitCode: 0,
           endTime: 2000,
+          name: "build",
         }),
       ],
       theme,
     );
-    expect(lines[0]).toContain("{success:done}");
+    expect(lines).toHaveLength(1);
+    // The exited-success process name should NOT appear individually.
+    expect(lines[0]).not.toContain("{success:build}");
+    // Summary token with check glyph and count.
+    expect(lines[0]).toContain("{success:✓}");
+    expect(lines[0]).toContain("1 done");
   });
 
-  it("renders a failed exit with the code", () => {
+  it("shows failed processes individually, not in the summary", () => {
+    const lines = renderStatusWidget(
+      [
+        makeProcess({
+          id: "proc_1",
+          status: "running",
+          name: "dev",
+        }),
+        makeProcess({
+          id: "proc_2",
+          status: "exited",
+          success: false,
+          exitCode: 7,
+          endTime: 2000,
+          name: "lint",
+        }),
+      ],
+      theme,
+    );
+    expect(lines).toHaveLength(1);
+    // Failed process shown individually with error glyph and name.
+    expect(lines[0]).toContain("{error:!}");
+    expect(lines[0]).toContain("{error:lint}");
+    // No done summary since the only finished process failed.
+    expect(lines[0]).not.toContain("done");
+  });
+
+  it("renders a failed exit with an error-toned name", () => {
     const lines = renderStatusWidget(
       [
         makeProcess({
@@ -75,7 +115,7 @@ describe("renderStatusWidget", () => {
       ],
       theme,
     );
-    expect(lines[0]).toContain("{error:exit(7)}");
+    expect(lines[0]).toContain("{error:dev}");
   });
 
   it("joins multiple processes with a dim separator", () => {
@@ -86,18 +126,18 @@ describe("renderStatusWidget", () => {
           id: "proc_2",
           name: "test",
           status: "exited",
-          success: true,
-          exitCode: 0,
+          success: false,
+          exitCode: 1,
           endTime: 2000,
         }),
       ],
       theme,
     );
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toContain("{dim: | }");
+    expect(lines[0]).toContain("{dim:  }");
     // Live processes come before finished ones.
     expect(lines[0].indexOf("{accent:dev}")).toBeLessThan(
-      lines[0].indexOf("{success:done}"),
+      lines[0].indexOf("{error:test}"),
     );
   });
 
@@ -128,12 +168,12 @@ describe("renderStatusWidget", () => {
     expect(lines[0].length).toBeGreaterThan(0);
   });
 
-  it("renders terminating as stopping with a warning dot", () => {
+  it("renders terminating with a warning dot and warning-toned name", () => {
     const lines = renderStatusWidget(
       [makeProcess({ status: "terminating" })],
       theme,
     );
     expect(lines[0]).toContain("{warning:●}");
-    expect(lines[0]).toContain("{dim:stopping}");
+    expect(lines[0]).toContain("{warning:dev}");
   });
 });

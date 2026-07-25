@@ -66,8 +66,14 @@ export function setupDockWidgets(
   let pinnedConnectionId: string | null = null;
   let hasSeenRunningProcess = false;
   let pendingRefresh: NodeJS.Timeout | null = null;
+  let pendingRender: NodeJS.Timeout | null = null;
 
   const render = () => {
+    // A direct render supersedes any pending throttled render.
+    if (pendingRender) {
+      clearTimeout(pendingRender);
+      pendingRender = null;
+    }
     if (disposed) return;
     // Re-read config live: /ps:settings can change dock height and the
     // startup snapshot may predate the persisted merge.
@@ -201,6 +207,19 @@ export function setupDockWidgets(
     }, REFRESH_THROTTLE_MS);
   };
 
+  // Throttle the widget re-render on high-frequency output events. State
+  // (previews, processLogStream, pinnedLines) is updated immediately by the
+  // callers; only the setWidget call is coalesced so a 10/s output stream
+  // does not rebuild the widget tree 10 times a second. User-initiated
+  // actions call render() directly, which cancels a pending scheduled render.
+  const scheduleRender = () => {
+    if (disposed || pendingRender) return;
+    pendingRender = setTimeout(() => {
+      pendingRender = null;
+      render();
+    }, REFRESH_THROTTLE_MS);
+  };
+
   const seedProcessLogStream = () => {
     const current = state.getState();
     if (current.visibility !== "expanded" || current.focusedProcessId) {
@@ -289,7 +308,7 @@ export function setupDockWidgets(
       );
       const last = lines.at(-1);
       if (last) previews.set(id, last);
-      render();
+      scheduleRender();
     });
   };
 
@@ -359,7 +378,7 @@ export function setupDockWidgets(
       config.output.maxOutputBytes,
       (entry) => entry.line.text,
     );
-    render();
+    scheduleRender();
   };
 
   const handlePin = (payload: unknown) => {
@@ -429,6 +448,7 @@ export function setupDockWidgets(
       if (disposed) return;
       disposed = true;
       if (pendingRefresh) clearTimeout(pendingRefresh);
+      if (pendingRender) clearTimeout(pendingRender);
       pinnedConnection?.unsubscribe();
       for (const dispose of disposers.splice(0)) dispose();
       ctx.ui.setWidget(DOCK_WIDGET_KEY, undefined, {

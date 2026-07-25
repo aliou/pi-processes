@@ -68,6 +68,9 @@ export function setupDockWidgets(
 
   const render = () => {
     if (disposed) return;
+    // Re-read config live: /ps:settings can change dock height and the
+    // startup snapshot may predate the persisted merge.
+    const liveConfig = requestConfig(events);
     const current = state.getState();
     const pinned = selectPinnedProcess(processes, current);
     const pinnedId = pinned?.id ?? null;
@@ -108,7 +111,7 @@ export function setupDockWidgets(
             },
             theme,
             width,
-            config.widget.dockHeight,
+            liveConfig.widget.dockHeight,
           ),
         invalidate: () => undefined,
       }),
@@ -118,7 +121,10 @@ export function setupDockWidgets(
 
   const renderStatus = () => {
     if (disposed) return;
-    if (!config.widget.showStatusWidget) {
+    // Re-read config live so toggling showStatusWidget in /ps:settings takes
+    // effect without a restart.
+    const liveConfig = requestConfig(events);
+    if (!liveConfig.widget.showStatusWidget) {
       ctx.ui.setWidget(STATUS_WIDGET_KEY, undefined, {
         placement: "belowEditor",
       });

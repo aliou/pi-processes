@@ -1,6 +1,7 @@
 import { fs, vol } from "memfs";
 import { assert, beforeEach, describe, expect, it } from "vitest";
 
+import { MAX_TAIL_READ_BYTES } from "./limits";
 import { ProcessLogStore } from "./process-log-store";
 
 describe("ProcessLogStore", () => {
@@ -99,6 +100,105 @@ describe("ProcessLogStore", () => {
     expect(store.readTailLines("/nonexistent", 10)).toEqual([]);
   });
 
+  it("readTailLines handles files without a trailing newline", () => {
+    using store = new ProcessLogStore("/tmp/test-logs");
+    const paths = store.createLogs("proc_1");
+
+    fs.writeFileSync(paths.stdoutFile, "line1\nline2\nline3");
+
+    expect(store.readTailLines(paths.stdoutFile, 2)).toEqual([
+      "line2",
+      "line3",
+    ]);
+  });
+
+  it("readTailLines handles empty and zero-line requests", () => {
+    using store = new ProcessLogStore("/tmp/test-logs");
+    const paths = store.createLogs("proc_1");
+
+    expect(store.readTailLines(paths.stdoutFile, 10)).toEqual([]);
+    fs.writeFileSync(paths.stdoutFile, "line\n");
+    expect(store.readTailLines(paths.stdoutFile, 0)).toEqual([]);
+  });
+
+  it("readTailLines handles an exact chunk boundary", () => {
+    using store = new ProcessLogStore("/tmp/test-logs");
+    const paths = store.createLogs("proc_1");
+    const prefix = "x".repeat(64 * 1024 - "\nlast\n".length);
+    fs.writeFileSync(paths.stdoutFile, `${prefix}\nlast\n`);
+
+    expect(store.readTailLines(paths.stdoutFile, 1)).toEqual(["last"]);
+  });
+
+  it("readTailLines reads the tail of a multi-megabyte numbered file", () => {
+    using store = new ProcessLogStore("/tmp/test-logs");
+    const paths = store.createLogs("proc_1");
+    const lines = Array.from(
+      { length: 500_000 },
+      (_, index) => `line-${String(index).padStart(6, "0")}`,
+    );
+    fs.writeFileSync(paths.stdoutFile, `${lines.join("\n")}\n`);
+
+    expect(store.readTailLines(paths.stdoutFile, 10)).toEqual(lines.slice(-10));
+  });
+
+  it("readTailLines bounds a tail containing one huge line", () => {
+    using store = new ProcessLogStore("/tmp/test-logs");
+    const paths = store.createLogs("proc_1");
+    fs.writeFileSync(paths.stdoutFile, "x".repeat(3 * 1024 * 1024));
+
+    const result = store.readTailLines(paths.stdoutFile, 10);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.startsWith("[… truncated] ")).toBe(true);
+    expect(Buffer.byteLength(result[0] ?? "")).toBeLessThanOrEqual(
+      MAX_TAIL_READ_BYTES + Buffer.byteLength("[… truncated] "),
+    );
+  });
+
+  it("readTailLines retains a marked huge line ending in newline", () => {
+    using store = new ProcessLogStore("/tmp/test-logs");
+    const paths = store.createLogs("proc_1");
+    fs.writeFileSync(paths.stdoutFile, `${"x".repeat(3 * 1024 * 1024)}\n`);
+
+    const result = store.readTailLines(paths.stdoutFile, 1);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.startsWith("[… truncated] ")).toBe(true);
+  });
+
+  it("readTailLines bounds decoded invalid UTF-8 output", () => {
+    using store = new ProcessLogStore("/tmp/test-logs");
+    const paths = store.createLogs("proc_1");
+    fs.writeFileSync(
+      paths.stdoutFile,
+      Buffer.alloc(MAX_TAIL_READ_BYTES + 1, 0xff),
+    );
+
+    const result = store.readTailLines(paths.stdoutFile, 1);
+
+    expect(Buffer.byteLength(result[0] ?? "")).toBeLessThanOrEqual(
+      MAX_TAIL_READ_BYTES + Buffer.byteLength("[… truncated] "),
+    );
+  });
+
+  it("readTailLines keeps final lines after invalid UTF-8 output", () => {
+    using store = new ProcessLogStore("/tmp/test-logs");
+    const paths = store.createLogs("proc_1");
+    fs.writeFileSync(
+      paths.stdoutFile,
+      Buffer.concat([
+        Buffer.alloc(MAX_TAIL_READ_BYTES - 32, 0xff),
+        Buffer.from("\npenultimate\nlast\n"),
+      ]),
+    );
+
+    expect(store.readTailLines(paths.stdoutFile, 2)).toEqual([
+      "penultimate",
+      "last",
+    ]);
+  });
+
   it("readFullFile returns entire content", () => {
     using store = new ProcessLogStore("/tmp/test-logs");
     const paths = store.createLogs("proc_1");
@@ -112,6 +212,21 @@ describe("ProcessLogStore", () => {
     using store = new ProcessLogStore("/tmp/test-logs");
 
     expect(store.readFullFile("/nonexistent")).toBe("");
+  });
+
+  it("readFullFile returns a marked bounded suffix for large files", () => {
+    using store = new ProcessLogStore("/tmp/test-logs");
+    const paths = store.createLogs("proc_1");
+    fs.writeFileSync(paths.stdoutFile, "x".repeat(MAX_TAIL_READ_BYTES * 8 + 1));
+
+    const content = store.readFullFile(paths.stdoutFile);
+
+    expect(content.startsWith(`[… truncated, see ${paths.stdoutFile}]\n`)).toBe(
+      true,
+    );
+    expect(Buffer.byteLength(content)).toBeLessThanOrEqual(
+      MAX_TAIL_READ_BYTES * 8,
+    );
   });
 
   it("getCombinedOutput parses tagged lines", () => {

@@ -98,6 +98,10 @@ export class ProcessManager {
     return this.logStore.getCombinedOutput(managed.combinedFile, tailLines);
   }
 
+  /**
+   * Return output capped at 16 MiB per stream. Use getLogFiles() and stream
+   * the returned paths when an exact, unbounded read is required.
+   */
   getFullOutput(id: string): { stdout: string; stderr: string } | null {
     const managed = this.registry.getRecord(id);
     if (!managed) return null;

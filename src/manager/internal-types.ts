@@ -1,4 +1,3 @@
-import type { ChildProcess } from "node:child_process";
 import type { Writable } from "node:stream";
 
 import type {
@@ -46,7 +45,6 @@ interface ProcessPublicState {
  * to expose because they allow direct mutation/control outside manager methods.
  */
 interface ProcessRuntimeState {
-  process: ChildProcess;
   stdin: Writable | null;
   stdinClosed: boolean;
   lastSignalSent: NodeJS.Signals | null;
@@ -70,8 +68,12 @@ interface ProcessLogState {
  * buffers let `ProcessOutput` emit only completed lines in events/logs.
  */
 interface ProcessLineBufferState {
-  stdoutPendingLine: string;
-  stderrPendingLine: string;
+  stdoutPendingLine: Buffer;
+  stderrPendingLine: Buffer;
+  /** The line head was emitted; discard the tail through the next newline. */
+  stdoutLineOverflowed: boolean;
+  /** The line head was emitted; discard the tail through the next newline. */
+  stderrLineOverflowed: boolean;
 }
 
 /**
@@ -82,6 +84,7 @@ interface ProcessLineBufferState {
  */
 interface ProcessOutputEventBufferState {
   appendedLines: Array<{ type: "stdout" | "stderr"; text: string }>;
+  droppedLineCount: number;
 }
 
 /**

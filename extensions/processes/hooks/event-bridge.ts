@@ -21,6 +21,7 @@ export function registerEventBridge(
         events.emit(CHANNELS.OUTPUT_CHANGED, {
           id: event.id,
           appendedText: event.appendedText,
+          droppedLines: event.droppedLines,
         });
         break;
       case "processes_changed":

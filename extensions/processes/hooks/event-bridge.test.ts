@@ -77,10 +77,19 @@ describe("registerEventBridge", () => {
     const info = makeInfo({ status: "exited", success: true, exitCode: 0 });
     const appendedText = [{ type: "stdout" as const, text: "ready" }];
     fake.emit({ type: "process_ended", info });
-    fake.emit({ type: "process_output_changed", id: "proc_1", appendedText });
+    fake.emit({
+      type: "process_output_changed",
+      id: "proc_1",
+      appendedText,
+      droppedLines: 3,
+    });
 
     expect(ended).toHaveBeenCalledWith(info);
-    expect(output).toHaveBeenCalledWith({ id: "proc_1", appendedText });
+    expect(output).toHaveBeenCalledWith({
+      id: "proc_1",
+      appendedText,
+      droppedLines: 3,
+    });
   });
 
   it("bridges processes changed events", () => {

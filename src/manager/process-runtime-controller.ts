@@ -64,13 +64,15 @@ export class ProcessRuntimeController {
       signal: null,
       errorMessage: null,
       combinedFile: logPaths.combinedFile,
-      process: child,
       stdin: child.stdin,
       stdinClosed: false,
       lastSignalSent: null,
-      stdoutPendingLine: "",
-      stderrPendingLine: "",
+      stdoutPendingLine: Buffer.alloc(0),
+      stderrPendingLine: Buffer.alloc(0),
+      stdoutLineOverflowed: false,
+      stderrLineOverflowed: false,
       appendedLines: [],
+      droppedLineCount: 0,
     };
 
     this.registry.add(managed);

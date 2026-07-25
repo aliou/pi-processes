@@ -50,6 +50,7 @@ export type ManagerEvent =
       type: "process_output_changed";
       id: string;
       appendedText?: Array<{ type: "stdout" | "stderr"; text: string }>;
+      droppedLines?: number;
     }
   | { type: "processes_changed" };
 

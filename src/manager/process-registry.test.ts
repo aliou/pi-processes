@@ -23,9 +23,12 @@ const managedDefaults = {
   stdin: null,
   stdinClosed: false,
   lastSignalSent: null,
-  stdoutPendingLine: "",
-  stderrPendingLine: "",
+  stdoutPendingLine: Buffer.alloc(0),
+  stderrPendingLine: Buffer.alloc(0),
+  stdoutLineOverflowed: false,
+  stderrLineOverflowed: false,
   appendedLines: [],
+  droppedLineCount: 0,
 } satisfies PartialFuncReturn<ManagedProcessRecord>;
 
 describe("ProcessRegistry", () => {

@@ -63,6 +63,16 @@ Seven actions: `start`, `list`, `output`, `update`, `write`, `stop`, `clear`.
 - Process IDs are opaque; sorting, truncation, and color are UI concerns only.
 - Managed processes keep running in detached process groups when pi is suspended (`Ctrl+Z`); log capture continues and match notifications deliver once pi is foregrounded.
 
+## Polish and runtime fixes
+
+- Rate-limit delivered log-match notifications to 20 per minute across all processes, summarize suppressed matches, and cool down repeated matchers to 15 seconds.
+- Share one `statusColor` / `statusDot` mapping across panel, overlay, dock, and widget; exited-success uses `✓`, and the widget collapses finished-success processes into a `✓ N done` summary.
+- Clamp dock sidebar width to the longest active process name; truncate tab labels instead of padding.
+- Drop the dock bottom border and fix a line-overflow crash on narrow terminals.
+- Re-read dock widget config on each render so `/ps:settings` changes apply immediately.
+- Reap old finished records from the manager.
+- Preserve leading empty lines in tail-style log views.
+
 ## Tooling
 
 - Targets Pi 0.80.3. 427 tests pass; typecheck and lint clean. Tests are excluded from published files.

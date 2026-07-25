@@ -17,7 +17,7 @@ export interface CompiledLogMatcher {
 export const MAX_LOG_MATCHERS_PER_PROCESS = 20;
 export const MAX_LOG_MATCH_PATTERN_LENGTH = 500;
 const MAX_LINE_LENGTH = 10_000;
-const LOG_MATCH_COOLDOWN_MS = 5000;
+const LOG_MATCH_COOLDOWN_MS = 15_000;
 
 export function compileLogMatchers(config: NotifyConfig): CompiledLogMatcher[] {
   const raw = config.logMatches;
@@ -89,7 +89,7 @@ export function evaluateLogMatchers(
 
     if (
       matcher.repeat &&
-      matcher.lastMatchTime > 0 &&
+      matcher.fired &&
       now - matcher.lastMatchTime < LOG_MATCH_COOLDOWN_MS
     ) {
       continue;

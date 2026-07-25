@@ -92,6 +92,8 @@ function summaryVerb(details: ProcessNotificationDetails): string {
       return "killed";
     case "log_match":
       return "matched log output";
+    case "log_match_suppressed":
+      return "suppressed repeated log matches";
   }
 }
 
@@ -109,6 +111,7 @@ function colorKind(
     case "crash":
       return theme.fg("error", text);
     case "log_match":
+    case "log_match_suppressed":
       return theme.fg("accent", text);
   }
 }

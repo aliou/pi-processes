@@ -66,6 +66,10 @@ describe("registerNotificationDelivery", () => {
     events.emit(CHANNELS.NOTIFICATION, {});
     events.emit(CHANNELS.NOTIFICATION, { kind: "success" });
     events.emit(CHANNELS.NOTIFICATION, { ...makePayload(), attention: 5 });
+    events.emit(CHANNELS.NOTIFICATION, {
+      ...makePayload(),
+      kind: "unknown",
+    });
 
     expect(sendMessage).not.toHaveBeenCalled();
   });
@@ -82,5 +86,43 @@ describe("registerNotificationDelivery", () => {
     events.emit(CHANNELS.NOTIFICATION, makePayload());
 
     expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("caps log-match delivery, summarizes suppression, and exempts lifecycle events", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    const events = createEventBus();
+    const sendMessage = vi.fn();
+    const dispose = registerNotificationDelivery(
+      events,
+      piWithSendMessage(sendMessage),
+    );
+
+    for (let index = 0; index < 30; index++) {
+      events.emit(
+        CHANNELS.NOTIFICATION,
+        makePayload({ kind: "log_match", attention: "turn" }),
+      );
+    }
+    expect(sendMessage).toHaveBeenCalledTimes(20);
+
+    events.emit(CHANNELS.NOTIFICATION, makePayload({ kind: "crash" }));
+    expect(sendMessage).toHaveBeenCalledTimes(21);
+    expect(sendMessage.mock.calls.at(-1)?.[0].details.kind).toBe("crash");
+
+    vi.advanceTimersByTime(60_000);
+    expect(sendMessage).toHaveBeenCalledTimes(22);
+    const [summary, options] = sendMessage.mock.calls.at(-1) ?? [];
+    expect(summary.details).toEqual(
+      expect.objectContaining({
+        kind: "log_match_suppressed",
+        summary: expect.stringContaining("Suppressed 10"),
+        attention: "context",
+      }),
+    );
+    expect(options).toEqual({ triggerTurn: false, deliverAs: "steer" });
+
+    dispose();
+    vi.useRealTimers();
   });
 });

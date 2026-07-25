@@ -124,14 +124,15 @@ export function createNotificationService(deps: NotificationServiceDeps): {
     const state = syncMatcherState(event.id, watchState);
     if (!state) return;
 
-    const now = Date.now();
+    const matchTime = performance.now();
     const matches = evaluateLogMatchers(
       state.matchers,
       event.appendedText,
-      now,
+      matchTime,
     );
 
     const processInfo = getProcess(event.id);
+    const timestamp = Date.now();
 
     for (const match of matches) {
       const attention = match.on;
@@ -140,7 +141,7 @@ export function createNotificationService(deps: NotificationServiceDeps): {
         processInfo,
         match,
         attention,
-        now,
+        timestamp,
       );
       events.emit(CHANNELS.NOTIFICATION, details);
     }
@@ -160,6 +161,8 @@ export function createNotificationService(deps: NotificationServiceDeps): {
         return config?.onKilled ?? DEFAULT_ATTENTION.onKilled;
       case "log_match":
         return "turn";
+      case "log_match_suppressed":
+        return "context";
     }
   }
 

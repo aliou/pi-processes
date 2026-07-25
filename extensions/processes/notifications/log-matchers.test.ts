@@ -169,13 +169,23 @@ describe("evaluateLogMatchers", () => {
     const results1 = evaluateLogMatchers(matchers, appended, 1000);
     expect(results1).toHaveLength(1);
 
-    // Second match at t=2000 (within 5s cooldown) - should not fire
+    // Second match at t=2000 (within 15s cooldown) - should not fire
     const results2 = evaluateLogMatchers(matchers, appended, 2000);
     expect(results2).toHaveLength(0);
 
-    // Third match at t=7000 (after 5s cooldown) - should fire
-    const results3 = evaluateLogMatchers(matchers, appended, 7000);
+    // Third match at t=16000 (after 15s cooldown) - should fire
+    const results3 = evaluateLogMatchers(matchers, appended, 16_000);
     expect(results3).toHaveLength(1);
+  });
+
+  it("enforces repeat cooldown when the first match occurs at zero", () => {
+    const matchers = compileLogMatchers({
+      logMatches: [{ pattern: "ready", repeat: true }],
+    });
+    const appended = [{ type: "stdout" as const, text: "ready" }];
+
+    expect(evaluateLogMatchers(matchers, appended, 0)).toHaveLength(1);
+    expect(evaluateLogMatchers(matchers, appended, 1)).toHaveLength(0);
   });
 
   it("returns no results for empty appended text", () => {

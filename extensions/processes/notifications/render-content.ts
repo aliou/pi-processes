@@ -6,8 +6,19 @@ export function buildProcessNotificationContent(
   if (details.kind === "log_match" && details.logMatch) {
     return buildLogMatchContent(details);
   }
+  if (details.kind === "log_match_suppressed") {
+    return buildSuppressedContent(details);
+  }
 
   return buildLifecycleContent(details);
+}
+
+function buildSuppressedContent(details: ProcessNotificationDetails): string {
+  return [
+    '<process_event type="notification_summary" kind="log_match_suppressed">',
+    element("summary", details.summary, 1),
+    "</process_event>",
+  ].join("\n");
 }
 
 function buildLifecycleContent(details: ProcessNotificationDetails): string {

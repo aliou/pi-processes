@@ -70,4 +70,24 @@ describe("process notification content", () => {
       "<matched_line>ready &lt;http://localhost:3000&gt;</matched_line>",
     );
   });
+
+  it("builds a summary-only suppression event", () => {
+    const details: ProcessNotificationDetails = {
+      kind: "log_match_suppressed",
+      processId: "*",
+      processName: "log watches",
+      command: "",
+      timestamp: 123,
+      summary: "Suppressed 10 log-match notifications.",
+      attention: "context",
+    };
+
+    expect(buildProcessNotificationContent(details)).toBe(
+      [
+        '<process_event type="notification_summary" kind="log_match_suppressed">',
+        "  <summary>Suppressed 10 log-match notifications.</summary>",
+        "</process_event>",
+      ].join("\n"),
+    );
+  });
 });

@@ -21,7 +21,8 @@ export type ProcessProtocolNotificationKind =
   | "failure"
   | "crash"
   | "killed"
-  | "log_match";
+  | "log_match"
+  | "log_match_suppressed";
 
 export interface ProcessProtocolNotificationLogMatch {
   pattern: string;

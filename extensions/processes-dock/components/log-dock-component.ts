@@ -9,7 +9,12 @@ import type { ProcessInfo } from "../../../src/types";
 import { LIVE_STATUSES } from "../../../src/types";
 import { stripAnsi } from "../../../src/utils/ansi";
 import { renderProcessTab } from "../../process-tabs";
-import { LineComponent, LinesComponent, RuleComponent } from "../../shared/ui";
+import {
+  clampNameColumn,
+  LineComponent,
+  LinesComponent,
+  RuleComponent,
+} from "../../shared/ui";
 import type { ProcessLogLine } from "../client";
 import type { DockState } from "../widget/types";
 
@@ -228,11 +233,22 @@ function renderAllRunningLogLines(
     return centerLine(theme.fg("muted", "No output yet"), width, height);
   }
 
+  const activeProcesses = snapshot.processes.filter((process) =>
+    LIVE_STATUSES.has(process.status),
+  );
+  const nameCol = clampNameColumn(activeProcesses);
+  const separator = theme.fg("dim", " │ ");
+  const sepLen = visibleWidth(separator);
+
   return stream.slice(-height).map(({ processId, line }) => {
     const process = byId.get(processId);
-    const label = theme.fg("dim", padName(process?.name ?? processId, 12));
-    const separator = theme.fg("dim", " │ ");
-    const text = renderLogText(line, snapshot, theme, Math.max(1, width - 15));
+    const label = theme.fg("dim", padName(process?.name ?? processId, nameCol));
+    const text = renderLogText(
+      line,
+      snapshot,
+      theme,
+      Math.max(1, width - nameCol - sepLen),
+    );
     return truncateToWidth(`${label}${separator}${text}`, width, "", true);
   });
 }

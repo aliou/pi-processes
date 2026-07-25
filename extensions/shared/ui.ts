@@ -9,7 +9,7 @@
  */
 
 import type { Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
-import type { Component } from "@earendil-works/pi-tui";
+import { type Component, visibleWidth } from "@earendil-works/pi-tui";
 
 import { LIVE_STATUSES, type ProcessInfo } from "../../src/types";
 import { formatStatus } from "../../src/utils/format";
@@ -57,6 +57,26 @@ export class RuleComponent implements Component {
 
 /** Maximum visible width for a process name or tab label. */
 export const MAX_TAB_NAME = 12;
+
+/** Minimum width for the dock log-line sidebar column. */
+export const MIN_NAME_COLUMN = 4;
+
+/**
+ * Compute the sidebar width for a set of processes: the longest name
+ * clamped to [min, max]. Use this instead of hardcoding a fixed width so
+ * short names (`api`, `web`) don't get padded to 12 columns.
+ */
+export function clampNameColumn(
+  processes: ProcessInfo[],
+  max: number = MAX_TAB_NAME,
+  min: number = MIN_NAME_COLUMN,
+): number {
+  const longest = processes.reduce(
+    (acc, p) => Math.max(acc, visibleWidth(p.name)),
+    0,
+  );
+  return Math.min(Math.max(longest, min), max);
+}
 
 // ---------------------------------------------------------------------------
 // Status formatting

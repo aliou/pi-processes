@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import type { ProcessInfo } from "../../src/types";
 import {
+  clampNameColumn,
   formatProcessSelectionDescription,
   LineComponent,
   LinesComponent,
+  MAX_TAB_NAME,
+  MIN_NAME_COLUMN,
   RuleComponent,
   statusColor,
   statusDot,
@@ -64,6 +67,36 @@ describe("RuleComponent", () => {
   it("clamps to non-negative width", () => {
     const component = new RuleComponent(theme as never);
     expect(component.render(0)).toEqual(["{dim:}"]);
+  });
+});
+
+describe("clampNameColumn", () => {
+  it("returns min for an empty list", () => {
+    expect(clampNameColumn([])).toBe(MIN_NAME_COLUMN);
+  });
+
+  it("returns the longest name when below max but above min", () => {
+    const procs = [
+      makeProcess({ name: "server" }),
+      makeProcess({ name: "webclient" }),
+      makeProcess({ name: "db" }),
+    ];
+    expect(clampNameColumn(procs)).toBe(9);
+  });
+
+  it("clamps to max when a name exceeds it", () => {
+    const procs = [makeProcess({ name: "very-long-process-name" })];
+    expect(clampNameColumn(procs)).toBe(MAX_TAB_NAME);
+  });
+
+  it("respects min when all names are shorter", () => {
+    const procs = [makeProcess({ name: "a" }), makeProcess({ name: "b" })];
+    expect(clampNameColumn(procs)).toBe(MIN_NAME_COLUMN);
+  });
+
+  it("respects custom max and min", () => {
+    const procs = [makeProcess({ name: "abcdefgh" })];
+    expect(clampNameColumn(procs, 6, 2)).toBe(6);
   });
 });
 

@@ -7,25 +7,21 @@ description: Manage long-running commands with the process tool. Use when a task
 
 Use the `process` tool for commands that should keep running while the agent continues working. Do not use shell background patterns such as `&`, `nohup`, `disown`, or `setsid` when `process` fits.
 
-## Basic workflow
+## The core loop: start, do not wait, get notified
 
-1. Run `process list` before starting anything that might already be running.
-2. Start long-running commands with `process start` and a specific name.
-3. Add `notify.logMatches` when you need readiness, error, or progress signals.
-4. Continue other work after starting the process. Let process notifications bring you back.
-5. Use `process output` only for targeted recent inspection.
-6. Use `read` on the log file paths from `process list` or `process output` for deep log reads.
-7. Use `process update` to rename a process or change watches.
-8. Use `process write` to send bytes to a running process's stdin.
-9. Use `process stop` for obsolete live processes and `process clear` for finished entries.
+A started process runs in the background and the manager brings you back when something happens. You do not need to sleep, poll, or hold your turn for a process to finish.
 
-Notifications can also request attention on process exit:
+1. `process start` a long-running command, with `notify.logMatches` for the signals you care about.
+2. End your turn or move on to other work. Do not call `process output` in a loop waiting for "ready".
+3. The process notifies you when:
+   - a `logMatches` pattern hits (readiness, error, progress),
+   - the process exits successfully (`onSuccess`, default `context`),
+   - the process fails or crashes (`onFailure`, default `turn`),
+   - the process is killed, by you or externally (`onKilled`, default `context`).
+4. When a watch is too noisy or wrong, fix it with `process update` — do not restart the process just to change watches.
+5. `process stop` obsolete live processes and `process clear` finished entries when they are no longer useful.
 
-- `notify.onSuccess` — defaults to `context`
-- `notify.onFailure` — defaults to `turn`
-- `notify.onKilled` — defaults to `context`
-
-Each `logMatches` entry can also set `on` to `turn`, `context`, or `ignore` to override the default attention for that watch.
+The only reason to wait after `process start` is when the next step literally cannot proceed until the process is ready, and even then prefer a `logMatches` watch over polling.
 
 ## Actions
 
@@ -54,7 +50,7 @@ Good:
 }
 ```
 
-Optional `cwd` sets the working directory for the spawned command. Omit it to inherit the extension's process directory.
+Optional `cwd` sets the working directory for the spawned command. Omit it to inherit the agent's current working directory.
 
 Empty `logMatches` patterns (literal or regex) are rejected at start and update time. Use `mode: "regex"` only when literal matching is not enough, scope by `stream` to cut noise, and use `repeat: true` when a matcher should fire more than once.
 
@@ -132,9 +128,16 @@ Use watches instead:
 
 ### `process update`
 
-Renames a running process or changes its watches.
+Renames a running process or changes its watches. Update only works while the process is running.
 
-Use it instead of restarting a process just to add, remove, or replace watch patterns. You can change `name` and `watches` in the same call. Update only works while the process is running.
+Use it instead of restarting a process just to add, remove, or replace watch patterns. You can change `name` and `watches` in the same call.
+
+`watches.mode` controls how the `items` are applied:
+
+- `append` — add the items to the existing watches.
+- `replace` — replace all watches with the items.
+- `remove` — remove specific watches. Identify each by `index`, or by `pattern` (index takes precedence when both are given).
+- `clear` — remove all watches. `items` is ignored.
 
 Good:
 
@@ -205,6 +208,176 @@ Good:
 { "action": "clear" }
 ```
 
+## Notification reference
+
+`notify` on `process start` (and watches on `process update`) control how the manager brings you back.
+
+Exit attention:
+
+- `notify.onSuccess` — when the process exits successfully. Defaults to `context`.
+- `notify.onFailure` — when the process fails or crashes. Defaults to `turn`.
+- `notify.onKilled` — when the process is killed, by you or externally. Defaults to `context`.
+
+Log match watches (`notify.logMatches`, up to 20, each pattern up to 500 chars):
+
+- `pattern` — required. Literal by default; regex when `mode: "regex"`. Empty patterns are rejected.
+- `mode` — `literal` (default) or `regex`.
+- `stream` — `stdout`, `stderr`, or `both` (default). Scope to cut noise.
+- `repeat` — `false` (default) fires once; `true` fires on every match.
+- `on` — `turn`, `context`, or `ignore`. Overrides the default attention for that watch. Defaults to `turn`.
+
+`turn` interrupts with an agent message. `context` adds the notice as context without interrupting. `ignore` records the match silently.
+
+## Use cases
+
+### Dev server readiness
+
+Start a server, get brought back when it prints its ready marker, then keep working.
+
+```json
+{
+  "action": "start",
+  "name": "web-dev",
+  "command": "pnpm dev",
+  "notify": {
+    "logMatches": [{ "pattern": "ready", "stream": "stdout" }]
+  }
+}
+```
+
+You do not wait. End your turn; the watch fires and the manager brings you back.
+
+### Test watcher failures
+
+Keep a watcher running and react only when a test fails.
+
+```json
+{
+  "action": "start",
+  "name": "vitest-watch",
+  "command": "pnpm test --watch",
+  "notify": {
+    "logMatches": [
+      { "pattern": "FAIL", "stream": "stdout", "repeat": true, "on": "turn" },
+      { "pattern": "Error:", "stream": "stderr", "repeat": true, "on": "turn" }
+    ]
+  }
+}
+```
+
+### Build errors from stderr
+
+Watch a build watcher and surface type or compile errors as they happen.
+
+```json
+{
+  "action": "start",
+  "name": "builder",
+  "command": "pnpm build --watch",
+  "notify": {
+    "logMatches": [
+      { "pattern": "TypeError|ReferenceError", "mode": "regex", "stream": "stderr", "repeat": true }
+    ]
+  }
+}
+```
+
+### Repeatable progress markers
+
+Fire on every job completion, not just the first.
+
+```json
+{
+  "action": "start",
+  "name": "worker",
+  "command": "pnpm worker",
+  "notify": {
+    "logMatches": [{ "pattern": "job completed", "stream": "stdout", "repeat": true }]
+  }
+}
+```
+
+### Interactive process that needs stdin
+
+Start a process that waits for input, drive it, then close stdin.
+
+```json
+{ "action": "start", "name": "customer-import", "command": "npm run import:customer" }
+```
+
+```json
+{ "action": "write", "id": "proc_1", "input": "ALFKI\n", "end": true }
+```
+
+The process prints its result and exits; `onFailure`/`onSuccess` brings you back.
+
+## When a log watch is too noisy
+
+A watch that fires too often wastes turns. Fix it with `process update` — never restart the process just to change watches.
+
+First, diagnose: is the pattern too broad, on the wrong stream, or repeating when it should fire once?
+
+Then pick a `watches.mode`:
+
+- **Tighten the pattern or scope the stream** — `replace` all watches with corrected ones.
+
+```json
+{
+  "action": "update",
+  "id": "proc_1",
+  "watches": {
+    "mode": "replace",
+    "items": [{ "pattern": "EADDRINUSE", "stream": "stderr" }]
+  }
+}
+```
+
+- **Drop `repeat`** — if a `repeat: true` watch fires on every line, replace it with the same pattern and `repeat` omitted (defaults to `false`).
+
+- **Remove one watch** — `remove` by `index` or `pattern`.
+
+```json
+{
+  "action": "update",
+  "id": "proc_1",
+  "watches": {
+    "mode": "remove",
+    "items": [{ "pattern": "ready" }]
+  }
+}
+```
+
+```json
+{
+  "action": "update",
+  "id": "proc_1",
+  "watches": {
+    "mode": "remove",
+    "items": [{ "index": 0 }]
+  }
+}
+```
+
+- **Silence without removing** — set the watch's `on` to `ignore` so matches are recorded but do not interrupt.
+
+```json
+{
+  "action": "update",
+  "id": "proc_1",
+  "watches": {
+    "mode": "replace",
+    "items": [{ "pattern": "job completed", "stream": "stdout", "repeat": true, "on": "ignore" }]
+  }
+}
+```
+
+- **Remove all watches** — `clear`.
+
+```json
+{
+  "action": "update", "id": "proc_1", "watches": { "mode": "clear" } }
+```
+
 ## Common mistakes
 
 ### Polling output instead of setting watches
@@ -222,10 +395,22 @@ Good:
   "action": "start",
   "name": "web-dev",
   "command": "pnpm dev",
-  "notify": {
-    "logMatches": [{ "pattern": "ready", "mode": "literal" }]
-  }
+  "notify": { "logMatches": [{ "pattern": "ready", "mode": "literal" }] }
 }
+```
+
+### Waiting or sleeping after start
+
+Bad:
+
+```text
+Start a dev server, then sleep or hold the turn until it is ready.
+```
+
+Good:
+
+```text
+Start the server with a "ready" watch and end the turn. The watch brings you back.
 ```
 
 ### Restarting instead of updating watches
@@ -233,7 +418,7 @@ Good:
 Bad:
 
 ```text
-Stop and restart a process because you forgot to watch for EADDRINUSE.
+Stop and restart a process because you forgot to watch for EADDRINUSE, or because a watch is too noisy.
 ```
 
 Good:
@@ -289,7 +474,7 @@ The process list shows proc_1 is running, proc_2 exited, and proc_3 failed...
 Good:
 
 ```text
-I’ll reuse the existing `web-dev` process.
+I'll reuse the existing `web-dev` process.
 ```
 
 ### Using vague names

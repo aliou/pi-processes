@@ -54,14 +54,12 @@ export function registerProcessTool(
       description:
         "Start, list, stop, write to stdin, update, clear, and inspect output of long-running background processes.",
       promptSnippet:
-        "Manage long-running background processes: start, list, stop, write to stdin, update watches, clear finished entries, and inspect recent output.",
+        "Manage long-running background processes: start, list, stop, write to stdin, update watches, clear finished entries, and inspect recent output. After starting a process, do not wait - notifications bring you back on exit and on log matches.",
       promptGuidelines: [
-        "Use process list before process start when a similar dev server, watcher, or log tail may already be running; do not re-summarize visible tool output to the user.",
-        "Use process start for long-running commands instead of shell background patterns like &, nohup, disown, or setsid; give each process a specific name.",
-        "Use notify.logMatches on process start, and process update to change watches on a running process, instead of polling process output or restarting just to change watches.",
-        "Use process output for targeted recent stdout/stderr inspection with pattern/mode filters; for deep log reads, use the log file paths from process list or process output with the read tool.",
-        "Use process write to send input to a running process's stdin (e.g. answering a prompt or piping data); set end: true to close stdin and signal EOF.",
-        "Use process stop for obsolete live processes and process clear for finished entries; by default failures trigger an agent turn, successes add context, and externally-killed processes add context unless notify overrides it.",
+        "process tool: use process start for long-running commands (dev servers, watchers, builds) instead of shell background patterns like &, nohup, or setsid; give each process a specific name and check process list first when a duplicate would be noisy.",
+        "process tool: after process start, do not sleep, poll, or hold your turn. End your turn or move on. The process notifies you on exit (success, failure, killed) and on notify.logMatches matches, which brings you back.",
+        "process tool: use notify.logMatches to get brought back on readiness or error signals instead of polling process output. If a watch is too noisy, use process update (watches.mode append/replace/remove/clear) to fix it without restarting.",
+        "process tool: for the full lifecycle (start, list, output, update, write, stop, clear), notify options, use cases, and noisy-watch handling, read the pi-processes skill.",
       ],
       parameters: ProcessesParams,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {

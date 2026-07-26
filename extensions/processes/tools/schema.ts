@@ -165,7 +165,8 @@ export const ProcessesParams = Type.Object({
   notify: Type.Optional(NotifyParams),
   id: Type.Optional(
     Type.String({
-      description: "Process id. Required for stop, output, and write.",
+      description:
+        "Opaque process ID returned by start or list (for example, proc_ab12). Required for stop, output, write, and update. Process names are not accepted.",
     }),
   ),
   limit: Type.Optional(

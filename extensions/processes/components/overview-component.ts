@@ -628,18 +628,13 @@ export class OverviewComponent implements Component {
       );
     }
     while (body.length < available + 1) body.push("");
-    if (total > available) {
-      body.push(
-        truncateToWidth(
-          dim(
-            `  ${start + 1}-${Math.min(start + available, total)} of ${total}  (J/K scroll)`,
-          ),
-          width,
-          "",
-          true,
-        ),
-      );
-    }
+    const pageHint =
+      total > available
+        ? `  ${start + 1}-${Math.min(start + available, total)} of ${total}  (J/K scroll)`
+        : "";
+    // Keep the overview stable while moving between processes. A short log
+    // still reserves the page-hint row that a longer log uses for scrolling.
+    body.push(truncateToWidth(dim(pageHint), width, "", true));
     return body;
   }
 

@@ -458,6 +458,37 @@ describe("overview panel render width safety", () => {
     expect(body).not.toContain("out line 1 ");
   });
 
+  it("keeps the preview height stable for short and paginated output", () => {
+    const processes = [
+      makeProcess({ id: "proc_1", name: "dev", status: "running" }),
+    ];
+    const tui = {
+      requestRender: () => {},
+      terminal: { rows: 24, columns: 112 },
+    } as unknown;
+    const shortPreview = new OverviewComponent({
+      events: makeEvents(processes, ["only line"]) as never,
+      tui: tui as never,
+      theme: theme as never,
+      config: makeConfig() as never,
+      onClose: () => {},
+    }).render(112);
+    const paginatedPreview = new OverviewComponent({
+      events: makeEvents(
+        processes,
+        Array.from({ length: 12 }, (_, index) => `out line ${index + 1}`),
+      ) as never,
+      tui: tui as never,
+      theme: theme as never,
+      config: makeConfig() as never,
+      onClose: () => {},
+    }).render(112);
+
+    expect(shortPreview).toHaveLength(paginatedPreview.length);
+    expect(shortPreview.map(stripAnsi).join("\n")).not.toContain("of 12");
+    expect(paginatedPreview.map(stripAnsi).join("\n")).toContain("5-12 of 12");
+  });
+
   it("appends output events without re-reading the log tail", () => {
     const processes = [makeProcess({ id: "proc_1" })];
     const events = makeEvents(processes, ["initial"]);

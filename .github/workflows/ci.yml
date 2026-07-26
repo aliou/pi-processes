@@ -30,6 +30,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Check schema
+        run: pnpm check:schema
+
       - name: Unit tests
         run: pnpm test
 

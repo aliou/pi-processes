@@ -1,0 +1,130 @@
+{
+  "$ref": "#/definitions/ProcessConfig",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "ExecutionConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "shellPath": {
+          "description": "Absolute shell executable used to run process commands.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "FollowConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "autoHideOnFinish": {
+          "description": "Hide process log interfaces when all managed processes finish.",
+          "type": "boolean"
+        },
+        "enabledByDefault": {
+          "description": "Open process log interfaces in follow mode by default.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "InterceptionConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "blockBackgroundCommands": {
+          "description": "Block shell background patterns and redirect the agent to the process tool.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "OutputConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "defaultTailLines": {
+          "description": "Default number of recent lines returned by the process output action.",
+          "type": "number"
+        },
+        "maxOutputBytes": {
+          "description": "Maximum bytes retained by each process log interface.",
+          "type": "number"
+        },
+        "maxOutputLines": {
+          "description": "Maximum lines retained by process log interfaces.",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "ProcessConfig": {
+      "additionalProperties": false,
+      "description": "User-facing pi-processes settings stored on disk.",
+      "properties": {
+        "$schema": {
+          "description": "JSON Schema URL used by editors for validation and autocomplete.",
+          "type": "string"
+        },
+        "execution": {
+          "$ref": "#/definitions/ExecutionConfig",
+          "description": "Process execution settings."
+        },
+        "follow": {
+          "$ref": "#/definitions/FollowConfig",
+          "description": "Live log follow behavior."
+        },
+        "interception": {
+          "$ref": "#/definitions/InterceptionConfig",
+          "description": "Shell-command interception settings."
+        },
+        "output": {
+          "$ref": "#/definitions/OutputConfig",
+          "description": "Process output retention settings."
+        },
+        "processList": {
+          "$ref": "#/definitions/ProcessListConfig",
+          "description": "Process overview and log viewport settings."
+        },
+        "widget": {
+          "$ref": "#/definitions/WidgetConfig",
+          "description": "Dock and status widget settings."
+        }
+      },
+      "type": "object"
+    },
+    "ProcessListConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "maxPreviewLines": {
+          "description": "Maximum log rows displayed in the overview preview and logs overlay.",
+          "type": "number"
+        },
+        "maxVisibleProcesses": {
+          "description": "Maximum process rows displayed in the overview before scrolling.",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "WidgetConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "dockDefaultState": {
+          "description": "Initial visibility of the process dock.",
+          "enum": [
+            "closed",
+            "collapsed",
+            "expanded"
+          ],
+          "type": "string"
+        },
+        "dockHeight": {
+          "description": "Number of log rows displayed in the expanded process dock.",
+          "type": "number"
+        },
+        "showStatusWidget": {
+          "description": "Show a one-line process summary below the editor.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    }
+  }
+}

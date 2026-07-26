@@ -37,6 +37,7 @@
     "extensions",
     "!extensions/**/*.test.ts",
     "skills",
+    "schema.json",
     "README.md",
     "CONTRIBUTING.md"
   ],
@@ -62,6 +63,7 @@
     "@types/node": "^25.0.10",
     "husky": "^9.1.7",
     "memfs": "^4.57.2",
+    "ts-json-schema-generator": "^2.9.0",
     "typebox": "1.1.38",
     "typescript": "^5.9.3",
     "vitest": "^4.1.5"
@@ -76,6 +78,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check",
     "format": "biome check --write",
+    "gen:schema": "ts-json-schema-generator --path extensions/processes/config/types.ts --type ProcessConfig --no-type-check -o schema.json",
+    "check:schema": "ts-json-schema-generator --path extensions/processes/config/types.ts --type ProcessConfig --no-type-check -o /tmp/pi-processes-schema-check.json && diff -q schema.json /tmp/pi-processes-schema-check.json",
     "check:lockfile": "pnpm install --frozen-lockfile --ignore-scripts",
     "prepare": "[ -d .git ] && husky || true",
     "changeset": "changeset",

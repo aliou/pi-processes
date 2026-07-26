@@ -24,6 +24,8 @@ During UI tests that require processes to be running, either give the user a pro
 - `pnpm typecheck` — TypeScript check
 - `pnpm lint` — Biome check
 - `pnpm format` — Biome check with write
+- `pnpm gen:schema` — regenerate `schema.json` from `extensions/processes/config/types.ts`
+- `pnpm check:schema` — verify `schema.json` is up to date
 - `pnpm test` — Unit tests
 - `pnpm test:e2e` — End-to-end tests
 - `pnpm changeset` — Add a changeset

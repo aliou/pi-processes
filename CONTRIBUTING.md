@@ -86,6 +86,8 @@ Useful manual process scripts live under `tests/e2e/scripts/`:
 ./tests/e2e/scripts/crash-on-file.sh <name>  # waits for a marker file then crashes
 ```
 
+See `.agents/skills/pi-processes-testing/SKILL.md` for the full manual QA workflow and the complete fixture script reference.
+
 ## Docs conventions
 
 ### README
@@ -105,32 +107,15 @@ Avoid putting these in `README.md`:
 - detailed tool-call schemas
 - release workflow notes
 
-### Video placeholders
+### Docs page build
 
-Use markdown link thumbnails with a GIF poster that links to the MP4, matching the `pi-ts-aperture` convention:
+The docs page is generated from `README.md` by an external build, not in this repo. Keep `README.md` self-contained with only standard markdown.
 
-```md
-[![Browse and manage processes from the panel](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/process-panel.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/process-panel.mp4)
-```
+## Future design notes
 
-Assets live under `https://assets.aliou.me/pi-extensions/demos/processes/<version>/<slug>.{gif,mp4}`. Add one link per feature section.
+Unimplemented design notes live in `docs/`:
 
-## Docs page build
+- `docs/future-cleanup-hooks.md` - planned `cleanup` support for `process start` / `process stop`
+- `docs/future-persistent-manager.md` - planned cross-session process persistence
 
-The docs page is generated from `README.md` by an external build, not in this repo. Keep `README.md` self-contained: only standard markdown and the demo link pattern above.
-
-## Demo pattern
-
-For demo recording, use a small self-contained project with a realistic workflow. The fixture scripts under `tests/e2e/scripts/` are good building blocks (for example `http-server.sh` for a dev server and `exited-task.sh` for a finite job).
-
-A pattern that shows why background processes matter in a normal task instead of showing features one by one:
-
-1. Pi starts a server in the background
-2. Pi runs tests and sees failures
-3. Pi runs migrations
-4. Pi checks server logs
-5. Pi updates seed data
-6. Pi reruns tests
-7. Pi cleans up the process
-
-See the `demo-setup` skill for the full demo recording workflow.
+These describe intended future behavior, not current behavior. Active implementation work goes under `.agents/plans/`.

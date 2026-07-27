@@ -9,12 +9,22 @@ import { configLoader } from "../../config";
 import type { ExecuteResult, ProcessesDetails } from "../../constants";
 import type { ProcessManager } from "../../manager";
 import { formatStatus, hasAnsi, stripAnsi } from "../../utils";
-
-const MAX_BYTES = 50 * 1024; // 50KB
+import {
+  countLines,
+  formatTruncationNotice,
+  MAX_OUTPUT_BYTES,
+  MAX_OUTPUT_JSON_BYTES,
+  type TruncationDetails,
+  type TruncationResult,
+  truncateTail,
+} from "./output-truncate";
 
 interface OutputParams {
   id?: string;
 }
+
+/** Marker delimiting the always-present complete-log footer in content. */
+const LOG_FOOTER_MARKER = "[Complete currently-retained logs:";
 
 export function renderOutputCall(
   args: OutputParams,
@@ -35,28 +45,83 @@ export function renderOutputResult(
   options: ToolRenderResultOptions,
   theme: Theme,
 ): ToolBody {
-  const { details } = result;
+  const { details, content } = result;
 
-  if (!details.output) {
-    return new ToolBody(
-      {
-        fields: [
-          {
-            label: "Error",
-            value: "Missing output details",
-            showCollapsed: true,
-          },
-        ],
-      },
-      options,
-      theme,
+  const textBlock = Array.isArray(content)
+    ? content.find((block) => block.type === "text")
+    : undefined;
+  const contentText =
+    textBlock && textBlock.type === "text" ? textBlock.text : "";
+
+  // Legacy session results still carry raw stdout/stderr arrays in details.
+  // Render them so historical entries remain visible without errors.
+  if (details.output) {
+    return renderLegacyOutput(details, theme, options);
+  }
+
+  const bodyLines = extractOutputBody(contentText, details);
+  let hadAnsi = false;
+
+  const lines: string[] = [theme.fg("muted", details.message)];
+
+  if (bodyLines.length > 0) {
+    lines.push("");
+    for (const line of bodyLines) {
+      if (!hadAnsi && hasAnsi(line)) hadAnsi = true;
+      lines.push(line);
+    }
+  } else {
+    lines.push("", theme.fg("muted", "(no output)"));
+  }
+
+  if (details.truncation) {
+    lines.push(
+      "",
+      theme.fg("muted", buildTruncationSummary(details.truncation)),
     );
   }
 
+  if (details.logFiles) {
+    lines.push(
+      "",
+      theme.fg("success", "Log files:"),
+      `  stdout: ${theme.fg("accent", details.logFiles.stdoutFile)}`,
+      `  stderr: ${theme.fg("accent", details.logFiles.stderrFile)}`,
+    );
+  }
+
+  if (hadAnsi) {
+    lines.push(
+      "",
+      theme.fg("muted", "ANSI escape codes were stripped from output"),
+    );
+  }
+
+  const fields: Array<
+    { label: string; value: string; showCollapsed?: boolean } | Text
+  > = [new Text(lines.join("\n"), 0, 0)];
+
+  // Collapsed preview: the last couple of body lines.
+  const preview =
+    bodyLines.slice(-2).join("\n") || theme.fg("muted", "(empty)");
+  fields.push({
+    label: "Output",
+    value: theme.fg("muted", preview),
+    showCollapsed: true,
+  });
+
+  return new ToolBody({ fields }, options, theme);
+}
+
+function renderLegacyOutput(
+  details: ProcessesDetails,
+  theme: Theme,
+  options: ToolRenderResultOptions,
+): ToolBody {
   const lines: string[] = [theme.fg("muted", details.message)];
   let hadAnsi = false;
 
-  if (details.output.stdout.length > 0) {
+  if (details.output?.stdout.length) {
     lines.push("", theme.fg("accent", "stdout:"));
     for (const line of details.output.stdout.slice(-20)) {
       if (!hadAnsi && hasAnsi(line)) hadAnsi = true;
@@ -72,7 +137,7 @@ export function renderOutputResult(
     }
   }
 
-  if (details.output.stderr.length > 0) {
+  if (details.output?.stderr.length) {
     lines.push("", theme.fg("warning", "stderr:"));
     for (const line of details.output.stderr.slice(-10)) {
       if (!hadAnsi && hasAnsi(line)) hadAnsi = true;
@@ -104,28 +169,100 @@ export function renderOutputResult(
     );
   }
 
-  const fields: Array<
-    { label: string; value: string; showCollapsed?: boolean } | Text
-  > = [new Text(lines.join("\n"), 0, 0)];
-
-  // Collapsed summary
-  const previewSource =
-    details.output.stdout.length > 0
-      ? details.output.stdout
-      : details.output.stderr;
+  const previewSource = details.output?.stdout.length
+    ? details.output.stdout
+    : (details.output?.stderr ?? []);
   const preview = previewSource
     .slice(-2)
     .map((l) => stripAnsi(l))
     .join("\n");
-  fields.push({
-    label: "Output",
-    value: preview
-      ? `${theme.fg("muted", preview)}`
-      : theme.fg("muted", "(empty)"),
-    showCollapsed: true,
-  });
+
+  const fields: Array<
+    { label: string; value: string; showCollapsed?: boolean } | Text
+  > = [
+    new Text(lines.join("\n"), 0, 0),
+    {
+      label: "Output",
+      value: preview
+        ? theme.fg("muted", preview)
+        : theme.fg("muted", "(empty)"),
+      showCollapsed: true,
+    },
+  ];
 
   return new ToolBody({ fields }, options, theme);
+}
+
+/**
+ * Extract the bounded process-output body from tool-result content text.
+ *
+ * Content is structured as:
+ *   - a one-line header (`details.message`);
+ *   - the bounded output body (already ANSI-stripped);
+ *   - an optional truncation notice line;
+ *   - an always-present complete-log footer.
+ *
+ * Only the body is returned. The renderer uses `details` for metadata,
+ * truncation state, and log paths; this function never re-parses stream
+ * labels, so a real log line containing `stderr:` cannot confuse it.
+ *
+ * Legacy content that lost its header through tail truncation is accepted: if
+ * the first line does not match the expected header, the whole content is
+ * treated as body up to the footer.
+ */
+function extractOutputBody(
+  contentText: string,
+  details: ProcessesDetails,
+): string[] {
+  if (!contentText) return [];
+
+  const lines = contentText.split("\n");
+  const header = details.message;
+
+  let bodyStart = lines[0] === header ? 1 : 0;
+  // Skip the blank separator following the header.
+  if (bodyStart > 0 && lines[bodyStart] === "") {
+    bodyStart++;
+  }
+
+  const footerStart = findLastLineIndex(
+    lines,
+    (line) => line === LOG_FOOTER_MARKER,
+  );
+  let bodyEnd = footerStart >= 0 ? footerStart : lines.length;
+
+  // Exclude the running-guidance line, which sits between the body and the
+  // footer/notice. It is metadata, not process output.
+  const guidance = "Process is still running. Use watches instead of polling.";
+  const guidanceIndex = findLastLineIndex(
+    lines,
+    (line, index) => index < bodyEnd && line === guidance,
+  );
+  if (guidanceIndex >= bodyStart) {
+    bodyEnd = guidanceIndex;
+  }
+
+  // Exclude a preceding blank line that separated body from the footer/notice.
+  while (bodyEnd > bodyStart && (lines[bodyEnd - 1] ?? "") === "") {
+    bodyEnd--;
+  }
+
+  return lines.slice(bodyStart, bodyEnd);
+}
+
+function buildTruncationSummary(truncation: TruncationDetails): string {
+  const partialNote = truncation.lastLinePartial ? " · partial final line" : "";
+  return `Preview truncated · ${truncation.outputLines}/${truncation.totalLines} lines${partialNote}`;
+}
+
+function findLastLineIndex(
+  lines: string[],
+  predicate: (line: string, index: number) => boolean,
+): number {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (predicate(lines[i] ?? "", i)) return i;
+  }
+  return -1;
 }
 
 export function executeOutput(
@@ -156,7 +293,7 @@ export function executeOutput(
     };
   }
 
-  const { defaultTailLines } = configLoader.getConfig().output;
+  const { defaultTailLines, maxOutputLines } = configLoader.getConfig().output;
   const output = manager.getOutput(proc.id, defaultTailLines);
   if (!output) {
     const message = `Could not read output for "${proc.name}" (${proc.id})`;
@@ -175,95 +312,136 @@ export function executeOutput(
   const stderrLines = output.stderr.length;
   const message = `"${proc.name}" (${proc.id}) [${formatStatus(proc)}]: ${stdoutLines} stdout lines, ${stderrLines} stderr lines`;
 
-  // Build the full text content (ANSI-stripped), then truncate from the tail
-  // like bash does, so the agent sees the most recent output.
-  const outputParts: string[] = [message];
+  // Build the stripped body text. stdout/stderr stay local and are never
+  // persisted in `details`; only the bounded preview survives in `content`.
+  const bodyLines: string[] = [];
   if (output.stdout.length > 0) {
-    outputParts.push("\nstdout:");
-    outputParts.push(...output.stdout.map(stripAnsi));
+    bodyLines.push("stdout:");
+    bodyLines.push(...output.stdout.map(stripAnsi));
   }
   if (output.stderr.length > 0) {
-    outputParts.push("\nstderr:");
-    outputParts.push(...output.stderr.map(stripAnsi));
+    if (bodyLines.length > 0) bodyLines.push("");
+    bodyLines.push("stderr:");
+    bodyLines.push(...output.stderr.map(stripAnsi));
   }
 
-  const fullText = outputParts.join("\n");
-  const { maxOutputLines } = configLoader.getConfig().output;
-  const contentText = truncateTail(fullText, logFiles, maxOutputLines);
+  const guidance =
+    output.status === "running"
+      ? "Process is still running. Use watches instead of polling."
+      : null;
+
+  const { contentText, truncation } = buildBoundedOutput(
+    message,
+    bodyLines.join("\n"),
+    guidance,
+    logFiles,
+    maxOutputLines,
+  );
+
+  const details: ProcessesDetails = {
+    action: "output",
+    success: true,
+    message,
+    logFiles: logFiles
+      ? {
+          stdoutFile: logFiles.stdoutFile,
+          stderrFile: logFiles.stderrFile,
+        }
+      : undefined,
+  };
+
+  if (truncation.truncated) {
+    const { content: _content, ...rest } = truncation;
+    details.truncation = rest;
+  }
 
   return {
     content: [{ type: "text", text: contentText }],
-    details: {
-      action: "output",
-      success: true,
-      message,
-      output,
-      logFiles: logFiles
-        ? {
-            stdoutFile: logFiles.stdoutFile,
-            stderrFile: logFiles.stderrFile,
-          }
-        : undefined,
-    },
+    details,
   };
 }
 
 /**
- * Truncate text from the tail (keep last N lines / MAX_BYTES), matching
- * the behaviour of pi's built-in bash tool.  When truncated, appends a
- * notice pointing the agent to the full log files.
+ * Compose the bounded content text. The header, optional guidance, truncation
+ * notice, and complete-log footer live outside the truncation window, so the
+ * agent always receives log paths even when the body is truncated.
+ *
+ * The byte and line budgets apply to the composed+JSON-escaped result. If the
+ * first pass overflows (because JSON escaping expands control characters or
+ * the fixed metadata consumes the budget), the body budget is shrunk and the
+ * body re-truncated while keeping the newest output.
  */
-function truncateTail(
-  text: string,
+function buildBoundedOutput(
+  header: string,
+  body: string,
+  guidance: string | null,
   logFiles: { stdoutFile: string; stderrFile: string } | null,
   maxLines: number,
-): string {
-  const totalBytes = Buffer.byteLength(text, "utf-8");
-  const lines = text.split("\n");
-  const totalLines = lines.length;
+): { contentText: string; truncation: TruncationResult } {
+  let maxBodyBytes = MAX_OUTPUT_BYTES;
+  let maxBodyLines = maxLines;
 
-  if (totalLines <= maxLines && totalBytes <= MAX_BYTES) {
-    return text;
-  }
+  let truncation = truncateTail(body, {
+    maxBytes: maxBodyBytes,
+    maxLines: maxBodyLines,
+  });
+  let contentText = composeContent(header, truncation, guidance, logFiles);
 
-  // Work backwards, collecting lines that fit
-  const kept: string[] = [];
-  let keptBytes = 0;
-  let hitBytes = false;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const excessBytes =
+      Buffer.byteLength(contentText, "utf-8") - MAX_OUTPUT_BYTES;
+    const excessLines = countLines(contentText) - maxLines;
+    const excessJsonBytes =
+      Buffer.byteLength(JSON.stringify(contentText), "utf-8") -
+      MAX_OUTPUT_JSON_BYTES;
 
-  for (let i = lines.length - 1; i >= 0 && kept.length < maxLines; i--) {
-    const line = lines[i] ?? "";
-    const lineBytes =
-      Buffer.byteLength(line, "utf-8") + (kept.length > 0 ? 1 : 0);
-
-    if (keptBytes + lineBytes > MAX_BYTES) {
-      hitBytes = true;
-      break;
+    if (excessBytes <= 0 && excessLines <= 0 && excessJsonBytes <= 0) {
+      return { contentText, truncation };
     }
 
-    kept.unshift(line);
-    keptBytes += lineBytes;
+    maxBodyBytes = Math.max(0, maxBodyBytes - Math.max(0, excessBytes));
+    if (excessJsonBytes > 0) {
+      maxBodyBytes = Math.floor(maxBodyBytes / 2);
+    }
+    maxBodyLines = Math.max(1, maxBodyLines - Math.max(0, excessLines));
+
+    truncation = truncateTail(body, {
+      maxBytes: maxBodyBytes,
+      maxLines: maxBodyLines,
+    });
+    contentText = composeContent(header, truncation, guidance, logFiles);
   }
 
-  let result = kept.join("\n");
-
-  // Append a notice so the agent knows output was truncated
-  const shownLines = kept.length;
-  const startLine = totalLines - shownLines + 1;
-  const sizeNote = hitBytes ? ` (${formatSize(MAX_BYTES)} limit)` : "";
-  result += `\n\n[Showing lines ${startLine}-${totalLines} of ${totalLines}${sizeNote}.`;
-
-  if (logFiles) {
-    result += ` Full logs: ${logFiles.stdoutFile} , ${logFiles.stderrFile}`;
-  }
-
-  result += "]";
-
-  return result;
+  // Pathological metadata can still consume the whole budget. Bound the final
+  // composed string so a session entry cannot grow unbounded.
+  const finalTruncation = truncateTail(contentText, {
+    maxBytes: MAX_OUTPUT_BYTES,
+    maxLines: maxLines,
+  });
+  return { contentText: finalTruncation.content, truncation };
 }
 
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes}B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+function composeContent(
+  header: string,
+  truncation: TruncationResult,
+  guidance: string | null,
+  logFiles: { stdoutFile: string; stderrFile: string } | null,
+): string {
+  const sections: string[] = [header, truncation.content];
+
+  if (guidance) {
+    sections.push(guidance);
+  }
+
+  if (truncation.truncated) {
+    sections.push(formatTruncationNotice(truncation));
+  }
+
+  if (logFiles) {
+    sections.push(
+      `${LOG_FOOTER_MARKER}\nstdout=${logFiles.stdoutFile}\nstderr=${logFiles.stderrFile}]`,
+    );
+  }
+
+  return sections.filter((section) => section.length > 0).join("\n\n");
 }

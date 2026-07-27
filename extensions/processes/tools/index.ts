@@ -1,4 +1,5 @@
 import {
+  type AgentToolResult,
   defineTool,
   type ExtensionAPI,
   type ExtensionContext,
@@ -13,11 +14,7 @@ import * as clearRender from "./clear/render";
 import { ToolLayout } from "./components";
 import { executeList, formatListDetails, type ListDetails } from "./list";
 import * as listRender from "./list/render";
-import {
-  executeOutput,
-  formatOutputDetails,
-  type OutputDetails,
-} from "./output";
+import { executeOutput, type OutputDetails } from "./output";
 import * as outputRender from "./output/render";
 import { ProcessesParams, type ProcessesParamsType } from "./schema";
 import { executeStart, formatStartDetails, type StartDetails } from "./start";
@@ -63,6 +60,14 @@ export function registerProcessTool(
       ],
       parameters: ProcessesParams,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+        if (params.action === "output") {
+          const result = executeOutput(params, manager);
+          return {
+            content: [{ type: "text", text: result.content }],
+            details: result.details,
+          };
+        }
+
         const details = await execute(params, manager, ctx, notifications);
         return {
           content: [{ type: "text", text: formatDetails(details) }],
@@ -88,8 +93,6 @@ async function execute(
       return executeList(manager, params, notifications);
     case "stop":
       return executeStop(params, manager, notifications);
-    case "output":
-      return executeOutput(params, manager);
     case "write":
       return executeWrite(params, manager);
     case "update":
@@ -137,7 +140,7 @@ function renderProcessCall(
 }
 
 function renderProcessResult(
-  result: { details?: unknown },
+  result: AgentToolResult<ProcessDetails>,
   options: { expanded?: boolean; isPartial?: boolean },
   theme: Theme,
   context?: { isError?: boolean },
@@ -156,14 +159,27 @@ function renderProcessResult(
     return fallbackContainer(theme, "process completed");
   }
 
+  const contentText = getContentText(result);
+
   return new ToolLayout()
     .withSectionSpacing(options.expanded)
-    .setBody(buildBody(details, options, theme))
-    .setFooter(buildFooter(details, options, theme));
+    .setBody(buildBody(details, contentText, options, theme))
+    .setFooter(buildFooter(details, contentText, options, theme));
+}
+
+function getContentText(
+  result: AgentToolResult<ProcessDetails>,
+): string | undefined {
+  const first = result.content[0];
+  if (first?.type === "text" && typeof first.text === "string") {
+    return first.text;
+  }
+  return undefined;
 }
 
 function buildBody(
   details: ProcessDetails,
+  contentText: string | undefined,
   options: { expanded?: boolean },
   theme: Theme,
 ): Container {
@@ -178,8 +194,8 @@ function buildBody(
         : listRender.buildCollapsed(details, theme);
     case "output":
       return options.expanded
-        ? outputRender.buildExpanded(details, theme)
-        : outputRender.buildCollapsed(details, theme);
+        ? outputRender.buildExpanded(contentText ?? "", details, theme)
+        : outputRender.buildCollapsed(contentText ?? "", details, theme);
     case "update":
       return options.expanded
         ? updateRender.buildExpanded(details, theme)
@@ -201,6 +217,7 @@ function buildBody(
 
 function buildFooter(
   details: ProcessDetails,
+  _contentText: string | undefined,
   options: { expanded?: boolean },
   theme: Theme,
 ): Container | null {
@@ -230,14 +247,14 @@ function formatDetails(details: ProcessDetails): string {
       return formatListDetails(details);
     case "stop":
       return formatStopDetails(details);
-    case "output":
-      return formatOutputDetails(details);
     case "update":
       return formatUpdateDetails(details);
     case "write":
       return formatWriteDetails(details);
     case "clear":
       return formatClearDetails(details);
+    case "output":
+      throw new Error("output action uses pre-formatted content");
   }
 }
 

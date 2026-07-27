@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ProcessManager } from "../../../../src/manager";
 import type { ProcessInfo } from "../../../../src/types";
-import {
-  executeOutput,
-  formatOutputDetails,
-  type OutputDetails,
-} from "./index";
+import { MAX_OUTPUT_BYTES, MAX_OUTPUT_TAIL_LINES } from "../schema";
+import { executeOutput } from "./index";
+
+const STDOUT_FILE = "/tmp/proc_1.stdout.log";
+const STDERR_FILE = "/tmp/proc_1.stderr.log";
 
 function mockManager(
   output: {
@@ -14,6 +14,7 @@ function mockManager(
     stderr: string[];
     status: string;
   } | null,
+  processOverrides: Partial<ProcessInfo> = {},
 ): ProcessManager {
   const process: ProcessInfo = {
     id: "proc_1",
@@ -26,11 +27,12 @@ function mockManager(
     status: "running",
     exitCode: null,
     success: null,
-    stdoutFile: "/tmp/proc_1.stdout.log",
-    stderrFile: "/tmp/proc_1.stderr.log",
+    stdoutFile: STDOUT_FILE,
+    stderrFile: STDERR_FILE,
     endReason: null,
     signal: null,
     errorMessage: null,
+    ...processOverrides,
   };
 
   return {
@@ -71,18 +73,21 @@ describe("executeOutput", () => {
       status: "running",
     });
 
-    const result = executeOutput(
+    const { content, details } = executeOutput(
       { action: "output", id: "proc_1" } as never,
       manager,
     );
 
-    expect(result.action).toBe("output");
-    expect(result.stream).toBe("both");
-    expect(result.stdout).toEqual(["line 1", "line 2"]);
-    expect(result.stderr).toEqual(["err 1"]);
-    expect(result.pattern).toBeNull();
-    expect(result.mode).toBe("literal");
-    expect(result.tailLines).toBe(100);
+    expect(details.action).toBe("output");
+    expect(details.stream).toBe("both");
+    expect(details.pattern).toBeNull();
+    expect(details.mode).toBe("literal");
+    expect(details.tailLines).toBe(100);
+    expect(content).toContain("stdout:");
+    expect(content).toContain("line 1");
+    expect(content).toContain("line 2");
+    expect(content).toContain("stderr:");
+    expect(content).toContain("err 1");
   });
 
   it("filters to stdout only", () => {
@@ -92,13 +97,14 @@ describe("executeOutput", () => {
       status: "running",
     });
 
-    const result = executeOutput(
+    const { content } = executeOutput(
       { action: "output", id: "proc_1", stream: "stdout" } as never,
       manager,
     );
 
-    expect(result.stdout).toEqual(["out"]);
-    expect(result.stderr).toEqual([]);
+    const body = contentBeforeFooter(content);
+    expect(body).toContain("out");
+    expect(body).not.toContain("err");
   });
 
   it("filters to stderr only", () => {
@@ -108,13 +114,14 @@ describe("executeOutput", () => {
       status: "running",
     });
 
-    const result = executeOutput(
+    const { content } = executeOutput(
       { action: "output", id: "proc_1", stream: "stderr" } as never,
       manager,
     );
 
-    expect(result.stdout).toEqual([]);
-    expect(result.stderr).toEqual(["err"]);
+    const body = contentBeforeFooter(content);
+    expect(body).toContain("err");
+    expect(body).not.toContain("out");
   });
 
   it("applies literal pattern filter", () => {
@@ -124,15 +131,16 @@ describe("executeOutput", () => {
       status: "running",
     });
 
-    const result = executeOutput(
+    const { content, details } = executeOutput(
       { action: "output", id: "proc_1", pattern: "error" } as never,
       manager,
     );
 
-    expect(result.stdout).toEqual(["error: crash", "error: fail"]);
-    expect(result.stderr).toEqual([]);
-    expect(result.pattern).toBe("error");
-    expect(result.mode).toBe("literal");
+    expect(content).toContain("error: crash");
+    expect(content).toContain("error: fail");
+    expect(content).not.toContain("info: ok");
+    expect(details.pattern).toBe("error");
+    expect(details.mode).toBe("literal");
   });
 
   it("applies regex pattern filter", () => {
@@ -142,7 +150,7 @@ describe("executeOutput", () => {
       status: "running",
     });
 
-    const result = executeOutput(
+    const { content } = executeOutput(
       {
         action: "output",
         id: "proc_1",
@@ -152,7 +160,9 @@ describe("executeOutput", () => {
       manager,
     );
 
-    expect(result.stdout).toEqual(["ERR404", "ERR500"]);
+    expect(content).toContain("ERR404");
+    expect(content).toContain("ERR500");
+    expect(content).not.toContain("INFO ok");
   });
 
   it("throws on invalid regex", () => {
@@ -183,14 +193,14 @@ describe("executeOutput", () => {
       status: "running",
     });
 
-    const result = executeOutput(
+    const { content } = executeOutput(
       { action: "output", id: "proc_1", tailLines: 10 } as never,
       manager,
     );
 
-    expect(result.stdout).toHaveLength(10);
-    expect(result.stdout[0]).toBe("line 190");
-    expect(result.stdout[9]).toBe("line 199");
+    expect(content).toContain("line 190");
+    expect(content).toContain("line 199");
+    expect(content).not.toContain("line 189");
   });
 
   it("uses larger scan window when pattern is present", () => {
@@ -201,7 +211,6 @@ describe("executeOutput", () => {
       status: "running",
     });
 
-    // Pattern present: getOutput should be called with MAX_OUTPUT_SCAN_LINES (5000)
     executeOutput(
       { action: "output", id: "proc_1", pattern: "line 99" } as never,
       manager,
@@ -232,12 +241,12 @@ describe("executeOutput", () => {
       status: "running",
     });
 
-    const result = executeOutput(
+    const { details } = executeOutput(
       { action: "output", id: "proc_1", tailLines: 9999 } as never,
       manager,
     );
 
-    expect(result.tailLines).toBe(2000);
+    expect(details.tailLines).toBe(2000);
   });
 
   it("defaults tailLines to 100", () => {
@@ -247,89 +256,321 @@ describe("executeOutput", () => {
       status: "running",
     });
 
-    const result = executeOutput(
+    const { details } = executeOutput(
       { action: "output", id: "proc_1" } as never,
       manager,
     );
 
-    expect(result.tailLines).toBe(100);
+    expect(details.tailLines).toBe(100);
   });
 
-  it("includes log file paths in details", () => {
+  it("includes log file paths in content", () => {
     const manager = mockManager({
       stdout: [],
       stderr: [],
       status: "running",
     });
 
-    const result = executeOutput(
+    const { content } = executeOutput(
       { action: "output", id: "proc_1" } as never,
       manager,
     );
 
-    expect(result.stdoutFile).toBe("/tmp/proc_1.stdout.log");
-    expect(result.stderrFile).toBe("/tmp/proc_1.stderr.log");
+    expect(content).toContain(`stdout=${STDOUT_FILE}`);
+    expect(content).toContain(`stderr=${STDERR_FILE}`);
   });
-});
 
-describe("formatOutputDetails", () => {
-  function makeDetails(overrides: Partial<OutputDetails> = {}): OutputDetails {
-    return {
-      action: "output",
-      id: "proc_1",
-      processName: "server",
-      processStatus: "running",
-      stream: "both",
-      tailLines: 100,
-      pattern: null,
-      mode: "literal",
-      stdout: ["hello world"],
+  it("includes process metadata in content", () => {
+    const manager = mockManager({
+      stdout: ["hello"],
       stderr: [],
-      stdoutFile: "/tmp/proc_1.stdout.log",
-      stderrFile: "/tmp/proc_1.stderr.log",
-      ...overrides,
-    };
-  }
+      status: "running",
+    });
 
-  it("formats basic output with header and stdout", () => {
-    const text = formatOutputDetails(makeDetails());
-    expect(text).toContain('"server" (proc_1) [running]');
-    expect(text).toContain("stdout:");
-    expect(text).toContain("hello world");
-    expect(text).toContain(
+    const { content } = executeOutput(
+      { action: "output", id: "proc_1" } as never,
+      manager,
+    );
+
+    expect(content).toContain('"server" (proc_1) [running]');
+    expect(content).toContain("stdout:");
+    expect(content).toContain("hello");
+    expect(content).toContain(
       "Process is still running. Use watches instead of polling.",
     );
   });
 
-  it("includes filter info when pattern is set", () => {
-    const text = formatOutputDetails(
-      makeDetails({ pattern: "error", mode: "regex" }),
+  it("strips ANSI escape codes from content", () => {
+    const manager = mockManager({
+      stdout: ["\u001b[31mred text\u001b[0m"],
+      stderr: [],
+      status: "running",
+    });
+
+    const { content } = executeOutput(
+      { action: "output", id: "proc_1" } as never,
+      manager,
     );
-    expect(text).toContain("filter: error (regex)");
+
+    expect(content).toContain("red text");
+    expect(content).not.toContain("\u001b[");
   });
 
-  it("shows stderr section when stderr has content", () => {
-    const text = formatOutputDetails(
-      makeDetails({ stderr: ["something broke"] }),
+  it("details never contains stdout or stderr arrays", () => {
+    const manager = mockManager({
+      stdout: ["hello"],
+      stderr: ["world"],
+      status: "running",
+    });
+
+    const { details } = executeOutput(
+      { action: "output", id: "proc_1" } as never,
+      manager,
     );
-    expect(text).toContain("stderr:");
-    expect(text).toContain("something broke");
+
+    expect(details).not.toHaveProperty("stdout");
+    expect(details).not.toHaveProperty("stderr");
   });
 
-  it("shows 'No output yet' when both streams empty and no pattern", () => {
-    const text = formatOutputDetails(makeDetails({ stdout: [], stderr: [] }));
-    expect(text).toContain("No output yet.");
-  });
+  it("serialized tool result stays bounded for a 2 MiB single line", () => {
+    const hugeLine = "x".repeat(2 * 1024 * 1024);
+    const manager = mockManager({
+      stdout: [hugeLine],
+      stderr: [],
+      status: "running",
+    });
 
-  it("shows 'No matching lines found' when both streams empty and pattern set", () => {
-    const text = formatOutputDetails(
-      makeDetails({ stdout: [], stderr: [], pattern: "missing" }),
+    const { content, details } = executeOutput(
+      { action: "output", id: "proc_1" } as never,
+      manager,
     );
-    expect(text).toContain("No matching lines found.");
+
+    const toolResult = {
+      content: [{ type: "text", text: content }],
+      details,
+    };
+
+    expect(details.truncation?.truncated).toBe(true);
+    expect(content).toContain("x".repeat(100));
+    expect(content).toContain(
+      "Process is still running. Use watches instead of polling.",
+    );
+    expect(JSON.stringify(details)).not.toContain("x".repeat(100));
+    expect(details.truncation).not.toHaveProperty("content");
+    expect(Buffer.byteLength(content, "utf8")).toBeLessThanOrEqual(
+      MAX_OUTPUT_BYTES,
+    );
+    expect(Buffer.byteLength(JSON.stringify(toolResult), "utf8")).toBeLessThan(
+      128 * 1024,
+    );
   });
 
-  it("does not add polling guidance for finished processes", () => {
-    const text = formatOutputDetails(makeDetails({ processStatus: "exited" }));
-    expect(text).not.toContain("Use watches instead of polling");
+  it("handles CR-only progress output without unbounded session growth", () => {
+    const progress = `${"\r".repeat(100_000)}done`;
+    const manager = mockManager({
+      stdout: [progress],
+      stderr: [],
+      status: "exited",
+    });
+
+    const { content, details } = executeOutput(
+      { action: "output", id: "proc_1" } as never,
+      manager,
+    );
+
+    expect(content).toContain("done");
+    expect(Buffer.byteLength(content, "utf8")).toBeLessThanOrEqual(
+      MAX_OUTPUT_BYTES,
+    );
+    expect(
+      Buffer.byteLength(JSON.stringify({ content, details }), "utf8"),
+    ).toBeLessThan(128 * 1024);
+  });
+
+  it("bounds JSON escaping expansion from control characters", () => {
+    const manager = mockManager({
+      stdout: ["\t".repeat(2 * 1024 * 1024)],
+      stderr: [],
+      status: "exited",
+    });
+
+    const { content, details } = executeOutput(
+      { action: "output", id: "proc_1" } as never,
+      manager,
+    );
+
+    expect(content).toContain("\t".repeat(100));
+    expect(details.truncation).not.toHaveProperty("content");
+    expect(
+      Buffer.byteLength(JSON.stringify({ content, details }), "utf8"),
+    ).toBeLessThan(128 * 1024);
+  });
+
+  it("bounds oversized process names in persisted output results", () => {
+    const hugeName = `server-${"x".repeat(2 * 1024 * 1024)}`;
+    const manager = mockManager(
+      { stdout: ["ready"], stderr: [], status: "running" },
+      { name: hugeName },
+    );
+
+    const { content, details } = executeOutput(
+      { action: "output", id: "proc_1" } as never,
+      manager,
+    );
+
+    expect(details.processName).toMatch(/^server-/);
+    expect(details.processName).toMatch(/…$/u);
+    expect(content).toContain("ready");
+    expect(
+      Buffer.byteLength(JSON.stringify({ content, details }), "utf8"),
+    ).toBeLessThan(128 * 1024);
+  });
+
+  it("handles large stdout and stderr together", () => {
+    const stdout = Array.from({ length: 1000 }, (_, i) => `out ${i}`);
+    const stderr = Array.from({ length: 1000 }, (_, i) => `err ${i}`);
+    const manager = mockManager({
+      stdout,
+      stderr,
+      status: "running",
+    });
+
+    const { content, details } = executeOutput(
+      { action: "output", id: "proc_1", tailLines: 2000 } as never,
+      manager,
+    );
+
+    expect(details.truncation?.truncated).toBe(true);
+    expect(Buffer.byteLength(content, "utf8")).toBeLessThanOrEqual(
+      MAX_OUTPUT_BYTES,
+    );
+  });
+
+  it("preserves multibyte UTF-8 suffix when truncating", () => {
+    // Construct a line where the byte limit falls inside a multibyte character.
+    const prefix = "a".repeat(MAX_OUTPUT_BYTES - 8);
+    const suffix = "é".repeat(100); // 2 bytes each
+    const manager = mockManager({
+      stdout: [`${prefix}${suffix}`],
+      stderr: [],
+      status: "exited",
+    });
+
+    const { content, details } = executeOutput(
+      { action: "output", id: "proc_1" } as never,
+      manager,
+    );
+
+    expect(details.truncation?.truncated).toBe(true);
+    expect(details.truncation?.lastLinePartial).toBe(true);
+    expect(Buffer.byteLength(content, "utf8")).toBeLessThanOrEqual(
+      MAX_OUTPUT_BYTES,
+    );
+  });
+
+  it("applies line-limit truncation", () => {
+    const lines = Array.from({ length: MAX_OUTPUT_TAIL_LINES + 100 }, (_, i) =>
+      String(i),
+    );
+    const manager = mockManager({
+      stdout: lines,
+      stderr: [],
+      status: "running",
+    });
+
+    const { content, details } = executeOutput(
+      { action: "output", id: "proc_1", tailLines: 3000 } as never,
+      manager,
+    );
+
+    expect(details.truncation?.truncated).toBe(true);
+    expect(details.truncation?.truncatedBy).toBe("lines");
+    expect(details.truncation?.outputLines).toBeLessThanOrEqual(
+      MAX_OUTPUT_TAIL_LINES,
+    );
+    expect(content).toContain("line limit");
+  });
+
+  it("applies byte-limit truncation", () => {
+    const line = "x".repeat(MAX_OUTPUT_BYTES + 1000);
+    const manager = mockManager({
+      stdout: [line],
+      stderr: [],
+      status: "running",
+    });
+
+    const { content, details } = executeOutput(
+      { action: "output", id: "proc_1" } as never,
+      manager,
+    );
+
+    expect(details.truncation?.truncated).toBe(true);
+    expect(details.truncation?.truncatedBy).toBe("bytes");
+    expect(content).toContain("byte limit");
+  });
+
+  it("truncation metadata is absent when output fits within limits", () => {
+    const manager = mockManager({
+      stdout: ["hello"],
+      stderr: [],
+      status: "running",
+    });
+
+    const { details } = executeOutput(
+      { action: "output", id: "proc_1" } as never,
+      manager,
+    );
+
+    expect(details.truncation).toBeUndefined();
+  });
+
+  it("raw output text is absent from serialized details", () => {
+    const manager = mockManager({
+      stdout: ["secret output"],
+      stderr: [],
+      status: "running",
+    });
+
+    const { details } = executeOutput(
+      { action: "output", id: "proc_1" } as never,
+      manager,
+    );
+
+    const serialized = JSON.stringify(details);
+    expect(serialized).not.toContain("secret output");
+  });
+
+  it("footer allow list is bounded for pathological output", () => {
+    const manager = mockManager({
+      stdout: ["x".repeat(10 * 1024 * 1024)],
+      stderr: ["y".repeat(10 * 1024 * 1024)],
+      status: "running",
+    });
+
+    const { content, details } = executeOutput(
+      { action: "output", id: "proc_1" } as never,
+      manager,
+    );
+
+    const toolResult = {
+      content: [{ type: "text", text: content }],
+      details,
+    };
+
+    expect(Buffer.byteLength(content, "utf8")).toBeLessThanOrEqual(
+      MAX_OUTPUT_BYTES,
+    );
+    expect(Buffer.byteLength(JSON.stringify(toolResult), "utf8")).toBeLessThan(
+      128 * 1024,
+    );
   });
 });
+
+/**
+ * Return the content text before the footer block so stream-filtering
+ * assertions are not confused by the labeled log-path footer.
+ */
+function contentBeforeFooter(content: string): string {
+  const footerIdx = content.indexOf("\n[");
+  return footerIdx === -1 ? content : content.slice(0, footerIdx);
+}

@@ -1,3 +1,9 @@
+import {
+  formatSize,
+  type TruncationResult,
+  truncateTail,
+} from "@earendil-works/pi-coding-agent";
+
 import type { ProcessManager } from "../../../../src/manager";
 import { stripAnsi } from "../../../../src/utils";
 import type { LineMatchMode } from "../../../../src/utils/match-line";
@@ -12,6 +18,9 @@ import {
   type ProcessOutputStream,
 } from "../schema";
 
+const MAX_OUTPUT_CONTENT_JSON_BYTES = 96 * 1024;
+const MAX_OUTPUT_PROCESS_NAME_BYTES = 256;
+
 export interface OutputDetails {
   action: "output";
   id: string;
@@ -21,16 +30,27 @@ export interface OutputDetails {
   tailLines: number;
   pattern: string | null;
   mode: ProcessOutputMatchMode;
-  stdout: string[];
-  stderr: string[];
   stdoutFile: string;
   stderrFile: string;
+  truncation?: OutputTruncationDetails;
+}
+
+export type OutputTruncationDetails = Omit<TruncationResult, "content">;
+
+interface OutputSelection {
+  stdout: string[];
+  stderr: string[];
+}
+
+export interface OutputExecutionResult {
+  content: string;
+  details: OutputDetails;
 }
 
 export function executeOutput(
   params: ProcessesParamsType,
   manager: ProcessManager,
-): OutputDetails {
+): OutputExecutionResult {
   if (!params.id) {
     throw new Error("process output requires id");
   }
@@ -61,8 +81,8 @@ export function executeOutput(
   }
 
   // Apply stream filter
-  let stdout = stream === "stderr" ? [] : output.stdout;
-  let stderr = stream === "stdout" ? [] : output.stderr;
+  let stdout: string[] = stream === "stderr" ? [] : output.stdout;
+  let stderr: string[] = stream === "stdout" ? [] : output.stderr;
 
   // Apply pattern filter (filter first, then tail)
   if (pattern) {
@@ -75,112 +95,196 @@ export function executeOutput(
   stdout = stdout.slice(-tailLines);
   stderr = stderr.slice(-tailLines);
 
-  return {
-    action: "output",
+  const selection: OutputSelection = { stdout, stderr };
+  const processName = formatProcessName(process.name);
+
+  const contentParts = formatOutputContent({
+    processName,
     id: process.id,
-    processName: process.name,
     processStatus: output.status,
     stream,
     tailLines,
     pattern,
     mode,
-    stdout,
-    stderr,
+    ...selection,
+  });
+
+  const { content, truncation } = buildBoundedOutput(contentParts, {
+    stdoutFile: process.stdoutFile,
+    stderrFile: process.stderrFile,
+  });
+
+  const details: OutputDetails = {
+    action: "output",
+    id: process.id,
+    processName,
+    processStatus: output.status,
+    stream,
+    tailLines,
+    pattern,
+    mode,
     stdoutFile: process.stdoutFile,
     stderrFile: process.stderrFile,
   };
+
+  if (truncation.truncated) {
+    const { content: _content, ...truncationDetails } = truncation;
+    details.truncation = truncationDetails;
+  }
+
+  return { content, details };
 }
 
-export function formatOutputDetails(details: OutputDetails): string {
-  const parts: string[] = [];
+interface OutputContentInput extends OutputSelection {
+  processName: string;
+  id: string;
+  processStatus: string;
+  stream: ProcessOutputStream;
+  tailLines: number;
+  pattern: string | null;
+  mode: ProcessOutputMatchMode;
+}
 
-  parts.push(
-    `"${details.processName}" (${details.id}) [${details.processStatus}]`,
-  );
+interface OutputContentParts {
+  header: string;
+  body: string;
+  guidance: string | null;
+}
 
-  if (details.pattern) {
-    const modeTag = details.mode === "regex" ? " (regex)" : "";
-    parts.push(`filter: ${details.pattern}${modeTag}`);
+function formatOutputContent(input: OutputContentInput): OutputContentParts {
+  const header: string[] = [];
+  header.push(`"${input.processName}" (${input.id}) [${input.processStatus}]`);
+
+  if (input.pattern) {
+    const modeTag = input.mode === "regex" ? " (regex)" : "";
+    header.push(`filter: ${input.pattern}${modeTag}`);
   }
 
-  if (details.stdout.length > 0) {
-    parts.push("", "stdout:");
-    parts.push(...details.stdout.map(stripAnsi));
+  const body: string[] = [];
+  const { stdout, stderr } = input;
+
+  if (stdout.length > 0) {
+    body.push("stdout:");
+    body.push(...stdout.map(stripAnsi));
   }
 
-  if (details.stderr.length > 0) {
-    parts.push("", "stderr:");
-    parts.push(...details.stderr.map(stripAnsi));
+  if (stderr.length > 0) {
+    if (body.length > 0) body.push("");
+    body.push("stderr:");
+    body.push(...stderr.map(stripAnsi));
   }
 
-  if (details.stdout.length === 0 && details.stderr.length === 0) {
-    if (details.pattern) {
-      parts.push("", "No matching lines found.");
-    } else {
-      parts.push("", "No output yet.");
-    }
+  if (stdout.length === 0 && stderr.length === 0) {
+    body.push(input.pattern ? "No matching lines found." : "No output yet.");
   }
 
-  if (details.processStatus === "running") {
-    parts.push("", "Process is still running. Use watches instead of polling.");
-  }
+  return {
+    header: header.join("\n"),
+    body: body.join("\n"),
+    guidance:
+      input.processStatus === "running"
+        ? "Process is still running. Use watches instead of polling."
+        : null,
+  };
+}
 
-  const fullText = parts.join("\n");
-  return truncateOutputText(fullText, {
-    stdoutFile: details.stdoutFile,
-    stderrFile: details.stderrFile,
+function buildBoundedOutput(
+  parts: OutputContentParts,
+  logFiles: { stdoutFile: string; stderrFile: string },
+): { content: string; truncation: TruncationResult } {
+  let maxBodyBytes = MAX_OUTPUT_BYTES;
+  let maxBodyLines = MAX_OUTPUT_TAIL_LINES;
+  let truncation = truncateTail(parts.body, {
+    maxBytes: maxBodyBytes,
+    maxLines: maxBodyLines,
   });
+  let content = composeOutputContent(parts, truncation, logFiles);
+
+  // The header, guidance, truncation notice, and log paths are part of the
+  // persisted content limit. JSON escaping can expand control characters, so
+  // keep the serialized content bounded too. Reduce the body budget until the
+  // complete result fits while keeping the newest output.
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const excessBytes = Buffer.byteLength(content, "utf8") - MAX_OUTPUT_BYTES;
+    const excessLines = countLines(content) - MAX_OUTPUT_TAIL_LINES;
+    const excessJsonBytes =
+      Buffer.byteLength(JSON.stringify(content), "utf8") -
+      MAX_OUTPUT_CONTENT_JSON_BYTES;
+    if (excessBytes <= 0 && excessLines <= 0 && excessJsonBytes <= 0) {
+      return { content, truncation };
+    }
+
+    maxBodyBytes = Math.max(0, maxBodyBytes - Math.max(0, excessBytes));
+    if (excessJsonBytes > 0) {
+      maxBodyBytes = Math.floor(maxBodyBytes / 2);
+    }
+    maxBodyLines = Math.max(1, maxBodyLines - Math.max(0, excessLines));
+    truncation = truncateTail(parts.body, {
+      maxBytes: maxBodyBytes,
+      maxLines: maxBodyLines,
+    });
+    content = composeOutputContent(parts, truncation, logFiles);
+  }
+
+  // Pathological metadata can consume the whole budget. Keep the final tail,
+  // which contains the truncation notice and complete-log paths, bounded.
+  const finalTruncation = truncateTail(content, {
+    maxBytes: MAX_OUTPUT_BYTES,
+    maxLines: MAX_OUTPUT_TAIL_LINES,
+  });
+  return { content: finalTruncation.content, truncation };
 }
 
-/**
- * Truncate output text from the tail (keep the last N lines / bytes).
- * When truncated, appends a notice pointing to the log files.
- */
-function truncateOutputText(
-  text: string,
+function composeOutputContent(
+  parts: OutputContentParts,
+  truncation: TruncationResult,
   logFiles: { stdoutFile: string; stderrFile: string },
 ): string {
-  const totalBytes = Buffer.byteLength(text, "utf-8");
-  const lines = text.split("\n");
-  const totalLines = lines.length;
+  const sections = [parts.header, truncation.content];
 
-  if (totalLines <= MAX_OUTPUT_TAIL_LINES && totalBytes <= MAX_OUTPUT_BYTES) {
-    return text;
+  if (parts.guidance) {
+    sections.push(parts.guidance);
   }
 
-  // Work backwards, collecting lines that fit
-  const kept: string[] = [];
-  let keptBytes = 0;
-  let hitBytes = false;
-
-  for (
-    let i = lines.length - 1;
-    i >= 0 && kept.length < MAX_OUTPUT_TAIL_LINES;
-    i--
-  ) {
-    const line = lines[i] ?? "";
-    const lineBytes =
-      Buffer.byteLength(line, "utf-8") + (kept.length > 0 ? 1 : 0);
-
-    if (keptBytes + lineBytes > MAX_OUTPUT_BYTES) {
-      hitBytes = true;
-      break;
-    }
-
-    kept.unshift(line);
-    keptBytes += lineBytes;
+  if (truncation.truncated) {
+    sections.push(formatTruncationNotice(truncation));
   }
 
-  let result = kept.join("\n");
+  sections.push(
+    `[Complete currently-retained logs:\nstdout=${logFiles.stdoutFile}\nstderr=${logFiles.stderrFile}]`,
+  );
+  return sections.filter((section) => section.length > 0).join("\n\n");
+}
 
-  const shownLines = kept.length;
-  const startLine = totalLines - shownLines + 1;
-  const sizeNote = hitBytes ? ` (${formatSize(MAX_OUTPUT_BYTES)} limit)` : "";
-  result += `\n\n[Showing lines ${startLine}-${totalLines} of ${totalLines}${sizeNote}.`;
-  result += ` Full logs: ${logFiles.stdoutFile} , ${logFiles.stderrFile}`;
-  result += "]";
+function formatTruncationNotice(truncation: TruncationResult): string {
+  const limit =
+    truncation.truncatedBy === "bytes"
+      ? `${formatSize(truncation.maxBytes)} byte limit`
+      : `${truncation.maxLines} line limit`;
+  const partialNote = truncation.lastLinePartial
+    ? " (final line is a partial suffix)"
+    : "";
+  return `[Preview truncated by ${limit}${partialNote}; showing ${truncation.outputLines} lines / ${formatSize(truncation.outputBytes)} of ${truncation.totalLines} lines / ${formatSize(truncation.totalBytes)}.]`;
+}
 
-  return result;
+function countLines(text: string): number {
+  if (text.length === 0) return 0;
+  return text.split("\n").length;
+}
+
+function formatProcessName(name: string): string {
+  const clean = stripAnsi(name).replace(/\s+/gu, " ").trim() || "(unnamed)";
+  if (Buffer.byteLength(clean, "utf8") <= MAX_OUTPUT_PROCESS_NAME_BYTES) {
+    return clean;
+  }
+
+  const suffix = "…";
+  const buffer = Buffer.from(clean, "utf8");
+  let end = MAX_OUTPUT_PROCESS_NAME_BYTES - Buffer.byteLength(suffix, "utf8");
+  while (end > 0 && (buffer[end] ?? 0) >> 6 === 0b10) {
+    end--;
+  }
+  return `${buffer.subarray(0, end).toString("utf8")}${suffix}`;
 }
 
 function clampTailLines(value: number | undefined): number {
@@ -200,10 +304,4 @@ function validateRegex(pattern: string): void {
       `process output pattern is not a valid regular expression: ${message}`,
     );
   }
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes}B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }

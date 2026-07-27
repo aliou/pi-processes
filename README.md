@@ -133,37 +133,21 @@ Enable background command interception in `/ps:settings`. When enabled, Pi avoid
 
 ## Feature demos
 
-**Browse and manage processes from the panel**
+**Watch a file-backed log and recover from an error**
 
-[![Browse and manage processes from the panel](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/process-panel.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/process-panel.mp4)
+[![Watch a file-backed log and recover from an error](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/debug-from-log.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/debug-from-log.mp4)
 
 **Open the log overlay and inspect output**
 
 [![Open the log overlay and inspect output](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/inspect-logs.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/inspect-logs.mp4)
 
-**Show, hide, and use the dock**
-
-[![Show, hide, and use the dock](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/dock-control.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/dock-control.mp4)
-
-**Pin the dock to one process**
-
-[![Pin the dock to one process](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/pin-process.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/pin-process.mp4)
-
 **Stop and clear processes**
 
 [![Stop and clear processes](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/stop-and-clear.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/stop-and-clear.mp4)
 
-**Status widget below the editor**
-
-[![Status widget below the editor](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/status-widget.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/status-widget.mp4)
-
 **Send input to a running process**
 
 [![Send input to a running process](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/send-input.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/send-input.mp4)
-
-**Adjust process extension settings**
-
-[![Adjust process extension settings](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/settings.gif)](https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/settings.mp4)
 
 ## Contributing
 

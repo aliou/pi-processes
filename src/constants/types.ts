@@ -89,14 +89,27 @@ export interface StartOptions {
   logWatches?: LogWatch[];
 }
 
+import type { TruncationDetails } from "../tools/actions/output-truncate";
+
 export interface ProcessesDetails {
   action: ProcessAction;
   success: boolean;
   message: string;
   process?: ProcessInfo;
   processes?: ProcessInfo[];
+  /**
+   * Legacy-only raw output arrays retained so historical session results can
+   * still render. New executions must never populate this field; the bounded
+   * preview lives in tool-result `content` and a truncation summary lives in
+   * `truncation`.
+   */
   output?: { stdout: string[]; stderr: string[]; status: string };
   logFiles?: { stdoutFile: string; stderrFile: string };
+  /**
+   * Metadata only (no raw output) describing how `content` was bounded.
+   * Present when the body exceeded the byte or line limits.
+   */
+  truncation?: TruncationDetails;
   cleared?: number;
 }
 

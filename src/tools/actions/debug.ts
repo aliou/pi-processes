@@ -101,26 +101,33 @@ export function executeDebugPreview(params: DebugParams): ExecuteResult {
   }
 
   if (preview === "output") {
+    const message =
+      '"demo-server" (proc_42) [running]: 4 stdout lines, 2 stderr lines';
+    const content = [
+      message,
+      "stdout:",
+      "starting...",
+      "loading config",
+      "ready on http://localhost:3000",
+      "watching for changes",
+      "",
+      "stderr:",
+      "warn: deprecated option in config",
+      "error: simulated stack trace line",
+      "",
+      "Process is still running. Use watches instead of polling.",
+      "",
+      "[Complete currently-retained logs:",
+      "stdout=/tmp/pi-processes-demo/proc_42-stdout.log",
+      "stderr=/tmp/pi-processes-demo/proc_42-stderr.log]",
+    ].join("\n");
+
     return {
-      content: [{ type: "text", text: "Debug preview: output" }],
+      content: [{ type: "text", text: content }],
       details: {
         action: "output",
         success: true,
-        message:
-          '"demo-server" (proc_42) [running]: 4 stdout lines, 2 stderr lines',
-        output: {
-          status: "running",
-          stdout: [
-            "starting...",
-            "loading config",
-            "ready on http://localhost:3000",
-            "watching for changes",
-          ],
-          stderr: [
-            "warn: deprecated option in config",
-            "error: simulated stack trace line",
-          ],
-        },
+        message,
         logFiles: {
           stdoutFile: "/tmp/pi-processes-demo/proc_42-stdout.log",
           stderrFile: "/tmp/pi-processes-demo/proc_42-stderr.log",

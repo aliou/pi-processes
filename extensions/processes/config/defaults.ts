@@ -8,17 +8,17 @@ export const DEFAULT_CONFIG: ProcessProtocolConfig = {
     blockBackgroundCommands: false,
   },
   processList: {
-    maxPreviewLines: 24,
-    maxVisibleProcesses: 12,
+    maxPreviewLines: 12,
+    maxVisibleProcesses: 8,
   },
   output: {
     defaultTailLines: 100,
-    maxOutputLines: 2000,
+    maxOutputLines: 200,
     maxOutputBytes: 4 * 1024 * 1024,
   },
   follow: {
     enabledByDefault: true,
-    autoHideOnFinish: false,
+    autoHideOnFinish: true,
   },
   widget: {
     showStatusWidget: false,

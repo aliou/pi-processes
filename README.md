@@ -59,7 +59,7 @@ From there you can:
 
 ## Inspect logs
 
-Use `/ps:logs [id|name]` to open the log overlay for one process. The viewer is cached per process, so switching tabs preserves scroll position and follow mode.
+Use `/ps:logs [id]` to open the log overlay for one process. The viewer is cached per process, so switching tabs preserves scroll position and follow mode.
 
 This is useful when Pi started a server, watcher, or local API and you want to follow what it is doing in more detail.
 
@@ -71,7 +71,7 @@ The dock gives you a compact live view without leaving the conversation.
 
 ## Pin one process
 
-Use `/ps:pin [id|name]` to keep the dock focused on one process.
+Use `/ps:pin [id]` to keep the dock focused on one process.
 
 This is useful when one process matters more than the others, such as a dev server or a test watcher.
 
@@ -79,7 +79,7 @@ Without arguments, Pi shows a picker.
 
 ## Stop and clear processes
 
-Use `/ps:kill [id|name]` to stop a running process, and `/ps:clear` to remove finished entries from the panel and free their log storage.
+Use `/ps:kill [id]` to stop a running process, and `/ps:clear` to remove finished entries from the panel and free their log storage.
 
 `/ps:kill` waits for the process to actually exit (or time out), so the result it reports reflects what happened. Without arguments, Pi shows a picker.
 

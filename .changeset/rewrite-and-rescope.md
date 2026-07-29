@@ -21,7 +21,7 @@ Rewrite `@aliou/pi-processes` into a pi-agnostic core plus three focused Pi exte
 
 ## Better log watches
 
-- Watches are manageable at runtime via the new `process update` action: add or remove watches on a running process without restarting it.
+- Watches are manageable at runtime via the new `process update` action: add, replace, remove, or clear watches on a running process without restarting it.
 - `start` and `list` output show active watches, and the `/ps:logs` overlay highlights matches.
 - Stale log-match notifications are suppressed after a process ends or is cleared — watches are unregistered on `process_ended`, so belated output events for a cleared id short-circuit instead of flooding the conversation. Closes #54.
 - Empty match patterns (literal and regex) are rejected at `start`.
@@ -33,7 +33,7 @@ Seven actions: `start`, `list`, `output`, `update`, `write`, `stop`, `clear`.
 - `start` restores the `cwd` parameter.
 - `output` filters by stream (stdout/stderr/both) and matches patterns.
 - `write` sends stdin and optionally closes it; no-op calls are rejected.
-- `clear` stops and removes a process.
+- `clear` removes finished process entries.
 
 ## `/ps:logs` overlay
 
@@ -54,7 +54,7 @@ Seven actions: `start`, `list`, `output`, `update`, `write`, `stop`, `clear`.
 
 ## Notifications
 
-- Configurable events (`onSuccess`/`onFailure`/`onKilled`) with attention context (`context`/`block`). Defaults: `onKilled` = `context`, `blockBackgroundCommands` = `false`.
+- Configurable events (`onSuccess`/`onFailure`/`onKilled`) with attention levels (`turn`/`context`/`ignore`). Defaults: `onKilled` = `context`, `blockBackgroundCommands` = `false`.
 - Log-watch alerts fan out and are highlighted in the overlay; the dead `timeout` kind is removed.
 
 ## Intentional changes
@@ -75,4 +75,4 @@ Seven actions: `start`, `list`, `output`, `update`, `write`, `stop`, `clear`.
 
 ## Tooling
 
-- Targets Pi 0.80.3. 427 tests pass; typecheck and lint clean. Tests are excluded from published files.
+- Targets Pi 0.80.3. 508 unit tests and 6 e2e tests pass; typecheck and lint clean. Tests are excluded from published files.

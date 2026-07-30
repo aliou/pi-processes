@@ -35,7 +35,7 @@ export interface LogWatch {
 export interface ProcessInfo {
   id: string;
   name: string;
-  pid: number; // On Unix, this is also the PGID (process group leader)
+  pid: number; // Positive Unix PID/PGID when spawned; 0 when unavailable
   command: string;
   cwd: string;
   startTime: number;

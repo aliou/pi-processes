@@ -54,6 +54,8 @@ describe("executeStart", () => {
 
     expect(result.details.success).toBe(false);
     expect(result.details.process?.error).toContain("ENOENT");
+    expect(result.details.process?.pid).toBe(0);
+    expect(JSON.stringify(result.details)).not.toContain('"pid":-1');
     expect(text).toContain("Failed to start");
     expect(text).toContain("ENOENT");
     expect(text).not.toContain("Started");
@@ -75,6 +77,8 @@ describe("executeStart", () => {
 
     expect(result.details.success).toBe(false);
     expect(result.details.process?.status).toBe("exited");
+    expect(result.details.process?.pid).toBe(0);
+    expect(JSON.stringify(result.details)).not.toContain('"pid":-1');
     expect(resultText(result)).toContain("ENOENT");
     expect(resultText(result)).not.toContain("Started");
     expect(resultText(result)).not.toContain("PID: -1");

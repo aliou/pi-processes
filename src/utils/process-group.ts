@@ -3,6 +3,8 @@
  * Uses signal 0 to test existence without actually sending a signal.
  */
 export function isProcessGroupAlive(pgid: number): boolean {
+  if (!Number.isInteger(pgid) || pgid <= 0) return false;
+
   try {
     process.kill(-pgid, 0);
     return true;
@@ -18,5 +20,9 @@ export function isProcessGroupAlive(pgid: number): boolean {
  * Negative PID targets the process group.
  */
 export function killProcessGroup(pgid: number, signal: NodeJS.Signals): void {
+  if (!Number.isInteger(pgid) || pgid <= 0) {
+    throw new RangeError("Process group ID must be a positive integer");
+  }
+
   process.kill(-pgid, signal);
 }

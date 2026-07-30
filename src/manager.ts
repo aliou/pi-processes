@@ -209,7 +209,7 @@ export class ProcessManager {
     const managed: ManagedProcess = {
       id,
       name,
-      pid: child.pid ?? -1,
+      pid: child.pid ?? 0,
       command,
       cwd,
       startTime: Date.now(),
@@ -260,7 +260,7 @@ export class ProcessManager {
     const initialized = new Promise<void>((resolve) => {
       const onSpawn = (): void => {
         child.off("error", onInitializationError);
-        managed.pid = child.pid ?? -1;
+        managed.pid = child.pid ?? 0;
         if (managed.pid <= 0) {
           handleProcessError(new Error("Process spawned without a valid PID"));
         } else {
@@ -412,7 +412,7 @@ export class ProcessManager {
         info: {
           id,
           name: "(unknown)",
-          pid: -1,
+          pid: 0,
           command: "",
           cwd: "",
           startTime: 0,
@@ -438,6 +438,14 @@ export class ProcessManager {
 
     if (!LIVE_STATUSES.has(managed.status)) {
       return { ok: true, info: this.toProcessInfo(managed) };
+    }
+
+    if (managed.pid <= 0) {
+      return {
+        ok: false,
+        info: this.toProcessInfo(managed),
+        reason: "error",
+      };
     }
 
     this.transition(managed, "terminating");
@@ -557,7 +565,7 @@ export class ProcessManager {
 
   shutdownKillAll(): void {
     for (const p of this.processes.values()) {
-      if (!LIVE_STATUSES.has(p.status)) continue;
+      if (!LIVE_STATUSES.has(p.status) || p.pid <= 0) continue;
       try {
         killProcessGroup(p.pid, "SIGKILL");
       } catch {
@@ -583,7 +591,7 @@ export class ProcessManager {
     this.lastOutputEmitAt.clear();
 
     for (const p of this.processes.values()) {
-      if (!LIVE_STATUSES.has(p.status)) continue;
+      if (!LIVE_STATUSES.has(p.status) || p.pid <= 0) continue;
       try {
         killProcessGroup(p.pid, "SIGKILL");
       } catch {

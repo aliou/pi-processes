@@ -110,10 +110,14 @@ export function renderListResult(
 
   for (const process of processes) {
     const status = formatStatusTag(process, theme);
+    const processStatus =
+      process.pid > 0
+        ? `pid: ${process.pid}   status: ${status}`
+        : `status: ${status}`;
     lines.push(
       [
         `- ${theme.fg("accent", process.name)} ${theme.fg("muted", `(${process.id})`)}`,
-        `  pid: ${process.pid}   status: ${status}`,
+        `  ${processStatus}`,
         `  started: ${theme.fg("muted", formatTimestamp(process.startTime))}`,
         `  ended:   ${theme.fg("muted", formatTimestamp(process.endTime))}`,
         `  runtime: ${theme.fg("muted", formatRuntime(process.startTime, process.endTime))}`,

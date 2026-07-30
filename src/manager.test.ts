@@ -3,9 +3,10 @@ import { EventEmitter } from "node:events";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { LIVE_STATUSES, type ManagerEvent } from "./constants";
 import { ProcessManager } from "./manager";
+import { killProcessGroup } from "./utils";
 
 function waitForEnd(manager: ProcessManager, id: string): Promise<void> {
   return new Promise((resolve) => {
@@ -62,7 +63,7 @@ describe("process initialization", () => {
     const info = await manager.start("missing-cwd", "true", "/missing");
 
     expect(info).toMatchObject({
-      pid: -1,
+      pid: 0,
       status: "exited",
       exitCode: -1,
       success: false,
@@ -78,6 +79,26 @@ describe("process initialization", () => {
     expect(
       events.filter((event) => event.type === "process_ended"),
     ).toHaveLength(1);
+  });
+
+  it("never signals an invalid process group during initialization", async () => {
+    manager = new ProcessManager({
+      spawnCommand: () =>
+        childThatFailsOnNextTick(new Error("spawn initialization failed")),
+    });
+    const processKill = vi.spyOn(process, "kill");
+
+    const start = manager.start("missing-cwd", "true", "/missing");
+    manager.shutdownKillAll();
+    manager.cleanup();
+    const info = await start;
+
+    expect(processKill).not.toHaveBeenCalled();
+    expect(info.pid).toBe(0);
+    expect(() => killProcessGroup(0, "SIGKILL")).toThrow(RangeError);
+    expect(() => killProcessGroup(-1, "SIGKILL")).toThrow(RangeError);
+    expect(processKill).not.toHaveBeenCalled();
+    processKill.mockRestore();
   });
 
   it("returns retained failure details if an end listener clears the record", async () => {

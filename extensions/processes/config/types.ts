@@ -53,6 +53,8 @@ export interface WidgetConfig {
 export interface ProcessConfig {
   /** JSON Schema URL used by editors for validation and autocomplete. */
   $schema?: string;
+  /** Config migration marker written after v0.10.0 settings migration. */
+  version?: string;
   /** Process execution settings. */
   execution?: ExecutionConfig;
   /** Shell-command interception settings. */

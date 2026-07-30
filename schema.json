@@ -82,6 +82,10 @@
           "$ref": "#/definitions/ProcessListConfig",
           "description": "Process overview and log viewport settings."
         },
+        "version": {
+          "description": "Config migration marker written after v0.10.0 settings migration.",
+          "type": "string"
+        },
         "widget": {
           "$ref": "#/definitions/WidgetConfig",
           "description": "Dock and status widget settings."

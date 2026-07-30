@@ -51,6 +51,7 @@ Seven actions: `start`, `list`, `output`, `update`, `write`, `stop`, `clear`.
 
 - `/ps:settings` covers process-list, output, dock, follow, status-widget, and interception options, persisted across sessions.
 - Imports the legacy `process.json` on first run and migrates v0.9.4 settings forward to v0.10.0, preserving `widget.showStatusWidget`.
+- Stamps migrated `processes.json` files with `version: "0.10.0"`, so future migrations can key off an explicit config version instead of inferring from shape.
 
 ## Notifications
 

@@ -2,6 +2,7 @@ import type { Migration } from "@aliou/pi-utils-settings";
 
 import type { ProcessConfig } from "../types";
 import { configV094ToV0100Migration } from "./001-v0-9-4-to-v0-10-0-config";
+import { configVersionStampMigration } from "./002-stamp-v0-10-0-config-version";
 
 export { importLegacyProcessConfig } from "./000-import-legacy-process-config";
 export {
@@ -11,7 +12,14 @@ export {
   migrateConfigV094ToV0100,
   needsConfigV094ToV0100Migration,
 } from "./001-v0-9-4-to-v0-10-0-config";
+export {
+  configVersionStampMigration,
+  needsConfigVersionStamp,
+  PROCESS_CONFIG_VERSION,
+  stampConfigVersion,
+} from "./002-stamp-v0-10-0-config-version";
 
 export const migrations: Migration<ProcessConfig>[] = [
   configV094ToV0100Migration,
+  configVersionStampMigration,
 ];

@@ -33,6 +33,7 @@ function mockProcess(overrides?: Partial<ProcessInfo>): ProcessInfo {
     status: "running",
     exitCode: null,
     success: null,
+    error: null,
     stdoutFile: "/tmp/pi-processes-demo/proc_42-stdout.log",
     stderrFile: "/tmp/pi-processes-demo/proc_42-stderr.log",
     alertOnSuccess: false,

@@ -43,6 +43,7 @@ export interface ProcessInfo {
   status: ProcessStatus;
   exitCode: number | null;
   success: boolean | null; // null if running, true if exit code 0, false otherwise
+  error?: string | null; // absent in historical records, null unless a child error occurred
   stdoutFile: string;
   stderrFile: string;
   alertOnSuccess: boolean;

@@ -76,6 +76,22 @@ export function renderStartResult(
   const { details } = result;
   const process = details.process;
 
+  if (!details.success) {
+    return new ToolBody(
+      {
+        fields: [
+          {
+            label: "Error",
+            value: details.message,
+            showCollapsed: true,
+          },
+        ],
+      },
+      options,
+      theme,
+    );
+  }
+
   if (!process) {
     return new ToolBody(
       {
@@ -121,11 +137,11 @@ export function renderStartResult(
   return new ToolBody({ fields }, options, theme);
 }
 
-export function executeStart(
+export async function executeStart(
   params: StartParams,
   manager: ProcessManager,
   ctx: ExtensionContext,
-): ExecuteResult {
+): Promise<ExecuteResult> {
   if (!params.name) {
     return {
       content: [{ type: "text", text: "Missing required parameter: name" }],
@@ -159,25 +175,44 @@ export function executeStart(
     };
   }
 
-  let proc: ReturnType<ProcessManager["start"]>;
+  let proc: Awaited<ReturnType<ProcessManager["start"]>>;
   try {
-    proc = manager.start(params.name, params.command, params.cwd ?? ctx.cwd, {
-      alertOnSuccess: params.alertOnSuccess,
-      alertOnFailure: params.alertOnFailure,
-      alertOnKill: params.alertOnKill,
-      logWatches: params.logWatches,
-    });
+    proc = await manager.start(
+      params.name,
+      params.command,
+      params.cwd ?? ctx.cwd,
+      {
+        alertOnSuccess: params.alertOnSuccess,
+        alertOnFailure: params.alertOnFailure,
+        alertOnKill: params.alertOnKill,
+        logWatches: params.logWatches,
+      },
+    );
   } catch (error) {
     const message =
       error instanceof Error
-        ? `Invalid start options: ${error.message}`
-        : "Invalid start options";
+        ? `Failed to start "${params.name}": ${error.message}`
+        : `Failed to start "${params.name}"`;
     return {
       content: [{ type: "text", text: message }],
       details: {
         action: "start",
         success: false,
         message,
+      },
+    };
+  }
+
+  if (proc.error || proc.pid <= 0) {
+    const reason = proc.error ?? "process did not receive a valid PID";
+    const message = `Failed to start "${proc.name}" (${proc.id}): ${reason}`;
+    return {
+      content: [{ type: "text", text: message }],
+      details: {
+        action: "start",
+        success: false,
+        message,
+        process: proc,
       },
     };
   }

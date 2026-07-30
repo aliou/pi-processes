@@ -1,15 +1,26 @@
+import type { ChildProcess } from "node:child_process";
+import { EventEmitter } from "node:events";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { ManagerEvent } from "./constants";
+import { LIVE_STATUSES, type ManagerEvent } from "./constants";
 import { ProcessManager } from "./manager";
 
 function waitForEnd(manager: ProcessManager, id: string): Promise<void> {
   return new Promise((resolve) => {
-    const unsub = manager.onEvent((e) => {
-      if (e.type === "process_ended" && e.info.id === id) {
+    const unsub = manager.onEvent((event) => {
+      if (event.type === "process_ended" && event.info.id === id) {
         unsub();
         resolve();
       }
     });
+
+    const process = manager.get(id);
+    if (process && !LIVE_STATUSES.has(process.status)) {
+      unsub();
+      resolve();
+    }
   });
 }
 
@@ -19,6 +30,95 @@ function collectEvents(manager: ProcessManager): ManagerEvent[] {
   manager.onEvent((e) => events.push(e));
   return events;
 }
+
+function childThatFailsOnNextTick(error: Error): ChildProcess {
+  const child = Object.assign(new EventEmitter(), {
+    pid: undefined,
+    stdin: null,
+    stdout: null,
+    stderr: null,
+    unref: () => child,
+  });
+  process.nextTick(() => child.emit("error", error));
+  return child as unknown as ChildProcess;
+}
+
+describe("process initialization", () => {
+  let manager: ProcessManager;
+
+  afterEach(() => {
+    manager.cleanup();
+  });
+
+  it("records an asynchronous spawn error and emits one terminal event", async () => {
+    const spawnError = Object.assign(new Error("spawn /bin/bash ENOENT"), {
+      code: "ENOENT",
+    });
+    manager = new ProcessManager({
+      spawnCommand: () => childThatFailsOnNextTick(spawnError),
+    });
+    const events = collectEvents(manager);
+
+    const info = await manager.start("missing-cwd", "true", "/missing");
+
+    expect(info).toMatchObject({
+      pid: -1,
+      status: "exited",
+      exitCode: -1,
+      success: false,
+      error: "spawn /bin/bash ENOENT",
+    });
+    expect(manager.get(info.id)?.error).toBe("spawn /bin/bash ENOENT");
+    expect(manager.getFullOutput(info.id)?.stderr).toContain(
+      "Process error: spawn /bin/bash ENOENT",
+    );
+    expect(events.filter((event) => event.type === "process_started")).toEqual(
+      [],
+    );
+    expect(
+      events.filter((event) => event.type === "process_ended"),
+    ).toHaveLength(1);
+  });
+
+  it("returns retained failure details if an end listener clears the record", async () => {
+    manager = new ProcessManager({
+      spawnCommand: () =>
+        childThatFailsOnNextTick(new Error("spawn initialization failed")),
+    });
+    manager.onEvent((event) => {
+      if (event.type === "process_ended") manager.clearFinished();
+    });
+
+    const info = await manager.start("racy-start", "true", "/missing");
+
+    expect(manager.get(info.id)).toBeNull();
+    expect(info.error).toBe("spawn initialization failed");
+    expect(info.success).toBe(false);
+  });
+
+  it("reports a real missing cwd while an existing cwd starts successfully", async () => {
+    manager = new ProcessManager();
+    const parent = mkdtempSync(join(tmpdir(), "pi-processes-cwd-"));
+
+    try {
+      const failed = await manager.start(
+        "missing-cwd",
+        "true",
+        join(parent, "missing"),
+      );
+      expect(failed.success).toBe(false);
+      expect(failed.error).toContain("ENOENT");
+
+      const started = await manager.start("existing-cwd", "sleep 0.1", parent);
+      expect(started.pid).toBeGreaterThan(0);
+      expect(started.status).toBe("running");
+      expect(started.error).toBeNull();
+    } finally {
+      manager.cleanup();
+      rmSync(parent, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("process_output_changed", () => {
   let manager: ProcessManager;
@@ -30,7 +130,7 @@ describe("process_output_changed", () => {
   it("emits process_output_changed on stdout", async () => {
     manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "echo hello", "/tmp");
+    const info = await manager.start("test", "echo hello", "/tmp");
     await waitForEnd(manager, info.id);
 
     const outputEvents = events.filter(
@@ -46,7 +146,7 @@ describe("process_output_changed", () => {
   it("emits process_output_changed on stderr", async () => {
     manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "echo err >&2", "/tmp");
+    const info = await manager.start("test", "echo err >&2", "/tmp");
     await waitForEnd(manager, info.id);
 
     const outputEvents = events.filter(
@@ -62,7 +162,7 @@ describe("process_output_changed", () => {
   it("throttles rapid output", async () => {
     manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "seq 1 200", "/tmp");
+    const info = await manager.start("test", "seq 1 200", "/tmp");
     await waitForEnd(manager, info.id);
 
     const outputEvents = events.filter(
@@ -78,7 +178,7 @@ describe("process_output_changed", () => {
 
     // Dual-stream burst: writes to both stdout and stderr rapidly
     const events2 = collectEvents(manager);
-    const info2 = manager.start(
+    const info2 = await manager.start(
       "dual",
       "bash -c 'for i in $(seq 1 50); do echo out$i; echo err$i >&2; done'",
       "/tmp",
@@ -95,7 +195,7 @@ describe("process_output_changed", () => {
   it("trailing emit fires after burst ends", async () => {
     manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "seq 1 100", "/tmp");
+    const info = await manager.start("test", "seq 1 100", "/tmp");
     await waitForEnd(manager, info.id);
 
     // There should be at least one output event, and a process_ended event
@@ -110,7 +210,7 @@ describe("process_output_changed", () => {
   it("final output event before process_ended", async () => {
     manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "echo hello", "/tmp");
+    const info = await manager.start("test", "echo hello", "/tmp");
     await waitForEnd(manager, info.id);
 
     let lastOutputIdx = -1;
@@ -130,7 +230,7 @@ describe("process_output_changed", () => {
   it("no output events for silent process", async () => {
     manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "true", "/tmp");
+    const info = await manager.start("test", "true", "/tmp");
     await waitForEnd(manager, info.id);
 
     // Wait a bit for any stale trailing emits
@@ -144,7 +244,7 @@ describe("process_output_changed", () => {
 
   it("no stale events after clearFinished", async () => {
     manager = new ProcessManager();
-    const info = manager.start("test", "seq 1 50", "/tmp");
+    const info = await manager.start("test", "seq 1 50", "/tmp");
     await waitForEnd(manager, info.id);
 
     manager.clearFinished();
@@ -164,8 +264,8 @@ describe("process_output_changed", () => {
     manager = new ProcessManager();
     const events = collectEvents(manager);
 
-    const info1 = manager.start("proc1", "echo one", "/tmp");
-    const info2 = manager.start("proc2", "echo two", "/tmp");
+    const info1 = await manager.start("proc1", "echo one", "/tmp");
+    const info2 = await manager.start("proc2", "echo two", "/tmp");
 
     await Promise.all([
       waitForEnd(manager, info1.id),
@@ -207,7 +307,7 @@ describe("process_watch_matched", () => {
     manager = new ProcessManager();
     const events = collectEvents(manager);
 
-    const info = manager.start(
+    const info = await manager.start(
       "watch-once",
       "bash -c 'echo ready; echo ready; echo ready'",
       "/tmp",
@@ -234,7 +334,7 @@ describe("process_watch_matched", () => {
     manager = new ProcessManager();
     const events = collectEvents(manager);
 
-    const info = manager.start(
+    const info = await manager.start(
       "watch-repeat",
       "bash -c 'echo done; echo done; echo done'",
       "/tmp",
@@ -253,7 +353,7 @@ describe("process_watch_matched", () => {
     manager = new ProcessManager();
     const events = collectEvents(manager);
 
-    const info = manager.start(
+    const info = await manager.start(
       "watch-stream",
       "bash -c 'echo out; echo err >&2'",
       "/tmp",
@@ -278,7 +378,7 @@ describe("process_watch_matched", () => {
     manager = new ProcessManager();
     const events = collectEvents(manager);
 
-    const info = manager.start(
+    const info = await manager.start(
       "watch-both",
       "bash -c 'echo marker; echo marker >&2'",
       "/tmp",
@@ -309,7 +409,7 @@ describe("process_watch_matched", () => {
     manager = new ProcessManager();
     const events = collectEvents(manager);
 
-    const info = manager.start("watch-trailing", "printf ready", "/tmp", {
+    const info = await manager.start("watch-trailing", "printf ready", "/tmp", {
       logWatches: [{ pattern: "ready" }],
     });
 
@@ -319,13 +419,13 @@ describe("process_watch_matched", () => {
     expect(matches).toHaveLength(1);
   });
 
-  it("throws for invalid watch regex", () => {
+  it("throws for invalid watch regex", async () => {
     manager = new ProcessManager();
 
-    expect(() =>
+    await expect(
       manager.start("bad-watch", "echo ok", "/tmp", {
         logWatches: [{ pattern: "(" }],
       }),
-    ).toThrowError(/Invalid log watch pattern/);
+    ).rejects.toThrowError(/Invalid log watch pattern/);
   });
 });

@@ -47,6 +47,7 @@ interface ManagedProcess extends ProcessInfo {
 
 interface ProcessManagerOptions {
   getConfiguredShellPath?: () => string | undefined;
+  spawnCommand?: typeof spawnCommand;
 }
 
 export class ProcessManager {
@@ -56,6 +57,7 @@ export class ProcessManager {
   private events = new EventEmitter();
   private watcher: ReturnType<typeof setInterval> | null = null;
   private getConfiguredShellPath: () => string | undefined;
+  private spawnCommand: typeof spawnCommand;
 
   private lastOutputEmitAt: Map<string, number> = new Map();
   private pendingOutputEmit: Map<string, NodeJS.Timeout> = new Map();
@@ -65,6 +67,7 @@ export class ProcessManager {
     mkdirSync(this.logDir, { recursive: true });
     this.getConfiguredShellPath =
       options?.getConfiguredShellPath ?? (() => undefined);
+    this.spawnCommand = options?.spawnCommand ?? spawnCommand;
   }
 
   onEvent(listener: (event: ManagerEvent) => void): () => void {
@@ -181,12 +184,12 @@ export class ProcessManager {
     }
   }
 
-  start(
+  async start(
     name: string,
     command: string,
     cwd: string,
     options?: StartOptions,
-  ): ProcessInfo {
+  ): Promise<ProcessInfo> {
     const resolvedWatches = this.resolveLogWatches(options?.logWatches);
     const id = `proc_${++this.counter}`;
     const stdoutFile = join(this.logDir, `${id}-stdout.log`);
@@ -197,9 +200,11 @@ export class ProcessManager {
     appendFileSync(stderrFile, "");
     appendFileSync(combinedFile, "");
 
-    const child = spawnCommand(command, cwd, this.getConfiguredShellPath());
-
-    child.unref();
+    const child = this.spawnCommand(
+      command,
+      cwd,
+      this.getConfiguredShellPath(),
+    );
 
     const managed: ManagedProcess = {
       id,
@@ -212,6 +217,7 @@ export class ProcessManager {
       status: "running",
       exitCode: null,
       success: null,
+      error: null,
       stdoutFile,
       stderrFile,
       combinedFile,
@@ -229,18 +235,51 @@ export class ProcessManager {
 
     this.processes.set(id, managed);
 
-    if (!child.pid) {
+    const handleProcessError = (error: Error): void => {
+      managed.error = error.message;
       try {
-        appendFileSync(stderrFile, "Spawn error: missing pid\n");
+        appendFileSync(stderrFile, `Process error: ${error.message}\n`);
       } catch {
         // Ignore
       }
-      managed.exitCode = -1;
-      managed.success = false;
-      managed.endTime = Date.now();
-      this.transition(managed, "exited");
-      return this.toProcessInfo(managed);
-    }
+
+      if (!managed.endTime) {
+        managed.exitCode = -1;
+        managed.success = false;
+        managed.endTime = Date.now();
+        this.flushPendingOutputChanged(id);
+        this.flushPendingLines(managed);
+        this.transition(managed, "exited");
+      }
+    };
+
+    // ChildProcess spawn failures are emitted asynchronously. This listener
+    // must be attached before start reaches its first await or return path.
+    child.on("error", handleProcessError);
+
+    const initialized = new Promise<void>((resolve) => {
+      const onSpawn = (): void => {
+        child.off("error", onInitializationError);
+        managed.pid = child.pid ?? -1;
+        if (managed.pid <= 0) {
+          handleProcessError(new Error("Process spawned without a valid PID"));
+        } else {
+          this.emit({
+            type: "process_started",
+            info: this.toProcessInfo(managed),
+          });
+          this.ensureWatcherRunning();
+        }
+        resolve();
+      };
+      const onInitializationError = (): void => {
+        child.off("spawn", onSpawn);
+        resolve();
+      };
+
+      child.once("spawn", onSpawn);
+      child.once("error", onInitializationError);
+    });
 
     child.stdout?.on("data", (data: Buffer) => {
       try {
@@ -285,26 +324,9 @@ export class ProcessManager {
       }
     });
 
-    child.on("error", (err) => {
-      try {
-        appendFileSync(stderrFile, `Process error: ${err.message}\n`);
-      } catch {
-        // Ignore
-      }
+    child.unref();
 
-      if (!managed.endTime) {
-        managed.exitCode = -1;
-        managed.success = false;
-        managed.endTime = Date.now();
-        this.flushPendingOutputChanged(id);
-        this.flushPendingLines(managed);
-        this.transition(managed, "exited");
-      }
-    });
-
-    this.emit({ type: "process_started", info: this.toProcessInfo(managed) });
-    this.ensureWatcherRunning();
-
+    await initialized;
     return this.toProcessInfo(managed);
   }
 
@@ -398,6 +420,7 @@ export class ProcessManager {
           status: "exited",
           exitCode: null,
           success: false,
+          error: null,
           stdoutFile: "",
           stderrFile: "",
           alertOnSuccess: false,
@@ -740,6 +763,7 @@ export class ProcessManager {
       status: managed.status,
       exitCode: managed.exitCode,
       success: managed.success,
+      error: managed.error,
       stdoutFile: managed.stdoutFile,
       stderrFile: managed.stderrFile,
       alertOnSuccess: managed.alertOnSuccess,

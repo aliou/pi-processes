@@ -27,6 +27,7 @@ function mockProcess(overrides: Partial<ProcessInfo> = {}): ProcessInfo {
     status: "running",
     exitCode: null,
     success: null,
+    error: null,
     stdoutFile: STDOUT_FILE,
     stderrFile: STDERR_FILE,
     alertOnSuccess: false,

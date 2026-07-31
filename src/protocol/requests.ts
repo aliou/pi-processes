@@ -69,6 +69,10 @@ export interface ProcessProtocolConfig {
     dockDefaultState: "closed" | "collapsed" | "expanded";
     dockHeight: number;
   };
+  /** codex-unified-exec gate (edited via /ps:settings, not a process runtime field). */
+  codexExec: {
+    enabled: boolean;
+  };
 }
 
 export interface RequestConfigPayload {

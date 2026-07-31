@@ -2,6 +2,17 @@
   "$ref": "#/definitions/ProcessConfig",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
+    "CodexExecConfig": {
+      "additionalProperties": false,
+      "description": "codex-unified-exec config shape.\n\nThe only codex setting is the host-repo `enabled` gate (not a codex semantic). It lives as a `codexExec` sub-section of the pi-processes config so it is edited through the single /ps:settings command rather than a separate settings command. Codex's runtime caps are constants, not settings (see ../constants).",
+      "properties": {
+        "enabled": {
+          "description": "When true, the extension creates its own ProcessManager instance and registers the unified_exec tools. Defaults to false.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
     "ExecutionConfig": {
       "additionalProperties": false,
       "properties": {
@@ -61,6 +72,10 @@
         "$schema": {
           "description": "JSON Schema URL used by editors for validation and autocomplete.",
           "type": "string"
+        },
+        "codexExec": {
+          "$ref": "#/definitions/CodexExecConfig",
+          "description": "codex-unified-exec gate; edited via /ps:settings."
         },
         "execution": {
           "$ref": "#/definitions/ExecutionConfig",

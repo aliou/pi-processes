@@ -40,6 +40,13 @@ export function buildSections(
         scopedConfig.interception?.blockBackgroundCommands,
         resolved.interception.blockBackgroundCommands,
       ),
+      boolItem(
+        "codexExec.enabled",
+        "Codex unified exec",
+        "Expose the codex unified_exec tools (exec_command, write_stdin) that emulate OpenAI Codex's interactive session model over pi-processes. Disabled by default.",
+        scopedConfig.codexExec?.enabled,
+        resolved.codexExec.enabled,
+      ),
     ],
   };
 

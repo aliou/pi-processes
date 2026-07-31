@@ -25,4 +25,7 @@ export const DEFAULT_CONFIG: ProcessProtocolConfig = {
     dockDefaultState: "closed",
     dockHeight: 12,
   },
+  codexExec: {
+    enabled: false,
+  },
 };

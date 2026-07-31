@@ -530,6 +530,45 @@ describe("process_output_changed", () => {
   });
 });
 
+// --- onRawOutput ---
+
+describe("onRawOutput", () => {
+  it("emits raw stdout chunks before line-splitting/throttling and stays subscribed", async () => {
+    using manager = new ProcessManager();
+    const raw: Buffer[] = [];
+    const unsub = manager.onRawOutput((_id, chunk) =>
+      raw.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)),
+    );
+    const info = manager.start("test", "echo hello", "/tmp");
+    await waitForEnd(manager, info.id);
+
+    expect(Buffer.concat(raw).toString("utf8")).toBe("hello\n");
+
+    // A second subscription receives later output (additive, multi-listener).
+    const raw2: Buffer[] = [];
+    const unsub2 = manager.onRawOutput((_id, chunk) =>
+      raw2.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)),
+    );
+    const info2 = manager.start("test", "echo world", "/tmp");
+    await waitForEnd(manager, info2.id);
+    expect(Buffer.concat(raw2).toString("utf8")).toBe("world\n");
+
+    unsub();
+    unsub2();
+  });
+
+  it("emits raw stderr chunks too (merged stream, no stream tag)", async () => {
+    using manager = new ProcessManager();
+    const raw: Buffer[] = [];
+    manager.onRawOutput((_id, chunk) =>
+      raw.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)),
+    );
+    const info = manager.start("test", "echo err >&2", "/tmp");
+    await waitForEnd(manager, info.id);
+    expect(Buffer.concat(raw).toString("utf8")).toBe("err\n");
+  });
+});
+
 // --- killAll ---
 
 describe("killAll", () => {

@@ -1,4 +1,4 @@
-![banner](https://assets.aliou.me/pi-extensions/banners/pi-processes.png)
+![banner](https://assets.aliou.me/github/aliou/pi-processes/banner-v0.10.x.png)
 
 # pi-processes
 

@@ -53,7 +53,7 @@ Avoid fixed sleeps in both unit and e2e tests. Prefer event-driven helpers that 
 
 - `src/` - pi-agnostic process management (manager, types, protocol, utils). Zero pi imports.
 - `extensions/processes/` - core extension: tool registration, settings, hooks, event bridge, request/command handlers, `/ps` overview panel, `/ps:kill`, `/ps:clear`, `/ps:settings`
-- `extensions/processes/config/migrations/` - ordered settings migrations. Each migration lives in its own file prefixed with its index, such as `001-v0-9-4-to-v0-10-0-config.ts`.
+- `extensions/processes/config/migrations/` - ordered settings migrations. Each migration lives in its own file prefixed with its index, such as `001-v0-9-4-to-v0-10-0-config.ts`. Migrations declare a semver `version` (the loader stamps it after a successful run); the terminal migration in `002-stamp-config-version.ts` exports `PROCESS_CONFIG_VERSION`, which must match the `--version` flag in the `gen:schema` and `check:schema` scripts.
 - `extensions/processes-logs/` - `/ps:logs` command and log overlay
 - `extensions/processes-dock/` - `/ps:dock`, `/ps:pin` commands, dock widget, status widget, `COMMAND_PIN` handler
 - `extensions/shared/` - shared UI helpers used across all three extensions: `ui.ts` (`statusDot`, `processStatusTone`, `LineComponent`), `display-text.ts` (`sanitizeForDisplay`), `truncate.ts` (ANSI-safe `truncateToWidth`), `log-line.ts` (`renderLogLine`), `line-buffer.ts`

@@ -1,7 +1,6 @@
 export { DEFAULT_CONFIG } from "./defaults";
 export {
   configLoader,
-  createSettingsConfigStore,
   drainImportMessages,
   loadProcessConfig,
 } from "./loader";

@@ -6,18 +6,21 @@
  */
 
 import {
+  createConfigStore,
   registerSettingsCommand,
   type SettingsSection,
 } from "@aliou/pi-utils-settings";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import type { ProcessConfig, ProcessProtocolConfig } from "../config";
-import { createSettingsConfigStore } from "../config";
+import { configLoader } from "../config";
 import { applySettingChange } from "./apply-setting-change";
 import { buildSections } from "./build-sections";
 
 export function registerProcessSettings(pi: ExtensionAPI): void {
-  const configStore = createSettingsConfigStore();
+  const configStore = createConfigStore(configLoader, {
+    scopes: ["global", "local", "memory"],
+  });
 
   registerSettingsCommand<ProcessConfig, ProcessProtocolConfig>(pi, {
     commandName: "ps:settings",

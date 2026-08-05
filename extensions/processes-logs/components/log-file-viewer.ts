@@ -2,6 +2,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { sanitizeForDisplay } from "../../shared/display-text";
 import { trimToBudget } from "../../shared/line-buffer";
+import { type LogLineEmphasis, renderLogLine } from "../../shared/log-line";
 import { truncateToWidth } from "../../shared/truncate";
 import type { ProcessLogLine } from "../logs-client";
 
@@ -186,23 +187,15 @@ export class LogFileViewer {
 
     const rendered = visible.slice(start, end).map((line, index) => {
       const visibleIndex = start + index;
-      const text = truncateToWidth(line.text, width, "", true);
-      if (visibleIndex === currentMatchIndex) {
-        return truncateToWidth(
-          this.theme.bold(this.theme.inverse(text)),
-          width,
-        );
-      }
-      if (matchSet.has(visibleIndex)) {
-        return truncateToWidth(this.theme.fg("warning", text), width);
-      }
-      if (this.notifyLines.has(line.text)) {
-        return truncateToWidth(this.theme.underline(text), width);
-      }
-      if (line.type === "stderr") {
-        return truncateToWidth(this.theme.fg("warning", text), width);
-      }
-      return truncateToWidth(text, width);
+      const emphasis: LogLineEmphasis =
+        visibleIndex === currentMatchIndex
+          ? "search-current"
+          : matchSet.has(visibleIndex)
+            ? "search"
+            : this.notifyLines.has(line.text)
+              ? "notify"
+              : "none";
+      return renderLogLine(line, { theme: this.theme, width, emphasis });
     });
 
     while (rendered.length < height) rendered.unshift("");

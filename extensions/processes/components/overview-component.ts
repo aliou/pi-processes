@@ -11,8 +11,8 @@ import {
 import { CHANNELS, type ProcessProtocolConfig } from "../../../src/protocol";
 import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
 import { formatRuntime, truncateCmd } from "../../../src/utils/format";
-import { sanitizeForDisplay } from "../../shared/display-text";
 import { buildDroppedOutputLine, trimToBudget } from "../../shared/line-buffer";
+import { renderLogLine } from "../../shared/log-line";
 import { isOutputChangedPayload } from "../../shared/output-payload";
 import { truncateToWidth } from "../../shared/truncate";
 import { LineComponent, LinesComponent, statusColor } from "../../shared/ui";
@@ -622,12 +622,12 @@ export class OverviewComponent implements Component {
     const start = this.previewOffset;
     const slice = this.previewLines.slice(start, start + available);
     for (const line of slice) {
-      // Preview lines are untrusted process output: strip anything that could
-      // move the cursor or erase the screen, keep color.
-      const safe = sanitizeForDisplay(line.text);
-      const text = line.type === "stderr" ? t.fg("warning", safe) : safe;
       body.push(
-        truncateToWidth(`${dim(PREVIEW_LOG_PREFIX)}${text}`, width, "", true),
+        renderLogLine(line, {
+          theme: t,
+          width,
+          prefix: dim(PREVIEW_LOG_PREFIX),
+        }),
       );
     }
     while (body.length < available + 1) body.push("");

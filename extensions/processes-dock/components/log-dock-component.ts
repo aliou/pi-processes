@@ -3,9 +3,8 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { type Component, visibleWidth } from "@earendil-works/pi-tui";
 import type { ProcessInfo } from "../../../src/types";
 import { LIVE_STATUSES } from "../../../src/types";
-import { stripAnsi } from "../../../src/utils/ansi";
 import { renderProcessTab } from "../../process-tabs";
-import { sanitizeForDisplay } from "../../shared/display-text";
+import { displayTextOf, renderLogLine } from "../../shared/log-line";
 import { truncateToWidth } from "../../shared/truncate";
 import {
   clampNameColumn,
@@ -276,18 +275,11 @@ function renderAllRunningLogLines(
   );
   const nameCol = clampNameColumn(activeProcesses);
   const separator = theme.fg("dim", " │ ");
-  const sepLen = visibleWidth(separator);
 
   return stream.slice(-height).map(({ processId, line }) => {
     const process = byId.get(processId);
     const label = theme.fg("dim", padName(process?.name ?? processId, nameCol));
-    const text = renderLogText(
-      line,
-      snapshot,
-      theme,
-      Math.max(1, width - nameCol - sepLen),
-    );
-    return truncateToWidth(`${label}${separator}${text}`, width, "", true);
+    return renderLogText(line, snapshot, theme, width, `${label}${separator}`);
   });
 }
 
@@ -309,22 +301,17 @@ function renderLogText(
   snapshot: LogDockSnapshot,
   theme: Theme,
   width: number,
+  prefix = "",
 ): string {
-  // sanitizeForDisplay first so tabs and escape sequences that survive a plain
-  // strip (unterminated OSC/DCS payloads) cannot desync the dock layout.
-  const text = truncateToWidth(
-    stripAnsi(sanitizeForDisplay(line.text)),
+  const notified =
+    snapshot.notifyLines.has(line.text) ||
+    snapshot.notifyLines.has(displayTextOf(line));
+  return renderLogLine(line, {
+    theme,
     width,
-    "",
-    true,
-  );
-  if (snapshot.notifyLines.has(line.text) || snapshot.notifyLines.has(text)) {
-    return truncateToWidth(theme.underline(text), width);
-  }
-  if (line.type === "stderr") {
-    return truncateToWidth(theme.fg("warning", text), width);
-  }
-  return truncateToWidth(text, width);
+    prefix,
+    emphasis: notified ? "notify" : "none",
+  });
 }
 
 function renderProcessToken(

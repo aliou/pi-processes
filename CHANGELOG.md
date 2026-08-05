@@ -1,5 +1,12 @@
 # @aliou/pi-processes
 
+## 0.10.1
+
+### Patch Changes
+
+- 544cdf3: Guard process-group helpers against non-positive pgids. `isProcessGroupAlive` now returns `false` and `killProcessGroup` now throws a `RangeError` when given a `0` or negative process-group ID, instead of probing or signaling the caller's own process group.
+- 4cdc5c4: Handle async spawn errors on failed starts. When a spawn fails during initialization (e.g. a non-existent cwd), the child has no pid and emits its `error` event asynchronously; the null-pid path now attaches an error listener so the failure is captured on the record (real `ENOENT`/`EACCES` reason) instead of crashing the host via `uncaughtException`.
+
 ## 0.10.0
 
 ### Minor Changes

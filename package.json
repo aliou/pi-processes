@@ -23,7 +23,8 @@
     "skills": [
       "./skills/pi-processes"
     ],
-    "video": "https://assets.aliou.me/pi-extensions/demos/pi-processes.mp4"
+    "image": "https://assets.aliou.me/github/aliou/pi-processes/banner-v0.10.x.png",
+    "video": "https://assets.aliou.me/pi-extensions/demos/processes/v0.10.0/agent-starts-processes.mp4"
   },
   "publishConfig": {
     "access": "public"

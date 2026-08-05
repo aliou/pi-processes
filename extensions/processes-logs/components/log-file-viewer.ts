@@ -1,5 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { sanitizeForDisplay } from "../../shared/display-text";
 import { trimToBudget } from "../../shared/line-buffer";
 import type { ProcessLogLine } from "../logs-client";
 
@@ -29,7 +30,7 @@ export class LogFileViewer {
   ) {
     this.follow = options.followEnabled;
     this.lines = trimToBudget(
-      initialLines,
+      initialLines.map(sanitizeLine),
       options.maxBufferLines,
       options.maxBufferBytes ?? Number.MAX_SAFE_INTEGER,
     );
@@ -38,7 +39,7 @@ export class LogFileViewer {
 
   appendLines(lines: ProcessLogLine[]): void {
     if (lines.length === 0) return;
-    this.lines.push(...lines);
+    this.lines.push(...lines.map(sanitizeLine));
     this.lines = trimToBudget(
       this.lines,
       this.options.maxBufferLines,
@@ -119,7 +120,9 @@ export class LogFileViewer {
    * priority (search current match > search match > notify match > stream).
    */
   addNotifyMatch(match: { line: string }): void {
-    if (match.line) this.notifyLines.add(match.line);
+    // Stored sanitized so it can be compared against sanitized buffer lines.
+    const line = sanitizeForDisplay(match.line);
+    if (line) this.notifyLines.add(line);
   }
 
   clearNotifyMatches(): void {
@@ -271,4 +274,13 @@ export class LogFileViewer {
     this.follow = false;
     this.centerTarget = index;
   }
+}
+
+/**
+ * Log lines are untrusted terminal output. Sanitize on ingest so search,
+ * notify-match comparison, and rendering all see the same safe text.
+ */
+function sanitizeLine(line: ProcessLogLine): ProcessLogLine {
+  const text = sanitizeForDisplay(line.text);
+  return text === line.text ? line : { ...line, text };
 }

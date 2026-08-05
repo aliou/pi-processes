@@ -9,6 +9,7 @@ import type { ProcessInfo } from "../../../src/types";
 import { LIVE_STATUSES } from "../../../src/types";
 import { stripAnsi } from "../../../src/utils/ansi";
 import { renderProcessTab } from "../../process-tabs";
+import { sanitizeForDisplay } from "../../shared/display-text";
 import {
   clampNameColumn,
   LineComponent,
@@ -312,7 +313,14 @@ function renderLogText(
   theme: Theme,
   width: number,
 ): string {
-  const text = truncateToWidth(stripAnsi(line.text), width, "", true);
+  // sanitizeForDisplay first so tabs and escape sequences that survive a plain
+  // strip (unterminated OSC/DCS payloads) cannot desync the dock layout.
+  const text = truncateToWidth(
+    stripAnsi(sanitizeForDisplay(line.text)),
+    width,
+    "",
+    true,
+  );
   if (snapshot.notifyLines.has(line.text) || snapshot.notifyLines.has(text)) {
     return truncateToWidth(theme.underline(text), width);
   }

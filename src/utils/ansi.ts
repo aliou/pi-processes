@@ -22,8 +22,10 @@ const ANSI_REPLACEMENTS: RegExp[] = [
 // Strip C0 terminal control characters that can corrupt TUI layout when
 // rendered back into pi, such as carriage return and backspace. Keep tabs and
 // newlines because logs use them as printable whitespace/line breaks.
+// C1 controls are stripped too: a raw \u009b is an alias for CSI on some
+// terminals, so leaving it in would reopen the escape-sequence hole.
 // biome-ignore lint/suspicious/noControlCharactersInRegex: this regex intentionally targets terminal control characters.
-const TERMINAL_CONTROL_CHARS = /[\u0000-\u0008\u000b-\u001f\u007f]/gu;
+const TERMINAL_CONTROL_CHARS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/gu;
 
 /** Check if a string contains ANSI escape codes. */
 export function hasAnsi(str: string): boolean {

@@ -204,4 +204,43 @@ describe("LogFileViewer", () => {
     expect(bold).toHaveBeenCalled();
     expect(underline).not.toHaveBeenCalled();
   });
+
+  it("neutralizes escape sequences that would corrupt the screen", () => {
+    const ESC = String.fromCodePoint(0x1b);
+    const viewer = new LogFileViewer(
+      [{ type: "stdout", text: `${ESC}[2Jwiped${ESC}[3A` }],
+      makeTheme(),
+      { followEnabled: false, maxBufferLines: 10 },
+    );
+
+    viewer.appendLines([
+      { type: "stdout", text: `${ESC}]0;title${String.fromCodePoint(7)}kept` },
+      { type: "stdout", text: "over\rwrite" },
+      { type: "stdout", text: `${ESC}[31mcolored${ESC}[0m` },
+    ]);
+
+    const lines = trimLines(viewer.render(40, 4));
+    expect(lines).toEqual([
+      "wiped",
+      "kept",
+      "overwrite",
+      `${ESC}[31mcolored${ESC}[0m`,
+    ]);
+  });
+
+  it("matches notify lines after sanitizing", () => {
+    const ESC = String.fromCodePoint(0x1b);
+    const underline = vi.fn((text: string) => text);
+    const theme = { ...makeTheme(), underline } as unknown as Theme;
+    const viewer = new LogFileViewer(
+      [{ type: "stdout", text: `${ESC}[2Kready` }],
+      theme,
+      { followEnabled: false, maxBufferLines: 10 },
+    );
+
+    viewer.addNotifyMatch({ line: `${ESC}[2Kready` });
+    viewer.render(40, 1);
+
+    expect(underline).toHaveBeenCalledTimes(1);
+  });
 });

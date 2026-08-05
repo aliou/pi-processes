@@ -24,4 +24,8 @@ describe("stripAnsi", () => {
 
     expect(stripAnsi(input)).toBe("onetwothree\nfour\tfive");
   });
+
+  it("strips C1 control characters", () => {
+    expect(stripAnsi(`${String.fromCodePoint(0x9b)}31mred`)).toBe("31mred");
+  });
 });

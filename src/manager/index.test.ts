@@ -125,6 +125,17 @@ vi.mock("../utils/command-executor", () => ({
   spawnCommand: vi.fn((command: string) => {
     const child = new FakeChildProcess();
     if (command === "missing pid") child.pid = undefined;
+    if (command === "missing pid error") {
+      child.pid = undefined;
+      process.nextTick(() => {
+        child.emit(
+          "error",
+          Object.assign(new Error("spawn /bin/bash ENOENT"), {
+            code: "ENOENT",
+          }),
+        );
+      });
+    }
     if (child.pid !== undefined) fakeProcesses.set(child.pid, child);
     queueMicrotask(() => {
       if (command === "spawn error") {
@@ -359,6 +370,30 @@ describe("lifecycle events", () => {
         exitCode: -1,
         endReason: "missing_pid",
         errorMessage: "Spawn error: missing pid",
+      }),
+    );
+  });
+
+  it("handles async spawn errors on null-pid starts without crashing", async () => {
+    using manager = new ProcessManager();
+    const events = collectEvents(manager);
+    // The async `error` event must be handled: attaching no listener would
+    // crash the host via uncaughtException and fail the whole test run.
+    const info = manager.start("test", "missing pid error", "/tmp");
+    await new Promise((r) => setImmediate(r));
+
+    const ended = events.filter((e) => e.type === "process_ended");
+    expect(ended).toHaveLength(1);
+    // The record is transitioned to exited synchronously; the async error
+    // handler then enriches it in place with the real reason.
+    const updated = manager.get(info.id);
+    expect(updated).toEqual(
+      expect.objectContaining({
+        status: "exited",
+        success: false,
+        exitCode: -1,
+        endReason: "spawn_error",
+        errorMessage: "spawn /bin/bash ENOENT",
       }),
     );
   });

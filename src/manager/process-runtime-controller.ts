@@ -83,6 +83,11 @@ export class ProcessRuntimeController {
     this.registry.add(managed);
 
     if (!child.pid) {
+      // No pid means the process never started. The async spawn `error`
+      // event may not have been delivered yet (Node emits it on a later
+      // turn of the event loop, and it cannot fire while start() runs),
+      // so attach a handler that finalizes the record with the real
+      // reason when it arrives.
       this.logs.appendErrorLine(managed.stderrFile, "Spawn error: missing pid");
       managed.exitCode = -1;
       managed.success = false;
@@ -91,6 +96,14 @@ export class ProcessRuntimeController {
       managed.endTime = Date.now();
       this.releaseRuntimeHandles(managed);
       this.transition(managed, "exited");
+      child.on("error", (err) => {
+        this.logs.appendErrorLine(
+          managed.stderrFile,
+          `Process error: ${err.message}`,
+        );
+        managed.endReason = "spawn_error";
+        managed.errorMessage = err.message;
+      });
       return managed;
     }
 
@@ -361,22 +374,29 @@ export class ProcessRuntimeController {
     });
 
     child.on("error", (err) => {
-      this.logs.appendErrorLine(
-        managed.stderrFile,
-        `Process error: ${err.message}`,
-      );
-
-      if (!managed.endTime) {
-        this.releaseRuntimeHandles(managed);
-        managed.exitCode = -1;
-        managed.success = false;
-        managed.endReason = "spawn_error";
-        managed.errorMessage = err.message;
-        managed.endTime = Date.now();
-        this.output.flush(managed);
-        this.transition(managed, "exited");
-      }
+      this.handleSpawnError(managed, err);
     });
+  }
+
+  private handleSpawnError(
+    managed: ManagedProcessRecord,
+    err: NodeJS.ErrnoException,
+  ): void {
+    this.logs.appendErrorLine(
+      managed.stderrFile,
+      `Process error: ${err.message}`,
+    );
+
+    if (managed.endTime) return;
+
+    this.releaseRuntimeHandles(managed);
+    managed.exitCode = -1;
+    managed.success = false;
+    managed.endReason = "spawn_error";
+    managed.errorMessage = err.message;
+    managed.endTime = Date.now();
+    this.output.flush(managed);
+    this.transition(managed, "exited");
   }
 
   private ensureWatcherRunning(): void {

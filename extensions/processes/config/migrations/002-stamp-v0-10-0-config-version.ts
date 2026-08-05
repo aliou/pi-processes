@@ -17,5 +17,5 @@ export const configVersionStampMigration: Migration<ProcessConfig> = {
   shouldRun: needsConfigVersionStamp,
   run: (config) => stampConfigVersion(config),
   message:
-    "Updated pi-processes settings for v0.10.0. This release rewrites the package into separate process, logs, and dock extensions while preserving your existing settings. Release notes will be published at https://github.com/aliou/pi-processes/releases/tag/v0.10.0.",
+    "Updated pi-processes settings for v0.10.0. This release rewrites the package into separate process, logs, and dock extensions while preserving your existing settings. Release notes are available at https://github.com/aliou/pi-processes/releases/tag/v0.10.0.",
 };

@@ -103,7 +103,7 @@ describe("NotificationService", () => {
     service.dispose();
   });
 
-  it("emits a context notification for a successful process with default config", async () => {
+  it("emits a turn notification for a successful process with default config", async () => {
     const fakeManager = createFakeManager();
     const spy = createNotificationSpy();
     const registry = createNotificationRegistry();
@@ -129,7 +129,7 @@ describe("NotificationService", () => {
     await flushQueuedMicrotasks();
 
     expect(spy.emitted).toHaveLength(1);
-    expect(spy.emitted[0].attention).toBe("context");
+    expect(spy.emitted[0].attention).toBe("turn");
 
     service.dispose();
   });
@@ -470,7 +470,7 @@ describe("NotificationService", () => {
     service.dispose();
   });
 
-  it("emits context notification for unregistered successful process", async () => {
+  it("emits turn notification for unregistered successful process", async () => {
     const fakeManager = createFakeManager();
     const spy = createNotificationSpy();
     const registry = createNotificationRegistry();
@@ -494,7 +494,7 @@ describe("NotificationService", () => {
     await flushQueuedMicrotasks();
 
     expect(spy.emitted).toHaveLength(1);
-    expect(spy.emitted[0].attention).toBe("context");
+    expect(spy.emitted[0].attention).toBe("turn");
 
     service.dispose();
   });
@@ -645,11 +645,12 @@ describe("NotificationService", () => {
   });
 
   it("uses custom onSuccess attention from config", async () => {
+    // Non-default value so this asserts the config path, not the default.
     const fakeManager = createFakeManager();
     const spy = createNotificationSpy();
     const registry = createNotificationRegistry();
 
-    registry.register("proc_1", { onSuccess: "turn" });
+    registry.register("proc_1", { onSuccess: "context" });
 
     const service = createNotificationService({
       events: spy.events,
@@ -670,7 +671,7 @@ describe("NotificationService", () => {
     await flushQueuedMicrotasks();
 
     expect(spy.emitted).toHaveLength(1);
-    expect(spy.emitted[0].attention).toBe("turn");
+    expect(spy.emitted[0].attention).toBe("context");
 
     service.dispose();
   });

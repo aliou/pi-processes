@@ -60,10 +60,11 @@ export function registerNotificationDelivery(
       summary: `Suppressed ${count} log-match notifications because output was too fast.`,
       attention: "context",
     };
-    sendProcessNotificationMessage(pi, details, {
-      triggerTurn: false,
-      deliverAs: "steer",
-    });
+    sendProcessNotificationMessage(
+      pi,
+      details,
+      attentionToSendOptions(details.attention),
+    );
   };
 
   const flushSuppressedSummary = () => {

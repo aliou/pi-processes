@@ -5,11 +5,21 @@ import { normalizeNotifyConfig } from "./notify";
 describe("normalizeNotifyConfig", () => {
   it("applies lifecycle defaults", () => {
     expect(normalizeNotifyConfig(undefined)).toEqual({
-      onSuccess: "context",
+      onSuccess: "turn",
       onFailure: "turn",
       onKilled: "context",
       logMatches: [],
     });
+  });
+
+  it("defaults onSuccess to turn so a finished process wakes an idle agent", () => {
+    expect(normalizeNotifyConfig({}).onSuccess).toBe("turn");
+  });
+
+  it("still allows opting out of a success turn", () => {
+    expect(normalizeNotifyConfig({ onSuccess: "context" }).onSuccess).toBe(
+      "context",
+    );
   });
 
   it("normalizes a literal matcher with defaults", () => {
@@ -18,7 +28,7 @@ describe("normalizeNotifyConfig", () => {
         logMatches: [{ pattern: "ready" }],
       }),
     ).toEqual({
-      onSuccess: "context",
+      onSuccess: "turn",
       onFailure: "turn",
       onKilled: "context",
       logMatches: [

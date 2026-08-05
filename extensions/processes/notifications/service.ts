@@ -25,7 +25,10 @@ const DEFAULT_ATTENTION: Record<
   "onSuccess" | "onFailure" | "onKilled",
   Attention
 > = {
-  onSuccess: "context",
+  // Keep in sync with DEFAULT_NOTIFY_CONFIG in tools/notify.ts. Success
+  // defaults to a turn because "context" is only seen by an agent that is
+  // still streaming when the process ends.
+  onSuccess: "turn",
   onFailure: "turn",
   // External kills surface as context by default (see DEFAULT_NOTIFY_CONFIG
   // in tools/notify.ts for rationale). Intentional stops are classified

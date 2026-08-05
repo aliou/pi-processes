@@ -14,7 +14,13 @@ export const MAX_NOTIFY_LOG_MATCHERS = MAX_LOG_MATCHERS_PER_PROCESS;
 export const MAX_NOTIFY_PATTERN_LENGTH = MAX_LOG_MATCH_PATTERN_LENGTH;
 
 const DEFAULT_NOTIFY_CONFIG = {
-  onSuccess: "context",
+  // A backgrounded process usually outlives the turn that started it, and
+  // "context" only reaches the agent if it happens to still be streaming when
+  // the process ends. Builds, tests, and other one-shot commands are started
+  // precisely because the agent needs the result, so success defaults to a
+  // turn. Long-running servers rarely exit 0, and callers that do not want the
+  // interruption can pass onSuccess: "context".
+  onSuccess: "turn",
   onFailure: "turn",
   // External kills (outside this manager) surface as context by default so
   // the agent and user learn that a managed process disappeared. Intentional
@@ -36,11 +42,14 @@ export function normalizeNotifyConfig(input: unknown): NotifyConfig {
 
   return {
     onSuccess:
-      normalizeAttention(input.onSuccess, "notify.onSuccess") ?? "context",
+      normalizeAttention(input.onSuccess, "notify.onSuccess") ??
+      DEFAULT_NOTIFY_CONFIG.onSuccess,
     onFailure:
-      normalizeAttention(input.onFailure, "notify.onFailure") ?? "turn",
+      normalizeAttention(input.onFailure, "notify.onFailure") ??
+      DEFAULT_NOTIFY_CONFIG.onFailure,
     onKilled:
-      normalizeAttention(input.onKilled, "notify.onKilled") ?? "context",
+      normalizeAttention(input.onKilled, "notify.onKilled") ??
+      DEFAULT_NOTIFY_CONFIG.onKilled,
     logMatches: normalizeLogMatches(logMatches),
   };
 }

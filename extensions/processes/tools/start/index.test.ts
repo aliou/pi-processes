@@ -73,7 +73,7 @@ describe("executeStart", () => {
 
     expect(start).toHaveBeenCalledWith("dev", "pnpm dev", "/repo");
     expect(details.notify).toEqual({
-      onSuccess: "context",
+      onSuccess: "turn",
       onFailure: "turn",
       onKilled: "context",
       logMatches: [
@@ -108,7 +108,7 @@ describe("executeStart", () => {
 
     const registered = registry.get("proc_1");
     expect(registered).not.toBeNull();
-    expect(registered?.onSuccess).toBe("context");
+    expect(registered?.onSuccess).toBe("turn");
     expect(registered?.onFailure).toBe("turn");
     expect(registered?.onKilled).toBe("context");
     expect(registered?.logMatches).toHaveLength(1);

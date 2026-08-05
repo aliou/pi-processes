@@ -110,28 +110,25 @@ const WatchUpdateItemParams = Type.Object({
   ),
   on: Type.Optional(
     StringEnum(PROCESS_NOTIFY_ATTENTIONS, {
-      description: "Agent attention for this log match. Defaults to turn.",
+      description: "Attention for this match. Defaults to turn.",
     }),
   ),
 });
 
-const NotifyParams = Type.Object({
+const NotifyProperties = {
   onSuccess: Type.Optional(
     StringEnum(PROCESS_NOTIFY_ATTENTIONS, {
-      description:
-        "Agent attention when the process exits successfully. Defaults to context.",
+      description: "Attention on clean exit. Defaults to turn.",
     }),
   ),
   onFailure: Type.Optional(
     StringEnum(PROCESS_NOTIFY_ATTENTIONS, {
-      description:
-        "Agent attention when the process fails or crashes. Defaults to turn.",
+      description: "Attention on failure or crash. Defaults to turn.",
     }),
   ),
   onKilled: Type.Optional(
     StringEnum(PROCESS_NOTIFY_ATTENTIONS, {
-      description:
-        "Agent attention when the process is killed. Defaults to context.",
+      description: "Attention on external kill. Defaults to context.",
     }),
   ),
   logMatches: Type.Optional(
@@ -141,6 +138,11 @@ const NotifyParams = Type.Object({
         "Log match notifications. Supports at most 20 matchers, with each pattern limited to 500 characters.",
     }),
   ),
+};
+
+const NotifyParams = Type.Object(NotifyProperties, {
+  description:
+    "Notify settings. Attention: turn wakes an idle agent, context only reaches an agent still working, ignore never notifies.",
 });
 
 export const ProcessesParams = Type.Object({

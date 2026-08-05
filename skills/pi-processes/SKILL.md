@@ -15,9 +15,11 @@ A started process runs in the background and the manager brings you back when so
 2. End your turn or move on to other work. Do not call `process output` in a loop waiting for "ready".
 3. The process notifies you when:
    - a `logMatches` pattern hits (readiness, error, progress),
-   - the process exits successfully (`onSuccess`, default `context`),
+   - the process exits successfully (`onSuccess`, default `turn`),
    - the process fails or crashes (`onFailure`, default `turn`),
-   - the process is killed, by you or externally (`onKilled`, default `context`).
+   - the process is killed externally (`onKilled`, default `context`, which does not wake an idle agent).
+
+   Stopping a process yourself never notifies.
 4. When a watch is too noisy or wrong, fix it with `process update` — do not restart the process just to change watches.
 5. `process stop` obsolete live processes and `process clear` finished entries when they are no longer useful.
 
@@ -49,6 +51,8 @@ Good:
   }
 }
 ```
+
+`onSuccess: "context"` here because a dev server exiting cleanly needs no reaction. Keep the default `turn` for builds, tests, and other one-shot commands whose result you need.
 
 Optional `cwd` sets the working directory for the spawned command. Omit it to inherit the agent's current working directory.
 
@@ -214,9 +218,9 @@ Good:
 
 Exit attention:
 
-- `notify.onSuccess` — when the process exits successfully. Defaults to `context`.
-- `notify.onFailure` — when the process fails or crashes. Defaults to `turn`.
-- `notify.onKilled` — when the process is killed, by you or externally. Defaults to `context`.
+- `notify.onSuccess` — clean exit. Defaults to `turn`.
+- `notify.onFailure` — failure or crash. Defaults to `turn`.
+- `notify.onKilled` — killed from outside the tool. Defaults to `context`. Stopping a process yourself never notifies.
 
 Log match watches (`notify.logMatches`, up to 20, each pattern up to 500 chars):
 
@@ -226,7 +230,13 @@ Log match watches (`notify.logMatches`, up to 20, each pattern up to 500 chars):
 - `repeat` — `false` (default) fires once; `true` fires on every match.
 - `on` — `turn`, `context`, or `ignore`. Overrides the default attention for that watch. Defaults to `turn`.
 
-`turn` interrupts with an agent message. `context` adds the notice as context without interrupting. `ignore` records the match silently.
+Attention levels:
+
+- `turn` — starts an agent turn. Reaches you even when you are idle.
+- `context` — recorded in the transcript, no turn. It reaches you only if you are still working when the event fires; an idle agent is not woken and sees it on the next user message.
+- `ignore` — recorded, never notifies.
+
+Use `context` only when nothing needs to happen in response.
 
 ## Use cases
 

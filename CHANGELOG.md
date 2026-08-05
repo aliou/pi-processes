@@ -1,5 +1,13 @@
 # @aliou/pi-processes
 
+## 0.10.4
+
+### Patch Changes
+
+- 94bf16e: Render carriage-return progress output as the final visible update in `/ps:logs` and the dock.
+
+  Log watches now match the same plain visible line shown in the UI, so hidden CR-overwritten text, dropped escape payloads, and invisible styling bytes no longer trigger notifications.
+
 ## 0.10.3
 
 ### Patch Changes

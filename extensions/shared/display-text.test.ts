@@ -1,6 +1,7 @@
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 
-import { sanitizeForDisplay } from "./display-text";
+import { sanitizeForDisplay, truncateForDisplay } from "./display-text";
 
 const ESC = String.fromCodePoint(0x001b);
 const BEL = String.fromCodePoint(0x0007);
@@ -96,5 +97,30 @@ describe("sanitizeForDisplay", () => {
     const sgr = new RegExp(`${ESC}\\[[0-9;:]*m`, "gu");
     expect(output.match(sgr)).toEqual([`${ESC}[31m`, `${ESC}[0m`]);
     expect(output.split(ESC)).toHaveLength(3);
+  });
+});
+
+describe("truncateForDisplay", () => {
+  it("fits wide characters into the requested cells", () => {
+    const cmd = "日本語のコマンドをここに書きます";
+
+    expect(visibleWidth(truncateForDisplay(cmd, 12))).toBeLessThanOrEqual(12);
+    expect(truncateForDisplay(cmd, 12)).toBe("日本語のコ…");
+  });
+
+  it("never cuts a grapheme in half", () => {
+    const emoji = String.fromCodePoint(0x1f642).repeat(8);
+    const truncated = truncateForDisplay(`run ${emoji}`, 12);
+
+    expect(visibleWidth(truncated)).toBeLessThanOrEqual(12);
+    expect(truncated).not.toMatch(/[\uD800-\uDBFF]$/u);
+  });
+
+  it("sanitizes escape sequences in labels", () => {
+    expect(truncateForDisplay(`echo ${ESC}[2Jboom`, 20)).toBe("echo boom");
+  });
+
+  it("leaves short labels alone", () => {
+    expect(truncateForDisplay("pnpm dev", 12)).toBe("pnpm dev");
   });
 });

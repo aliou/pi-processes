@@ -8,7 +8,10 @@ import {
   formatTimestamp,
   shortenPath,
 } from "../../../src/utils";
-import { truncateToWidth } from "../../shared/truncate";
+import {
+  sanitizeForDisplay,
+  truncateForDisplay,
+} from "../../shared/display-text";
 import { statusColor } from "../../shared/ui";
 
 export interface RenderOptions {
@@ -33,8 +36,8 @@ export function buildCommandField(
   options?: { truncate?: boolean },
 ): Text {
   const value = options?.truncate
-    ? truncateToWidth(command, 80, theme.fg("accent", "…"))
-    : command;
+    ? truncateForDisplay(command, 80)
+    : sanitizeForDisplay(command);
   return buildField("command", theme.fg("accent", `\`${value}\``), theme);
 }
 
@@ -45,7 +48,9 @@ export function buildProcessDetails(
 ): Container {
   const container = new Container();
   container.addChild(buildField("id", process.id, theme));
-  container.addChild(buildField("name", process.name, theme));
+  container.addChild(
+    buildField("name", sanitizeForDisplay(process.name), theme),
+  );
   container.addChild(
     buildField("status", formatColoredProcessStatus(process, theme), theme),
   );
@@ -58,7 +63,9 @@ export function buildProcessDetails(
   container.addChild(
     buildField("started", formatTimestamp(process.startTime), theme),
   );
-  container.addChild(buildField("cwd", shortenPath(process.cwd), theme));
+  container.addChild(
+    buildField("cwd", sanitizeForDisplay(shortenPath(process.cwd)), theme),
+  );
   container.addChild(buildCommandField(process.command, theme));
   container.addChild(buildField("stdout", process.stdoutFile, theme));
   container.addChild(buildField("stderr", process.stderrFile, theme));
@@ -71,7 +78,7 @@ export function buildProcessSummaryRow(
 ): Text {
   return new Text(
     [
-      process.name,
+      sanitizeForDisplay(process.name),
       theme.fg("accent", process.id),
       `pid ${process.pid}`,
       formatColoredProcessStatus(process, theme),

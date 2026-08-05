@@ -1,6 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
+import { truncateForDisplay } from "../../shared/display-text";
 import { truncateToWidth } from "../../shared/truncate";
 import { statusColor, statusDot } from "../../shared/ui";
 
@@ -12,11 +13,10 @@ const DEFAULT_MAX_WIDTH = 200;
  * and the name always agree.
  */
 function formatProcessName(process: ProcessInfo, theme: Theme): string {
-  const trimmed =
-    process.name.length > MAX_PROCESS_NAME
-      ? `${process.name.slice(0, MAX_PROCESS_NAME - 3)}...`
-      : process.name;
-  return theme.fg(statusColor(process), trimmed);
+  return theme.fg(
+    statusColor(process),
+    truncateForDisplay(process.name, MAX_PROCESS_NAME),
+  );
 }
 
 /**

@@ -1,7 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 
 import type { ProcessInfo } from "../src/types";
-import { truncateCmd } from "../src/utils/format";
+import { truncateForDisplay } from "./shared/display-text";
 import { MAX_TAB_NAME, statusDot } from "./shared/ui";
 
 export { MAX_TAB_NAME, statusDot as renderProcessTabDot };
@@ -19,7 +19,7 @@ export function renderProcessTab(
   theme: Theme,
 ): string {
   const dot = statusDot(process, active, theme);
-  const label = truncateCmd(process.name, MAX_TAB_NAME);
+  const label = truncateForDisplay(process.name, MAX_TAB_NAME);
   return active
     ? theme.bg("selectedBg", ` ${dot} ${theme.fg("accent", label)} `)
     : ` ${dot} ${theme.fg("dim", label)} `;

@@ -6,6 +6,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import type { ProcessProtocolConfig } from "../../../src/protocol";
 import type { ProcessInfo } from "../../../src/types";
+import { sanitizeForDisplay } from "../../shared/display-text";
 import { requestConfig, requestProcess, requestProcessList } from "../client";
 import { allProcessCompletions } from "../completions";
 import { LogOverlayComponent } from "../components/log-overlay-component";
@@ -102,7 +103,7 @@ function formatPlainProcessList(processes: ProcessInfo[]): string {
   return processes
     .map(
       (process) =>
-        `${process.id}\t${process.name}\t${process.status}\t${process.command}`,
+        `${process.id}\t${sanitizeForDisplay(process.name)}\t${process.status}\t${sanitizeForDisplay(process.command)}`,
     )
     .join("\n");
 }

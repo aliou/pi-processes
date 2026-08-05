@@ -9,7 +9,10 @@ import {
   type SelectItem,
   SelectList,
 } from "@earendil-works/pi-tui";
-import { formatProcessSelectionDescription } from "../../shared/ui";
+import {
+  formatProcessSelectionDescription,
+  formatProcessSelectionLabel,
+} from "../../shared/ui";
 import { requestProcess, requestProcessList } from "../client";
 import type { DockController } from "../widget/setup";
 
@@ -83,7 +86,7 @@ async function pickPinTarget(
         ]
       : []),
     ...processes.map((process) => ({
-      label: `${process.name} (${process.id})`,
+      label: formatProcessSelectionLabel(process),
       value: process.id,
       description: formatProcessSelectionDescription(
         process,
@@ -149,7 +152,7 @@ function completions(
     )
     .map((process) => ({
       value: process.id,
-      label: `${process.name} (${process.id})`,
+      label: formatProcessSelectionLabel(process),
       description: formatProcessSelectionDescription(process),
     }));
   const items = [...clearItems, ...processItems];

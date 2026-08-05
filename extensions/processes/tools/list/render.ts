@@ -1,6 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Text, visibleWidth } from "@earendil-works/pi-tui";
 import { formatTimestamp, shortenPath } from "../../../../src/utils";
+import { sanitizeForDisplay } from "../../../shared/display-text";
 import { truncateToWidth } from "../../../shared/truncate";
 import { LinesComponent } from "../../../shared/ui";
 import { formatPatternForDisplay, ProcessActionTitle } from "../components";
@@ -75,7 +76,7 @@ export function buildCollapsed(details: ListDetails, theme: Theme): Container {
 
   for (const process of details.processes.slice(0, 2)) {
     const parts = [
-      process.name,
+      sanitizeForDisplay(process.name),
       theme.fg("accent", process.id),
       `pid ${process.pid}`,
       formatColoredProcessStatus(process, theme),

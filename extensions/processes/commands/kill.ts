@@ -10,7 +10,10 @@ import {
   SelectList,
 } from "@earendil-works/pi-tui";
 import { LIVE_STATUSES } from "../../../src/types";
-import { formatProcessSelectionDescription } from "../../shared/ui";
+import {
+  formatProcessSelectionDescription,
+  formatProcessSelectionLabel,
+} from "../../shared/ui";
 import { requestKill, requestProcess, requestProcessList } from "../client";
 
 /**
@@ -42,7 +45,10 @@ export function registerKillCommand(pi: ExtensionAPI): void {
           return;
         }
         if (!LIVE_STATUSES.has(proc.status)) {
-          ctx.ui.notify(`${proc.name} (${proc.id}) is not running.`, "warning");
+          ctx.ui.notify(
+            `${formatProcessSelectionLabel(proc)} is not running.`,
+            "warning",
+          );
           return;
         }
         id = proc.id;
@@ -68,10 +74,10 @@ export function registerKillCommand(pi: ExtensionAPI): void {
       const timeoutMs = signal === "SIGKILL" ? 200 : 3000;
       const result = await requestKill(events, id, { signal, timeoutMs });
       if (result.ok) {
-        ctx.ui.notify(`Killed ${proc.name} (${proc.id}).`, "info");
+        ctx.ui.notify(`Killed ${formatProcessSelectionLabel(proc)}.`, "info");
       } else {
         ctx.ui.notify(
-          `Failed to kill ${proc.name} (${proc.id}): ${result.reason}.`,
+          `Failed to kill ${formatProcessSelectionLabel(proc)}: ${result.reason}.`,
           "warning",
         );
       }
@@ -92,7 +98,7 @@ async function pickTarget(
   const items: SelectItem[] = requestProcessList(events)
     .filter((process) => LIVE_STATUSES.has(process.status))
     .map((process) => ({
-      label: `${process.name} (${process.id})`,
+      label: formatProcessSelectionLabel(process),
       value: process.id,
       description: formatProcessSelectionDescription(process),
     }));
@@ -145,7 +151,7 @@ function completions(
     )
     .map((process) => ({
       value: process.id,
-      label: `${process.name} (${process.id})`,
+      label: formatProcessSelectionLabel(process),
       description: formatProcessSelectionDescription(process),
     }));
   return items.length > 0 ? items : null;

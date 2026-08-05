@@ -4,6 +4,7 @@ import type { ProcessInfo } from "../../src/types";
 import {
   clampNameColumn,
   formatProcessSelectionDescription,
+  formatProcessSelectionLabel,
   LineComponent,
   LinesComponent,
   MAX_TAB_NAME,
@@ -228,5 +229,26 @@ describe("formatProcessSelectionDescription", () => {
     expect(formatProcessSelectionDescription(makeProcess(), "")).toBe(
       "running — pnpm dev",
     );
+  });
+});
+
+describe("process selection text", () => {
+  const ESC = String.fromCodePoint(0x001b);
+
+  it("sanitizes names and commands", () => {
+    const process = makeProcess({
+      name: `${ESC}[2Jdev`,
+      command: `pnpm dev${ESC}[2A`,
+    });
+
+    expect(formatProcessSelectionLabel(process)).toBe("dev (proc_1)");
+    expect(formatProcessSelectionDescription(process)).not.toContain(ESC);
+    expect(formatProcessSelectionDescription(process)).toContain("pnpm dev");
+  });
+
+  it("measures the name column on sanitized names", () => {
+    const width = clampNameColumn([makeProcess({ name: `${ESC}[2Kapi` })]);
+
+    expect(width).toBe(MIN_NAME_COLUMN);
   });
 });

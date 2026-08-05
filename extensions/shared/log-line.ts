@@ -10,7 +10,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
 
-import { sanitizeForDisplay } from "./display-text";
+import { closeSgr, sanitizeForDisplay } from "./display-text";
 import { truncateToWidth } from "./truncate";
 
 export interface DisplayLogLine {
@@ -51,11 +51,8 @@ export function renderLogLine(
   const prefixWidth = visibleWidth(prefix);
   const textWidth = Math.max(1, width - prefixWidth);
   const safe = sanitizeForDisplay(line.text);
-  const text = truncateToWidth(
-    plain ? stripSgr(safe) : safe,
-    textWidth,
-    "",
-    true,
+  const text = closeSgr(
+    truncateToWidth(plain ? stripSgr(safe) : safe, textWidth, "", true),
   );
 
   return `${prefix}${toneLogText(text, line.type, emphasis, theme)}`;

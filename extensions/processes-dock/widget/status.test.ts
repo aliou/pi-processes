@@ -33,6 +33,22 @@ const theme = {
 } as never;
 
 describe("renderStatusWidget", () => {
+  it("bounds names by display width and drops escape sequences", () => {
+    const ESC = String.fromCodePoint(0x001b);
+    const wide = renderStatusWidget(
+      [makeProcess({ name: "日本語のプロセス名前です" })],
+      theme,
+    )[0] as string;
+    const escaped = renderStatusWidget(
+      [makeProcess({ name: `${ESC}[2Jdev` })],
+      theme,
+    )[0] as string;
+
+    expect(wide).toContain("日本語のプロセス名…");
+    expect(escaped).not.toContain(ESC);
+    expect(escaped).toContain("dev");
+  });
+
   it("renders nothing when there are no processes", () => {
     expect(renderStatusWidget([], theme)).toEqual([]);
   });

@@ -15,9 +15,10 @@ import {
   type ProcessProtocolNotificationPayload,
 } from "../../../src/protocol";
 import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
-import { formatRuntime, truncateCmd } from "../../../src/utils/format";
+import { formatRuntime } from "../../../src/utils/format";
 import { isRecord } from "../../../src/utils/is-record";
 import { renderProcessTab } from "../../process-tabs";
+import { truncateForDisplay } from "../../shared/display-text";
 import { truncateToWidth } from "../../shared/truncate";
 import { LineComponent, LinesComponent, RuleComponent } from "../../shared/ui";
 import { requestProcessList } from "../client";
@@ -559,7 +560,9 @@ export class LogOverlayComponent implements Component {
       4,
       width - visibleWidth(leftPrefix) - durationWidth - 1,
     );
-    const command = dim(truncateCmd(process.command, availableCommandWidth));
+    const command = dim(
+      truncateForDisplay(process.command, availableCommandWidth),
+    );
     const left = `${leftPrefix}${command}`;
     const gap = Math.max(1, width - visibleWidth(left) - durationWidth);
     return truncateToWidth(`${left}${" ".repeat(gap)}${duration}`, width);

@@ -4,7 +4,7 @@ import type {
   Theme,
 } from "@earendil-works/pi-coding-agent";
 import { type Component, Container, Text } from "@earendil-works/pi-tui";
-import { truncateToWidth } from "../shared/truncate";
+import { truncateForDisplay } from "../shared/display-text";
 import { MESSAGE_TYPE_PROCESS_NOTIFICATION } from "./constants";
 import type { ProcessNotificationDetails } from "./notifications/types";
 
@@ -40,10 +40,15 @@ function formatSummary(
   theme: Theme,
 ): string {
   const prefix = theme.fg("accent", "[process]");
-  const name = theme.fg("muted", `"${details.processName}"`);
+  const name = theme.fg(
+    "muted",
+    `"${truncateForDisplay(details.processName, 60)}"`,
+  );
 
   if (details.logMatch) {
-    const line = truncateToWidth(details.logMatch.line, 160, "…");
+    // Matched text is raw process output: sanitize before it reaches the
+    // transcript, or an escape sequence in a log line hits the terminal.
+    const line = truncateForDisplay(details.logMatch.line, 160);
     return `${prefix} ${name} matched ${details.logMatch.stream}: ${line}`;
   }
 

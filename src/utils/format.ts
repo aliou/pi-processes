@@ -50,14 +50,6 @@ export function formatStatus(proc: {
 }
 
 /**
- * Truncate a command string to a maximum length.
- */
-export function truncateCmd(cmd: string, max = 40): string {
-  if (cmd.length <= max) return cmd;
-  return `${cmd.slice(0, max - 3)}...`;
-}
-
-/**
  * Format a timestamp as an ISO string or "-" if null.
  */
 export function formatTimestamp(ts: number | null): string {

@@ -1,11 +1,6 @@
 export { hasAnsi, stripAnsi } from "./ansi";
 export { resolveShellExecutable, spawnCommand } from "./command-executor";
-export {
-  formatRuntime,
-  formatStatus,
-  formatTimestamp,
-  truncateCmd,
-} from "./format";
+export { formatRuntime, formatStatus, formatTimestamp } from "./format";
 export type { LineMatchMode } from "./match-line";
 export { compileLineMatcher } from "./match-line";
 export { isProcessGroupAlive, killProcessGroup } from "./process-group";

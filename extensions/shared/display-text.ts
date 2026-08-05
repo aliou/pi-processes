@@ -7,6 +7,8 @@
 
 import { visibleWidth } from "@earendil-works/pi-tui";
 
+import { truncateToWidth } from "./truncate";
+
 const ESC = String.fromCodePoint(0x001b);
 const BEL = String.fromCodePoint(0x0007);
 const ST = String.fromCodePoint(0x009c);
@@ -66,6 +68,25 @@ export function sanitizeForDisplay(text: string): string {
 
   if (!keptSgr || out.endsWith(RESET)) return out;
   return `${out}${RESET}`;
+}
+
+/**
+ * Fit a single-line label, such as a command or a process name, into `width`
+ * terminal cells. Sanitizes first, then truncates by display width so wide
+ * characters and emoji cannot over-run the row or get cut mid-grapheme.
+ */
+export function truncateForDisplay(text: string, width: number): string {
+  return closeSgr(truncateToWidth(sanitizeForDisplay(text), width, "…"));
+}
+
+/**
+ * Re-close colors after truncation. `sanitizeForDisplay` ends a colored string
+ * with a reset, but truncating can cut that reset off and let the color bleed
+ * into the rest of the frame.
+ */
+export function closeSgr(text: string): string {
+  if (!text.includes(ESC) || text.trimEnd().endsWith(RESET)) return text;
+  return `${text}${RESET}`;
 }
 
 /**

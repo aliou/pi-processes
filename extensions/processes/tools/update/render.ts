@@ -1,5 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
+import { sanitizeForDisplay } from "../../../shared/display-text";
 import type { LogMatcherConfig } from "../../notifications/registry";
 import { buildMatcherLine, ProcessActionHeader } from "../components";
 import type { ProcessesParamsType } from "../schema";
@@ -31,7 +32,7 @@ export function buildExpanded(details: UpdateDetails, theme: Theme): Container {
   if (details.renamed && details.previousName && details.process) {
     container.addChild(
       new Text(
-        `${theme.fg("muted", "renamed:")} ${details.previousName} -> ${theme.fg("accent", details.process.name)}`,
+        `${theme.fg("muted", "renamed:")} ${sanitizeForDisplay(details.previousName)} -> ${theme.fg("accent", sanitizeForDisplay(details.process.name))}`,
         0,
         0,
       ),
@@ -62,7 +63,7 @@ export function buildCollapsed(
     container.addChild(
       buildField(
         "renamed",
-        `${details.previousName} -> ${details.process.name}`,
+        `${sanitizeForDisplay(details.previousName)} -> ${sanitizeForDisplay(details.process.name)}`,
         theme,
       ),
     );

@@ -1,6 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 
+import { sanitizeForDisplay } from "../../../shared/display-text";
 import { ProcessActionHeader } from "../components";
 import type { ProcessesParamsType } from "../schema";
 import { buildField } from "../utils";
@@ -32,7 +33,7 @@ export function buildExpanded(
   if (bodyLines.length > 0) {
     container.addChild(new Spacer(1));
     for (const line of bodyLines) {
-      container.addChild(new Text(line, 0, 0));
+      container.addChild(new Text(sanitizeForDisplay(line), 0, 0));
     }
   } else {
     container.addChild(new Spacer(1));
@@ -61,7 +62,7 @@ export function buildCollapsed(
   container.addChild(
     new Text(
       [
-        details.processName,
+        sanitizeForDisplay(details.processName),
         theme.fg("accent", details.id),
         theme.fg(getStatusTone(details), details.processStatus),
       ]
@@ -73,7 +74,7 @@ export function buildCollapsed(
   );
 
   const bodyLines = extractOutputBody(contentText, details);
-  const preview = bodyLines.slice(-2).join("\n");
+  const preview = bodyLines.slice(-2).map(sanitizeForDisplay).join("\n");
 
   if (preview) {
     container.addChild(new Text(theme.fg("muted", preview), 0, 0));

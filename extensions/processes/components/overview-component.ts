@@ -10,7 +10,11 @@ import {
 } from "@earendil-works/pi-tui";
 import { CHANNELS, type ProcessProtocolConfig } from "../../../src/protocol";
 import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
-import { formatRuntime, truncateCmd } from "../../../src/utils/format";
+import { formatRuntime } from "../../../src/utils/format";
+import {
+  sanitizeForDisplay,
+  truncateForDisplay,
+} from "../../shared/display-text";
 import { buildDroppedOutputLine, trimToBudget } from "../../shared/line-buffer";
 import { renderLogLine } from "../../shared/log-line";
 import { isOutputChangedPayload } from "../../shared/output-payload";
@@ -574,7 +578,12 @@ export class OverviewComponent implements Component {
     width: number,
   ): string {
     const t = this.opts.theme;
-    const name = truncateToWidth(process.name, MAX_NAME_WIDTH, "", true);
+    const name = truncateToWidth(
+      sanitizeForDisplay(process.name),
+      MAX_NAME_WIDTH,
+      "",
+      true,
+    );
     const id = truncateToWidth(process.id, MAX_ID_WIDTH, "", true);
     const status = truncateToWidth(
       formatColoredStatusShort(process, t),
@@ -597,7 +606,7 @@ export class OverviewComponent implements Component {
     const marker = this.pinnedId === process.id ? t.fg("accent", "◆") : " ";
     const left = `${marker} ${name}${sep}${dim(id)}${sep}${status}${sep}${runtime}`;
     const remaining = Math.max(0, width - visibleWidth(left) - 2);
-    const command = dim(truncateCmd(process.command, remaining));
+    const command = dim(truncateForDisplay(process.command, remaining));
     const line = `${left}${sep}${command}`;
 
     if (selected) {
@@ -615,7 +624,7 @@ export class OverviewComponent implements Component {
     const dim = (value: string) => t.fg("dim", value);
     const accent = (value: string) => t.fg("accent", value);
 
-    const header = `${dim(">")} ${accent(truncateCmd(selected.command, Math.max(1, width - 2)))}`;
+    const header = `${dim(">")} ${accent(truncateForDisplay(selected.command, Math.max(1, width - 2)))}`;
     const body: string[] = [header];
     const available = this.previewHeight();
     const total = this.previewLines.length;

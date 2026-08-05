@@ -4,6 +4,7 @@ import { type Component, visibleWidth } from "@earendil-works/pi-tui";
 import type { ProcessInfo } from "../../../src/types";
 import { LIVE_STATUSES } from "../../../src/types";
 import { renderProcessTab } from "../../process-tabs";
+import { sanitizeForDisplay } from "../../shared/display-text";
 import { displayTextOf, renderLogLine } from "../../shared/log-line";
 import { truncateToWidth } from "../../shared/truncate";
 import {
@@ -362,6 +363,6 @@ function centerLine(content: string, width: number, height: number): string[] {
 }
 
 function padName(value: string, width: number): string {
-  const name = truncateToWidth(value, width, "", true);
+  const name = truncateToWidth(sanitizeForDisplay(value), width, "", true);
   return `${name}${" ".repeat(Math.max(0, width - visibleWidth(name)))}`;
 }

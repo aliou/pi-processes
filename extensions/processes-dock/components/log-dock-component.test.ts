@@ -1,4 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 import type { ProcessInfo } from "../../../src/types";
 import { type LogDockSnapshot, renderLogDock } from "./log-dock-component";
@@ -61,6 +62,39 @@ function snapshot(overrides: Partial<LogDockSnapshot> = {}): LogDockSnapshot {
 }
 
 describe("renderLogDock", () => {
+  it("keeps hostile names and log text out of the terminal", () => {
+    const ESC = String.fromCodePoint(0x001b);
+    const evil = process({ id: "proc_1", name: `${ESC}[2Japi` });
+    const lines = renderLogDock(
+      snapshot({
+        processes: [evil],
+        pinnedProcess: null,
+        pinnedLines: [],
+        processLogStream: [
+          {
+            processId: evil.id,
+            line: { type: "stdout", text: `${ESC}[2Jwiped\rback` },
+          },
+        ],
+        state: {
+          visibility: "expanded",
+          followEnabled: true,
+          focusedProcessId: null,
+        },
+      }),
+      makeTheme(),
+      60,
+      4,
+    );
+
+    const output = lines.join("\n");
+    expect(output).not.toContain(`${ESC}[2J`);
+    expect(output).not.toContain("\r");
+    expect(output).toContain("wipedback");
+    for (const line of lines)
+      expect(visibleWidth(line)).toBeLessThanOrEqual(60);
+  });
+
   it("renders nothing when closed", () => {
     const lines = renderLogDock(
       snapshot({

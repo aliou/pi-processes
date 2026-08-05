@@ -1,6 +1,9 @@
 import type { EventBus } from "@earendil-works/pi-coding-agent";
 import type { AutocompleteItem } from "@earendil-works/pi-tui";
-import { formatProcessSelectionDescription } from "../shared/ui";
+import {
+  formatProcessSelectionDescription,
+  formatProcessSelectionLabel,
+} from "../shared/ui";
 import { requestProcessList } from "./client";
 
 export function allProcessCompletions(
@@ -23,7 +26,7 @@ function buildCompletions(
     )
     .map((process) => ({
       value: process.id,
-      label: `${process.name} (${process.id})`,
+      label: formatProcessSelectionLabel(process),
       description: formatProcessSelectionDescription(process),
     }));
 

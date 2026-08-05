@@ -13,6 +13,7 @@ import { type Component, visibleWidth } from "@earendil-works/pi-tui";
 
 import { LIVE_STATUSES, type ProcessInfo } from "../../src/types";
 import { formatStatus } from "../../src/utils/format";
+import { sanitizeForDisplay } from "./display-text";
 
 // ---------------------------------------------------------------------------
 // Render components
@@ -72,7 +73,7 @@ export function clampNameColumn(
   min: number = MIN_NAME_COLUMN,
 ): number {
   const longest = processes.reduce(
-    (acc, p) => Math.max(acc, visibleWidth(p.name)),
+    (acc, p) => Math.max(acc, visibleWidth(sanitizeForDisplay(p.name))),
     0,
   );
   return Math.min(Math.max(longest, min), max);
@@ -133,6 +134,15 @@ export function statusDot(
 }
 
 /**
+ * Build the `label` string for process picker items and autocomplete
+ * completions: `"api (proc_1)"`. Names are untrusted display text, so they are
+ * sanitized here instead of at every call site.
+ */
+export function formatProcessSelectionLabel(process: ProcessInfo): string {
+  return `${sanitizeForDisplay(process.name)} (${process.id})`;
+}
+
+/**
  * Build the `description` string for process picker items and autocomplete
  * completions: `"running — pnpm dev"`. Shared so `/ps:kill`, `/ps:logs`,
  * `/ps:pin`, and the logs completions stay consistent.
@@ -141,6 +151,6 @@ export function formatProcessSelectionDescription(
   process: ProcessInfo,
   suffix = "",
 ): string {
-  const base = `${formatStatus(process)} — ${process.command}`;
+  const base = `${formatStatus(process)} — ${sanitizeForDisplay(process.command)}`;
   return suffix ? `${base}${suffix}` : base;
 }

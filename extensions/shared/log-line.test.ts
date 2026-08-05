@@ -56,6 +56,15 @@ describe("renderLogLine", () => {
     ).toBe("red");
   });
 
+  it("closes colors that truncation would leave open", () => {
+    const line = renderLogLine(
+      { type: "stdout", text: `${ESC}[31mred text that keeps going` },
+      { theme, width: 8 },
+    );
+
+    expect(line.endsWith(`${ESC}[0m`)).toBe(true);
+  });
+
   it("tones stderr and match state by priority", () => {
     const stderr = renderLogLine(
       { type: "stderr", text: "err" },

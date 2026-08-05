@@ -56,6 +56,7 @@ Avoid fixed sleeps in both unit and e2e tests. Prefer event-driven helpers that 
 - `extensions/processes-logs/` - `/ps:logs` command and log overlay
 - `extensions/processes-dock/` - `/ps:dock`, `/ps:pin` commands, dock widget, status widget, `COMMAND_PIN` handler
 - `extensions/shared/` - shared UI helpers used across all three extensions: `ui.ts` (`statusDot`, `processStatusTone`, `LineComponent`), `display-text.ts` (`sanitizeForDisplay`), `truncate.ts` (ANSI-safe `truncateToWidth`), `log-line.ts` (`renderLogLine`), `line-buffer.ts`
+- `plugins/` - repo-local Biome GritQL lint plugins, registered in `biome.json`
 - `skills/` - shipped package skills consumed by Pi
 - `.agents/skills/` - local repo-only skills for development workflows
 
@@ -68,6 +69,15 @@ Build TUI output with `Container` + `addChild`. Do not join strings and pass the
 - Render functions must be pure. Do not mutate `this.children` inside `render()`.
 - Use a class extending `Container` (or implementing `Component`) for reused UI pieces.
 - Use inline `Container` composition for one-off render trees.
+
+### Untrusted text
+
+Process output, names, commands, and cwd are untrusted display text. Never interpolate them into a rendered string raw.
+
+- Log lines: `renderLogLine` from `extensions/shared/log-line.ts`.
+- Bounded labels: `truncateForDisplay` from `extensions/shared/display-text.ts`.
+- Everything else: `sanitizeForDisplay`.
+- Truncate with `truncateToWidth` from `extensions/shared/truncate.ts`, never the one from `@earendil-works/pi-tui`. Pi's version injects `ESC[0m` and mis-parses non-SGR escape sequences; `plugins/no-pi-tui-truncate.grit` fails the lint if it is imported.
 
 ## Builder pattern for UI helpers
 

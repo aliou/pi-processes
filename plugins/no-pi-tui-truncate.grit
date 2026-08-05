@@ -1,0 +1,18 @@
+engine biome(1.0)
+language js(typescript)
+
+// Pi's truncateToWidth injects ESC[0m after the kept prefix and around the
+// ellipsis, so a caller-applied color or background ends early and the
+// ellipsis and padding render unstyled. Its CSI parser also only accepts the
+// finals m, G, K, H, and J, so any other escape sequence swallows visible text
+// and skews the measured width. extensions/shared/truncate.ts fixes both.
+JsImport() as $import where {
+    $import <: contains JsModuleSource() as $source,
+    $source <: r"[\"']@earendil-works/pi-tui[\"']",
+    $import <: r"(?s).*truncateToWidth.*",
+    register_diagnostic(
+        span = $import,
+        message = "Import truncateToWidth from extensions/shared/truncate, not @earendil-works/pi-tui. Pi's version injects resets that break caller styling and mis-parses non-SGR escape sequences.",
+        severity = "error"
+    )
+}

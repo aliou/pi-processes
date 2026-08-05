@@ -39,7 +39,21 @@ describe("renderLogLine", () => {
       { theme, width: 20 },
     );
 
-    expect(line.trimEnd()).toBe("wipedback");
+    expect(line.trimEnd()).toBe("back");
+  });
+
+  it("renders carriage-return progress as the final update", () => {
+    const line = renderLogLine(
+      {
+        type: "stderr",
+        text: "\rsynthesized 2/52 \rsynthesized 3/52 \rsynthesized 52/52 ",
+      },
+      { theme, width: 80 },
+    );
+
+    expect(line.startsWith("[warning]synthesized 52/52 ")).toBe(true);
+    expect(line).not.toContain("synthesized 2/52");
+    expect(line).not.toContain("synthesized 3/52");
   });
 
   it("keeps colors unless plain is requested", () => {
@@ -108,5 +122,8 @@ describe("renderLogLine", () => {
     expect(displayTextOf({ type: "stdout", text: `${ESC}[2Kready` })).toBe(
       "ready",
     );
+    expect(
+      displayTextOf({ type: "stdout", text: `${ESC}[31mred${ESC}[0m` }),
+    ).toBe("red");
   });
 });

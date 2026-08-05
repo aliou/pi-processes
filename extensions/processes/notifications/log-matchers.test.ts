@@ -243,6 +243,68 @@ describe("evaluateLogMatchers", () => {
     expect(results).toHaveLength(1);
   });
 
+  it("matches carriage-return progress against the displayed final update", () => {
+    const matchers = compileLogMatchers({
+      logMatches: [
+        { pattern: "synthesized 2/52" },
+        { pattern: "synthesized 52/52" },
+      ],
+    });
+
+    const results = evaluateLogMatchers(
+      matchers,
+      [
+        {
+          type: "stderr",
+          text: "\rsynthesized 2/52 \rsynthesized 3/52 \rsynthesized 52/52 ",
+        },
+      ],
+      1000,
+    );
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      pattern: "synthesized 52/52",
+      line: "synthesized 52/52 ",
+    });
+  });
+
+  it("does not match text hidden inside dropped escape payloads", () => {
+    const ESC = String.fromCodePoint(0x1b);
+    const BEL = String.fromCodePoint(0x07);
+    const matchers = compileLogMatchers({
+      logMatches: [{ pattern: "hidden" }, { pattern: "visible" }],
+    });
+
+    const results = evaluateLogMatchers(
+      matchers,
+      [{ type: "stdout", text: `${ESC}]0;hidden${BEL}visible` }],
+      1000,
+    );
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      pattern: "visible",
+      line: "visible",
+    });
+  });
+
+  it("does not match invisible SGR styling bytes", () => {
+    const ESC = String.fromCodePoint(0x1b);
+    const matchers = compileLogMatchers({
+      logMatches: [{ pattern: "31m" }, { pattern: "red" }],
+    });
+
+    const results = evaluateLogMatchers(
+      matchers,
+      [{ type: "stdout", text: `${ESC}[31mred${ESC}[0m` }],
+      1000,
+    );
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({ pattern: "red", line: "red" });
+  });
+
   it("supports both stream matching", () => {
     const matchers = compileLogMatchers({
       logMatches: [{ pattern: "warn", stream: "both" }],

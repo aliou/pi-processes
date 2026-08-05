@@ -223,9 +223,24 @@ describe("LogFileViewer", () => {
     expect(lines).toEqual([
       "wiped",
       "kept",
-      "overwrite",
+      "write",
       `${ESC}[31mcolored${ESC}[0m`,
     ]);
+  });
+
+  it("renders carriage-return progress as the final update", () => {
+    const viewer = new LogFileViewer(
+      [
+        {
+          type: "stderr",
+          text: "\rsynthesized 2/52 \rsynthesized 3/52 \rsynthesized 52/52 ",
+        },
+      ],
+      makeTheme(),
+      { followEnabled: false, maxBufferLines: 10 },
+    );
+
+    expect(trimLines(viewer.render(80, 1))).toEqual(["synthesized 52/52"]);
   });
 
   it("matches notify lines after sanitizing", () => {
@@ -239,6 +254,22 @@ describe("LogFileViewer", () => {
     );
 
     viewer.addNotifyMatch({ line: `${ESC}[2Kready` });
+    viewer.render(40, 1);
+
+    expect(underline).toHaveBeenCalledTimes(1);
+  });
+
+  it("matches notify lines by visible text when output is colored", () => {
+    const ESC = String.fromCodePoint(0x1b);
+    const underline = vi.fn((text: string) => text);
+    const theme = { ...makeTheme(), underline } as unknown as Theme;
+    const viewer = new LogFileViewer(
+      [{ type: "stdout", text: `${ESC}[31mready${ESC}[0m` }],
+      theme,
+      { followEnabled: false, maxBufferLines: 10 },
+    );
+
+    viewer.addNotifyMatch({ line: "ready" });
     viewer.render(40, 1);
 
     expect(underline).toHaveBeenCalledTimes(1);

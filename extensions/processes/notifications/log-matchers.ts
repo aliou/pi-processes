@@ -1,4 +1,5 @@
 import { compileLineMatcher } from "../../../src/utils/match-line";
+import { plainTextForDisplay } from "../../shared/display-text";
 import type { NotifyConfig } from "./registry";
 import type { Attention } from "./types";
 
@@ -130,8 +131,12 @@ function splitAppendedIntoLines(
   for (const entry of appended) {
     const split = entry.text.split("\n");
     for (const line of split) {
-      if (line.length === 0) continue;
-      lines.push({ type: entry.type, text: line });
+      // Match the same per-line visible text the log views render. This keeps
+      // CR-overwritten progress and invisible escape bytes from firing
+      // watches, without making watches depend on viewport width.
+      const displayLine = plainTextForDisplay(line);
+      if (displayLine.length === 0) continue;
+      lines.push({ type: entry.type, text: displayLine });
     }
   }
 

@@ -90,9 +90,35 @@ describe("renderLogDock", () => {
     const output = lines.join("\n");
     expect(output).not.toContain(`${ESC}[2J`);
     expect(output).not.toContain("\r");
-    expect(output).toContain("wipedback");
+    expect(output).toContain("back");
     for (const line of lines)
       expect(visibleWidth(line)).toBeLessThanOrEqual(60);
+  });
+
+  it("renders carriage-return progress as the final update", () => {
+    const lines = renderLogDock(
+      snapshot({
+        pinnedLines: [
+          {
+            type: "stderr",
+            text: "\rsynthesized 2/52 \rsynthesized 3/52 \rsynthesized 52/52 ",
+          },
+        ],
+        state: {
+          visibility: "expanded",
+          followEnabled: true,
+          focusedProcessId: "proc_1",
+        },
+      }),
+      makeTheme(),
+      100,
+      3,
+    );
+
+    const output = lines.join("\n");
+    expect(output).toContain("synthesized 52/52");
+    expect(output).not.toContain("synthesized 2/52");
+    expect(output).not.toContain("synthesized 3/52");
   });
 
   it("renders nothing when closed", () => {

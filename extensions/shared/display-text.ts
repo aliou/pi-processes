@@ -13,10 +13,17 @@ const ESC = String.fromCodePoint(0x001b);
 const BEL = String.fromCodePoint(0x0007);
 const ST = String.fromCodePoint(0x009c);
 const RESET = `${ESC}[0m`;
+const C1_DCS = String.fromCodePoint(0x0090);
+const C1_SOS = String.fromCodePoint(0x0098);
+const C1_OSC = String.fromCodePoint(0x009d);
+const C1_PM = String.fromCodePoint(0x009e);
+const C1_APC = String.fromCodePoint(0x009f);
+const C1_STRING_INTRODUCERS = [C1_DCS, C1_SOS, C1_OSC, C1_PM, C1_APC];
 
-// Control characters a single display row must never contain. Tabs are handled
-// separately; newlines are dropped because they would shift the whole frame.
-// C1 controls are included: a raw \u009b is an alias for CSI on some terminals.
+// Control characters a single display row must never contain. Tabs and
+// carriage returns are handled separately; newlines are dropped because they
+// would shift the whole frame. C1 controls are included: a raw \u009b is an
+// alias for CSI on some terminals.
 // biome-ignore lint/suspicious/noControlCharactersInRegex: this regex intentionally targets terminal control characters.
 const DISPLAY_CONTROL_CHARS = /[\u0000-\u0008\u000a-\u001f\u007f-\u009f]/gu;
 
@@ -41,7 +48,9 @@ const TAB_WIDTH = 8;
  * into the rest of the frame.
  */
 export function sanitizeForDisplay(text: string): string {
-  if (!text.includes(ESC)) return cleanPlainText(text, 0).text;
+  if (!text.includes(ESC) && !hasC1StringIntroducer(text)) {
+    return cleanPlainText(text, 0).text;
+  }
 
   let out = "";
   let cursor = 0;
@@ -49,21 +58,34 @@ export function sanitizeForDisplay(text: string): string {
   let keptSgr = false;
 
   while (cursor < text.length) {
-    const escapeAt = text.indexOf(ESC, cursor);
-    if (escapeAt === -1) {
-      out += cleanPlainText(text.slice(cursor), column).text;
+    const sequenceAt = findNextSequenceStart(text, cursor);
+    if (sequenceAt === -1) {
+      const chunk = cleanPlainText(text.slice(cursor), column);
+      if (chunk.resetsRow) {
+        out = "";
+        keptSgr = false;
+      }
+      out += chunk.text;
       break;
     }
-    const chunk = cleanPlainText(text.slice(cursor, escapeAt), column);
+    const chunk = cleanPlainText(text.slice(cursor, sequenceAt), column);
+    if (chunk.resetsRow) {
+      out = "";
+      keptSgr = false;
+    }
     out += chunk.text;
     column = chunk.column;
 
-    const sequence = readEscapeSequence(text, escapeAt);
-    if (sequence.isSgr) {
-      out += text.slice(escapeAt, sequence.end);
-      keptSgr = true;
+    if (text[sequenceAt] === ESC) {
+      const sequence = readEscapeSequence(text, sequenceAt);
+      if (sequence.isSgr) {
+        out += text.slice(sequenceAt, sequence.end);
+        keptSgr = true;
+      }
+      cursor = sequence.end;
+    } else {
+      cursor = readC1StringSequence(text, sequenceAt).end;
     }
-    cursor = sequence.end;
   }
 
   if (!keptSgr || out.endsWith(RESET)) return out;
@@ -77,6 +99,22 @@ export function sanitizeForDisplay(text: string): string {
  */
 export function truncateForDisplay(text: string, width: number): string {
   return closeSgr(truncateToWidth(sanitizeForDisplay(text), width, "…"));
+}
+
+/**
+ * Return the unstyled text a user can actually read after terminal controls
+ * have been interpreted/dropped. Use this for comparisons such as search,
+ * notify markers, and log watches so invisible escape bytes cannot match.
+ */
+export function plainTextForDisplay(text: string): string {
+  return stripSgr(sanitizeForDisplay(text));
+}
+
+const SGR = new RegExp(`${ESC}\\[[0-9;:]*m`, "gu");
+
+/** Drop the SGR sequences `sanitizeForDisplay` kept for rendering colors. */
+export function stripSgr(text: string): string {
+  return text.replace(SGR, "");
 }
 
 /**
@@ -97,21 +135,42 @@ export function closeSgr(text: string): string {
 function cleanPlainText(
   text: string,
   column: number,
-): { text: string; column: number } {
-  const clean = text.replace(DISPLAY_CONTROL_CHARS, "");
+): { text: string; column: number; resetsRow: boolean } {
+  const carriageReturn = text.lastIndexOf("\r");
+  const resetsRow = carriageReturn !== -1;
+  const visibleText = resetsRow ? text.slice(carriageReturn + 1) : text;
+  const startColumn = resetsRow ? 0 : column;
+  const clean = visibleText.replace(DISPLAY_CONTROL_CHARS, "");
   if (!clean.includes("\t")) {
-    return { text: clean, column: column + visibleWidth(clean) };
+    return {
+      text: clean,
+      column: startColumn + visibleWidth(clean),
+      resetsRow,
+    };
   }
 
   const parts = clean.split("\t");
   let out = parts[0] ?? "";
-  let col = column + visibleWidth(out);
+  let col = startColumn + visibleWidth(out);
   for (const part of parts.slice(1)) {
     const spaces = TAB_WIDTH - (col % TAB_WIDTH);
     out += " ".repeat(spaces) + part;
     col += spaces + visibleWidth(part);
   }
-  return { text: out, column: col };
+  return { text: out, column: col, resetsRow };
+}
+
+function findNextSequenceStart(text: string, cursor: number): number {
+  let next = text.indexOf(ESC, cursor);
+  for (const introducer of C1_STRING_INTRODUCERS) {
+    const index = text.indexOf(introducer, cursor);
+    if (index !== -1 && (next === -1 || index < next)) next = index;
+  }
+  return next;
+}
+
+function hasC1StringIntroducer(text: string): boolean {
+  return C1_STRING_INTRODUCERS.some((introducer) => text.includes(introducer));
 }
 
 /**
@@ -149,6 +208,12 @@ function readEscapeSequence(
 
   // Everything else is a two-byte escape: ESC c (reset), ESC 7/8, ESC =, ...
   return { end: start + 2, isSgr: false };
+}
+
+function readC1StringSequence(text: string, start: number): { end: number } {
+  const introducer = text[start];
+  const allowBel = introducer === C1_OSC || introducer === C1_APC;
+  return { end: findStringTerminator(text, start + 1, allowBel) };
 }
 
 /** Index just past the terminator of a string sequence, else end of input. */

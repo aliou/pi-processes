@@ -1,8 +1,15 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import { sanitizeForDisplay } from "../../shared/display-text";
+import {
+  plainTextForDisplay,
+  sanitizeForDisplay,
+} from "../../shared/display-text";
 import { trimToBudget } from "../../shared/line-buffer";
-import { type LogLineEmphasis, renderLogLine } from "../../shared/log-line";
+import {
+  displayTextOf,
+  type LogLineEmphasis,
+  renderLogLine,
+} from "../../shared/log-line";
 import { truncateToWidth } from "../../shared/truncate";
 import type { ProcessLogLine } from "../logs-client";
 
@@ -122,8 +129,9 @@ export class LogFileViewer {
    * priority (search current match > search match > notify match > stream).
    */
   addNotifyMatch(match: { line: string }): void {
-    // Stored sanitized so it can be compared against sanitized buffer lines.
-    const line = sanitizeForDisplay(match.line);
+    // Stored as plain visible text so invisible escape bytes cannot be what
+    // makes a notification marker match.
+    const line = plainTextForDisplay(match.line);
     if (line) this.notifyLines.add(line);
   }
 
@@ -192,7 +200,8 @@ export class LogFileViewer {
           ? "search-current"
           : matchSet.has(visibleIndex)
             ? "search"
-            : this.notifyLines.has(line.text)
+            : this.notifyLines.has(line.text) ||
+                this.notifyLines.has(displayTextOf(line))
               ? "notify"
               : "none";
       return renderLogLine(line, { theme: this.theme, width, emphasis });

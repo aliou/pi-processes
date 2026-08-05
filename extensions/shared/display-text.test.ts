@@ -1,7 +1,11 @@
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 
-import { sanitizeForDisplay, truncateForDisplay } from "./display-text";
+import {
+  plainTextForDisplay,
+  sanitizeForDisplay,
+  truncateForDisplay,
+} from "./display-text";
 
 const ESC = String.fromCodePoint(0x001b);
 const BEL = String.fromCodePoint(0x0007);
@@ -44,6 +48,11 @@ describe("sanitizeForDisplay", () => {
     expect(sanitizeForDisplay(`${ESC}Pdata${C1_ST}kept`)).toBe("kept");
   });
 
+  it("drops C1 string payloads before applying carriage returns", () => {
+    const C1_OSC = String.fromCodePoint(0x9d);
+    expect(sanitizeForDisplay(`old${C1_OSC}0;ti\rtle${BEL}new`)).toBe("oldnew");
+  });
+
   it("treats BEL inside a DCS payload as data, not a terminator", () => {
     expect(sanitizeForDisplay(`${ESC}Pq${BEL}payload${ESC}\\kept`)).toBe(
       "kept",
@@ -67,16 +76,24 @@ describe("sanitizeForDisplay", () => {
     ["dcs", `${ESC}Pq#0;2;0;0;0${ESC}\\tail`, "tail"],
     ["terminal reset", `${ESC}csurvived`, "survived"],
     ["charset designator", `${ESC}(0lqk`, "lqk"],
-    [
-      "carriage return",
-      "progress 10%\rprogress 99%",
-      "progress 10%progress 99%",
-    ],
+    ["carriage return", "progress 10%\rprogress 99%", "progress 99%"],
     ["backspace", "abc\b\b\bxyz", "abcxyz"],
     ["bell", "ding\u0007ding", "dingding"],
     ["c1 csi", `${String.fromCodePoint(0x9b)}2Jboom`, "2Jboom"],
   ])("neutralizes %s", (_name, input, expected) => {
     expect(sanitizeForDisplay(input)).toBe(expected);
+  });
+
+  it("shows the final carriage-return progress update", () => {
+    expect(
+      sanitizeForDisplay(
+        "\rsynthesized 2/52 \rsynthesized 3/52 \rsynthesized 52/52 ",
+      ),
+    ).toBe("synthesized 52/52 ");
+  });
+
+  it("ignores carriage returns inside dropped escape payloads", () => {
+    expect(sanitizeForDisplay(`old${ESC}]0;ti\rtle${BEL}new`)).toBe("oldnew");
   });
 
   it("drops unterminated sequences along with their payload", () => {
@@ -93,10 +110,16 @@ describe("sanitizeForDisplay", () => {
     const nasty = `${ESC}[31mred${ESC}[2J${ESC}]0;x${BEL}\rmore${ESC}[1A`;
     const output = sanitizeForDisplay(nasty);
 
-    expect(output).toBe(`${ESC}[31mredmore${RESET}`);
+    expect(output).toBe("more");
     const sgr = new RegExp(`${ESC}\\[[0-9;:]*m`, "gu");
-    expect(output.match(sgr)).toEqual([`${ESC}[31m`, `${ESC}[0m`]);
-    expect(output.split(ESC)).toHaveLength(3);
+    expect(output.match(sgr)).toBeNull();
+    expect(output.split(ESC)).toHaveLength(1);
+  });
+
+  it("returns plain visible text for comparisons", () => {
+    expect(
+      plainTextForDisplay(`${ESC}[31mred${ESC}[0m\rover${ESC}]0;hidden${BEL}`),
+    ).toBe("over");
   });
 });
 

@@ -10,7 +10,12 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
 
-import { closeSgr, sanitizeForDisplay } from "./display-text";
+import {
+  closeSgr,
+  plainTextForDisplay,
+  sanitizeForDisplay,
+  stripSgr,
+} from "./display-text";
 import { truncateToWidth } from "./truncate";
 
 export interface DisplayLogLine {
@@ -60,7 +65,7 @@ export function renderLogLine(
 
 /** Text of a log line as the views display it, for match comparisons. */
 export function displayTextOf(line: DisplayLogLine): string {
-  return sanitizeForDisplay(line.text);
+  return plainTextForDisplay(line.text);
 }
 
 function toneLogText(
@@ -74,11 +79,4 @@ function toneLogText(
   if (emphasis === "notify") return theme.underline(text);
   if (type === "stderr") return theme.fg("warning", text);
   return text;
-}
-
-const SGR = new RegExp(`${String.fromCodePoint(0x001b)}\\[[0-9;:]*m`, "gu");
-
-/** Drop the SGR sequences `sanitizeForDisplay` kept. */
-function stripSgr(text: string): string {
-  return text.replace(SGR, "");
 }

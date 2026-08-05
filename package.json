@@ -43,7 +43,7 @@
     "CONTRIBUTING.md"
   ],
   "dependencies": {
-    "@aliou/pi-utils-settings": "^0.18.0",
+    "@aliou/pi-utils-settings": "^0.19.1",
     "@aliou/pi-utils-ui": "^0.5.0",
     "@aliou/sh": "^0.1.0"
   },
@@ -75,8 +75,8 @@
     "typecheck:evals": "tsc --noEmit -p tests/evals/tsconfig.json",
     "lint": "biome check",
     "format": "biome check --write",
-    "gen:schema": "ts-json-schema-generator --path extensions/processes/config/types.ts --type ProcessConfig --no-type-check -o schema.json",
-    "check:schema": "ts-json-schema-generator --path extensions/processes/config/types.ts --type ProcessConfig --no-type-check -o /tmp/pi-processes-schema-check.json && diff -q schema.json /tmp/pi-processes-schema-check.json",
+    "gen:schema": "pi-settings-schema -p extensions/processes/config/types.ts -t ProcessConfig -o schema.json --version 0.10.6",
+    "check:schema": "pi-settings-schema -p extensions/processes/config/types.ts -t ProcessConfig -o schema.json --version 0.10.6 --check",
     "check:changesets": "node scripts/check-changesets.ts",
     "check:lockfile": "pnpm install --frozen-lockfile --ignore-scripts",
     "prepare": "[ -d .git ] && husky || true",

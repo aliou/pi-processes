@@ -13,8 +13,8 @@ importers:
   .:
     dependencies:
       '@aliou/pi-utils-settings':
-        specifier: ^0.18.0
-        version: 0.18.0(@earendil-works/pi-coding-agent@0.84.1(ws@8.19.0)(zod@3.25.76))(@earendil-works/pi-tui@0.84.1)
+        specifier: ^0.19.1
+        version: 0.19.1(@earendil-works/pi-coding-agent@0.84.1(ws@8.19.0)(zod@3.25.76))(@earendil-works/pi-tui@0.84.1)(ts-json-schema-generator@2.9.0)
       '@aliou/pi-utils-ui':
         specifier: ^0.5.0
         version: 0.5.0(@earendil-works/pi-coding-agent@0.84.1(ws@8.19.0)(zod@3.25.76))(@earendil-works/pi-tui@0.84.1)
@@ -75,12 +75,16 @@ packages:
     peerDependencies:
       '@biomejs/biome': '>=2.4.0'
 
-  '@aliou/pi-utils-settings@0.18.0':
-    resolution: {integrity: sha512-ct3Jt9Q7yyv1pHLQLlNrrFqNp6zvxC9nxjN8ak68ZIEfjMlK4tcdvlFxoAqv7yO7VLNFSgS7Us9ICKriK605lQ==}
+  '@aliou/pi-utils-settings@0.19.1':
+    resolution: {integrity: sha512-bAx2v1GSiqhj+Z9eU+Ixn1NJDVRp6e/h8bBFcWrKl6CnfbD1AfFgT/I4nNOzwZy0VgxnZLAqPFHbV184Ii9vaw==}
+    hasBin: true
     peerDependencies:
       '@earendil-works/pi-coding-agent': '>=0.74.0 <1'
+      ts-json-schema-generator: '>=2.4.0 <3'
     peerDependenciesMeta:
       '@earendil-works/pi-coding-agent':
+        optional: true
+      ts-json-schema-generator:
         optional: true
 
   '@aliou/pi-utils-ui@0.4.1':
@@ -1942,11 +1946,12 @@ snapshots:
     dependencies:
       '@biomejs/biome': 2.4.15
 
-  '@aliou/pi-utils-settings@0.18.0(@earendil-works/pi-coding-agent@0.84.1(ws@8.19.0)(zod@3.25.76))(@earendil-works/pi-tui@0.84.1)':
+  '@aliou/pi-utils-settings@0.19.1(@earendil-works/pi-coding-agent@0.84.1(ws@8.19.0)(zod@3.25.76))(@earendil-works/pi-tui@0.84.1)(ts-json-schema-generator@2.9.0)':
     dependencies:
       '@aliou/pi-utils-ui': 0.4.1(@earendil-works/pi-coding-agent@0.84.1(ws@8.19.0)(zod@3.25.76))(@earendil-works/pi-tui@0.84.1)
     optionalDependencies:
       '@earendil-works/pi-coding-agent': 0.84.1(ws@8.19.0)(zod@3.25.76)
+      ts-json-schema-generator: 2.9.0
     transitivePeerDependencies:
       - '@earendil-works/pi-tui'
 
@@ -2233,7 +2238,7 @@ snapshots:
       outdent: 0.5.0
       prettier: 2.8.8
       resolve-from: 5.0.0
-      semver: 7.7.4
+      semver: 7.8.0
 
   '@changesets/assemble-release-plan@6.0.9':
     dependencies:
@@ -2242,7 +2247,7 @@ snapshots:
       '@changesets/should-skip-package': 0.1.2
       '@changesets/types': 6.1.0
       '@manypkg/get-packages': 1.1.3
-      semver: 7.7.4
+      semver: 7.8.0
 
   '@changesets/changelog-git@0.2.1':
     dependencies:
@@ -2300,7 +2305,7 @@ snapshots:
       '@changesets/types': 6.1.0
       '@manypkg/get-packages': 1.1.3
       picocolors: 1.1.1
-      semver: 7.7.4
+      semver: 7.8.0
 
   '@changesets/get-release-plan@4.0.14':
     dependencies:

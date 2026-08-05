@@ -1,8 +1,4 @@
-import {
-  ConfigLoader,
-  type ConfigStore,
-  type Scope,
-} from "@aliou/pi-utils-settings";
+import { ConfigLoader } from "@aliou/pi-utils-settings";
 import { DEFAULT_CONFIG } from "./defaults";
 import { importLegacyProcessConfig, migrations } from "./migrations";
 import { PROCESS_CONFIG_SCHEMA_URL } from "./schema";
@@ -41,22 +37,3 @@ export const configLoader = new ConfigLoader<
   migrations,
   schemaUrl: PROCESS_CONFIG_SCHEMA_URL,
 });
-
-export function createSettingsConfigStore(): ConfigStore<
-  ProcessConfig,
-  ProcessProtocolConfig
-> {
-  return {
-    save: (scope, config) => configLoader.save(scope, config),
-    getConfig: () => configLoader.getConfig(),
-    getRawConfig: (scope) => configLoader.getRawConfig(scope),
-    hasScope: (scope) => configLoader.hasScope(scope),
-    hasConfig: (scope) => configLoader.hasConfig(scope),
-    getEnabledScopes: () => {
-      const enabled = new Set(configLoader.getEnabledScopes());
-      return (["global", "local", "memory"] as Scope[]).filter((scope) =>
-        enabled.has(scope),
-      );
-    },
-  };
-}

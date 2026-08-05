@@ -49,12 +49,13 @@ export interface WidgetConfig {
   dockHeight?: number;
 }
 
-/** User-facing pi-processes settings stored on disk. */
+/**
+ * User-facing pi-processes settings stored on disk.
+ *
+ * The reserved `$schema` and `version` keys are owned by the config loader
+ * and injected into schema.json by `pi-settings-schema`.
+ */
 export interface ProcessConfig {
-  /** JSON Schema URL used by editors for validation and autocomplete. */
-  $schema?: string;
-  /** Config migration marker written after v0.10.0 settings migration. */
-  version?: string;
   /** Process execution settings. */
   execution?: ExecutionConfig;
   /** Shell-command interception settings. */

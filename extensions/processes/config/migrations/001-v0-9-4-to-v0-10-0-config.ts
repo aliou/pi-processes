@@ -95,9 +95,31 @@ function migrateDockDefaultState(
   return undefined;
 }
 
+/** Config version this migration brings the config to. */
+export const CONFIG_VERSION_V0100 = "0.10.0";
+
+function compareSemver(a: string, b: string): number {
+  const left = a.split(".");
+  const right = b.split(".");
+
+  for (let i = 0; i < 3; i++) {
+    const diff = (Number(left[i]) || 0) - (Number(right[i]) || 0);
+    if (diff !== 0) return diff;
+  }
+
+  return 0;
+}
+
 export function needsConfigV094ToV0100Migration(
   config: ProcessConfig,
+  fromVersion: number | string = "0.0.0",
 ): boolean {
+  // Gate on content and version: the v0.9.4 projection drops keys added
+  // after v0.10.0, so it must never touch an already-stamped config.
+  if (compareSemver(String(fromVersion), CONFIG_VERSION_V0100) >= 0) {
+    return false;
+  }
+
   const root = config as Record<string, unknown>;
   const widget = isRecord(root.widget) ? root.widget : undefined;
 
@@ -177,7 +199,9 @@ function setNonEmpty<K extends keyof ConfigV0100>(
 
 export const configV094ToV0100Migration: Migration<ProcessConfig> = {
   name: "001-v0-9-4-to-v0-10-0-config",
-  shouldRun: (config) => needsConfigV094ToV0100Migration(config),
+  version: CONFIG_VERSION_V0100,
+  shouldRun: (config, ctx) =>
+    needsConfigV094ToV0100Migration(config, ctx.fromVersion),
   run: (config) => migrateConfigV094ToV0100(config as ConfigV094),
   message:
     "Migrated pi-processes settings to the current schema. Mapped the dock hidden state to closed.",

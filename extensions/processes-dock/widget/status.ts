@@ -1,7 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
+import { truncateToWidth } from "../../shared/truncate";
 import { statusColor, statusDot } from "../../shared/ui";
 
 const MAX_PROCESS_NAME = 20;

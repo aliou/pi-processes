@@ -8,8 +8,8 @@ import {
   formatTimestamp,
   shortenPath,
 } from "../../../src/utils";
+import { truncateToWidth } from "../../shared/truncate";
 import { statusColor } from "../../shared/ui";
-import { truncateToWidth } from "../utils/truncate";
 
 export interface RenderOptions {
   expanded?: boolean;

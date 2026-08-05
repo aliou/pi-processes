@@ -6,7 +6,6 @@ import {
   Key,
   matchesKey,
   type TUI,
-  truncateToWidth,
   visibleWidth,
 } from "@earendil-works/pi-tui";
 import {
@@ -19,6 +18,7 @@ import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
 import { formatRuntime, truncateCmd } from "../../../src/utils/format";
 import { isRecord } from "../../../src/utils/is-record";
 import { renderProcessTab } from "../../process-tabs";
+import { truncateToWidth } from "../../shared/truncate";
 import { LineComponent, LinesComponent, RuleComponent } from "../../shared/ui";
 import { requestProcessList } from "../client";
 import {

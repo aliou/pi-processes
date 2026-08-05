@@ -4,10 +4,9 @@ import type {
   Theme,
 } from "@earendil-works/pi-coding-agent";
 import { type Component, Container, Text } from "@earendil-works/pi-tui";
-
+import { truncateToWidth } from "../shared/truncate";
 import { MESSAGE_TYPE_PROCESS_NOTIFICATION } from "./constants";
 import type { ProcessNotificationDetails } from "./notifications/types";
-import { truncateToWidth } from "./utils/truncate";
 
 export function registerProcessNotificationRenderer(pi: ExtensionAPI): void {
   pi.registerMessageRenderer<ProcessNotificationDetails>(

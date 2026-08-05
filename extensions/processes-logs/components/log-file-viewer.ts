@@ -1,7 +1,8 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { sanitizeForDisplay } from "../../shared/display-text";
 import { trimToBudget } from "../../shared/line-buffer";
+import { truncateToWidth } from "../../shared/truncate";
 import type { ProcessLogLine } from "../logs-client";
 
 export type StreamFilter = "both" | "stdout" | "stderr";

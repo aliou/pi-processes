@@ -1,15 +1,12 @@
 import { Stack } from "@aliou/pi-utils-ui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import {
-  type Component,
-  truncateToWidth,
-  visibleWidth,
-} from "@earendil-works/pi-tui";
+import { type Component, visibleWidth } from "@earendil-works/pi-tui";
 import type { ProcessInfo } from "../../../src/types";
 import { LIVE_STATUSES } from "../../../src/types";
 import { stripAnsi } from "../../../src/utils/ansi";
 import { renderProcessTab } from "../../process-tabs";
 import { sanitizeForDisplay } from "../../shared/display-text";
+import { truncateToWidth } from "../../shared/truncate";
 import {
   clampNameColumn,
   LineComponent,

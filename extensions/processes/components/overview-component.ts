@@ -6,7 +6,6 @@ import {
   Key,
   matchesKey,
   type TUI,
-  truncateToWidth,
   visibleWidth,
 } from "@earendil-works/pi-tui";
 import { CHANNELS, type ProcessProtocolConfig } from "../../../src/protocol";
@@ -15,6 +14,7 @@ import { formatRuntime, truncateCmd } from "../../../src/utils/format";
 import { sanitizeForDisplay } from "../../shared/display-text";
 import { buildDroppedOutputLine, trimToBudget } from "../../shared/line-buffer";
 import { isOutputChangedPayload } from "../../shared/output-payload";
+import { truncateToWidth } from "../../shared/truncate";
 import { LineComponent, LinesComponent, statusColor } from "../../shared/ui";
 import {
   type ProcessLogLine,

@@ -1,5 +1,20 @@
 # @aliou/pi-processes
 
+## 0.10.2
+
+### Patch Changes
+
+- 000e0dc: Sanitize process output before rendering it in the `/ps:logs` overlay and the `/ps` preview. Both paths rendered raw log text since the 0.10 rewrite, so cursor movement, screen erase, alternate-screen switches, scroll regions, OSC/DCS/APC strings, and stray carriage returns reached the terminal and could corrupt the whole screen. v0.9.5 stripped these at render; the rewrite dropped that step.
+
+  Escape sequences other than SGR colors are now removed, tabs are expanded so measured width matches drawn width, and colors are preserved (v0.9.5 dropped them). The dock gets the same treatment on top of its existing strip.
+
+- e4d6cc5: Sanitize and width-truncate every place that renders process-controlled text: the `/ps` list, the dock tab strip, log labels and status widget, the pickers and completions, `/ps:kill` notifications, the plain-mode process lists, the process tool renders, and the notification summary. A name, command, or matched log line carrying an escape sequence could otherwise drive the terminal.
+
+  Commands and names are now measured in terminal cells rather than JavaScript characters, so a wide-character name no longer draws 21 columns in a 12-column dock tab and emoji are no longer cut mid-surrogate. Colors cut off by truncation are re-closed instead of bleeding into the rest of the frame.
+
+- 5c00907: Use one ANSI-safe `truncateToWidth` across every extension. Pi's version injects `ESC[0m` after the kept prefix and around the ellipsis, which ends a caller-applied background or foreground early and leaves the ellipsis and padding unstyled; it also mis-parses CSI sequences that do not end in `m`, `G`, `K`, `H`, or `J`, and can swallow visible text. The repo already had a corrected fork used by three tool renderers only. It now lives in `extensions/shared/truncate.ts`, has tests, and is used by the `/ps` overview, the `/ps:logs` overlay, and the dock as well.
+- bf76d4d: Render log lines through one shared helper in the `/ps` preview, the `/ps:logs` overlay, and the dock. The three views each had their own copy of sanitize, truncate, and stream/match toning, which is how the overlay and preview ended up missing sanitization in the first place. The dock now shows process colors like the other two views.
+
 ## 0.10.1
 
 ### Patch Changes

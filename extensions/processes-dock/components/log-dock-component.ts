@@ -3,9 +3,9 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { type Component, visibleWidth } from "@earendil-works/pi-tui";
 import type { ProcessInfo } from "../../../src/types";
 import { LIVE_STATUSES } from "../../../src/types";
-import { renderProcessTab } from "../../process-tabs";
 import { sanitizeForDisplay } from "../../shared/display-text";
 import { displayTextOf, renderLogLine } from "../../shared/log-line";
+import { renderProcessTab } from "../../shared/process-tabs";
 import { truncateToWidth } from "../../shared/truncate";
 import {
   clampNameColumn,

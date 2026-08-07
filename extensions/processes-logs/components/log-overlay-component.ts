@@ -17,8 +17,8 @@ import {
 import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
 import { formatRuntime } from "../../../src/utils/format";
 import { isRecord } from "../../../src/utils/is-record";
-import { renderProcessTab } from "../../process-tabs";
 import { truncateForDisplay } from "../../shared/display-text";
+import { renderProcessTab } from "../../shared/process-tabs";
 import { truncateToWidth } from "../../shared/truncate";
 import { LineComponent, LinesComponent, RuleComponent } from "../../shared/ui";
 import { requestProcessList } from "../client";

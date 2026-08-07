@@ -1,8 +1,8 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 
-import type { ProcessInfo } from "../src/types";
-import { truncateForDisplay } from "./shared/display-text";
-import { MAX_TAB_NAME, statusDot } from "./shared/ui";
+import type { ProcessInfo } from "../../src/types";
+import { truncateForDisplay } from "./display-text";
+import { MAX_TAB_NAME, statusDot } from "./ui";
 
 export { MAX_TAB_NAME, statusDot as renderProcessTabDot };
 

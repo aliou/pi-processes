@@ -2,11 +2,17 @@ import type {
   ExtensionAPI,
   MessageRenderOptions,
   Theme,
+  ThemeColor,
 } from "@earendil-works/pi-coding-agent";
 import { type Component, Container, Text } from "@earendil-works/pi-tui";
 import { truncateForDisplay } from "../shared/display-text";
 import { MESSAGE_TYPE_PROCESS_NOTIFICATION } from "./constants";
-import type { ProcessNotificationDetails } from "./notifications/types";
+import type {
+  Attention,
+  ProcessNotificationDetails,
+  ProcessNotificationKind,
+} from "./notifications/types";
+import { formatPatternForDisplay, quoteFilter } from "./tools/components";
 
 export function registerProcessNotificationRenderer(pi: ExtensionAPI): void {
   pi.registerMessageRenderer<ProcessNotificationDetails>(
@@ -25,11 +31,17 @@ export function renderProcessNotificationMessage(
     return undefined;
   }
 
+  // outputPad is only populated on Pi 0.82.1+ (see MessageRenderOptions);
+  // fall back to 0 so this renderer doesn't break on older Pi builds.
+  const outputPad = options.outputPad ?? 0;
+
   const container = new Container();
-  container.addChild(new Text(formatSummary(details, theme), 0, 0));
+  container.addChild(new Text(formatSummary(details, theme), outputPad, 0));
 
   if (options.expanded) {
-    container.addChild(new Text(formatDetailLine(details, theme), 0, 1));
+    container.addChild(
+      new Text(formatDetailLine(details, theme), outputPad, 0),
+    );
   }
 
   return container;
@@ -66,17 +78,100 @@ function formatDetailLine(
   details: ProcessNotificationDetails,
   theme: Theme,
 ): string {
-  const parts = [
-    `id: ${details.processId}`,
-    `attention: ${details.attention}`,
-    details.status ? `status: ${details.status}` : null,
-    details.exitCode === undefined || details.exitCode === null
-      ? null
-      : `exit: ${details.exitCode}`,
-    details.endReason ? `reason: ${details.endReason}` : null,
-  ].filter(Boolean);
+  const parts: string[] = [
+    field("id", details.processId, theme),
+    field("notify", formatAttention(details.attention, theme), theme),
+  ];
 
-  return theme.fg("muted", parts.join("  "));
+  if (details.logMatch) {
+    const pattern = quoteFilter(
+      formatPatternForDisplay(details.logMatch.pattern),
+      details.logMatch.mode,
+    );
+    parts.push(
+      field("pattern", theme.fg("accent", pattern), theme),
+      field("stream", theme.fg("muted", `[${details.logMatch.stream}]`), theme),
+    );
+  } else {
+    if (details.status) {
+      parts.push(
+        field(
+          "status",
+          theme.fg(statusTone(details.kind), details.status),
+          theme,
+        ),
+      );
+    }
+
+    if (details.exitCode !== undefined && details.exitCode !== null) {
+      parts.push(
+        field(
+          "exit",
+          theme.fg(statusTone(details.kind), String(details.exitCode)),
+          theme,
+        ),
+      );
+    }
+
+    if (details.endReason) {
+      parts.push(field("reason", theme.fg("muted", details.endReason), theme));
+    }
+
+    if (details.signal) {
+      const number =
+        details.signal.number === null
+          ? ""
+          : ` (${details.signal.number}, ${details.signal.description})`;
+      parts.push(
+        field(
+          "signal",
+          theme.fg("muted", `${details.signal.name}${number}`),
+          theme,
+        ),
+      );
+    }
+  }
+
+  return parts.join("  ");
+}
+
+/** `label:` in muted, matching `buildField` in tools/utils.ts. */
+function field(label: string, value: string, theme: Theme): string {
+  return `${theme.fg("muted", `${label}:`)} ${value}`;
+}
+
+/**
+ * Plain-language attention level, reusing the tone mapping from
+ * `attentionTone` in tools/components/watch.ts (turn/context keep their
+ * color; ignore switches from muted to dim to read as "quieter").
+ */
+function formatAttention(attention: Attention, theme: Theme): string {
+  switch (attention) {
+    case "turn":
+      return theme.bold(theme.fg("warning", "now"));
+    case "context":
+      return theme.bold(theme.fg("success", "next turn"));
+    default:
+      return theme.bold(theme.fg("dim", "silent"));
+  }
+}
+
+/**
+ * Same tone family as `statusColor` in shared/ui.ts: success for a clean
+ * exit, error for failure/crash, dim for killed.
+ */
+function statusTone(kind: ProcessNotificationKind): ThemeColor {
+  switch (kind) {
+    case "success":
+      return "success";
+    case "failure":
+    case "crash":
+      return "error";
+    case "killed":
+      return "dim";
+    default:
+      return "muted";
+  }
 }
 
 function summaryVerb(details: ProcessNotificationDetails): string {

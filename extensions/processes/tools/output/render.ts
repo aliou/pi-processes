@@ -2,7 +2,8 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 
 import { sanitizeForDisplay } from "../../../shared/display-text";
-import { ProcessActionHeader } from "../components";
+import { truncateToWidth } from "../../../shared/truncate";
+import { ProcessActionHeader, quoteFilter } from "../components";
 import type { ProcessesParamsType } from "../schema";
 import { buildField } from "../utils";
 import type { OutputDetails } from ".";
@@ -73,8 +74,22 @@ export function buildCollapsed(
     ),
   );
 
+  if (details.pattern) {
+    const quoted = quoteFilter(details.pattern, details.mode);
+    const value = truncateToWidth(sanitizeForDisplay(quoted), 80);
+    container.addChild(
+      new Text(
+        `${theme.fg("muted", "filter:")} ${theme.fg("accent", value)}`,
+        0,
+        0,
+      ),
+    );
+  }
+
   const bodyLines = extractOutputBody(contentText, details);
   const preview = bodyLines.slice(-2).map(sanitizeForDisplay).join("\n");
+
+  container.addChild(new Spacer(1));
 
   if (preview) {
     container.addChild(new Text(theme.fg("muted", preview), 0, 0));
@@ -119,9 +134,8 @@ function buildOutputMeta(details: OutputDetails, theme: Theme): Container {
   container.addChild(buildField("stream", details.stream, theme));
 
   if (details.pattern) {
-    const modeTag = details.mode === "regex" ? " (regex)" : "";
     container.addChild(
-      buildField("filter", `${details.pattern}${modeTag}`, theme),
+      buildField("filter", quoteFilter(details.pattern, details.mode), theme),
     );
   }
 

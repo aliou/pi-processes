@@ -150,7 +150,7 @@ describe("output render", () => {
     expect(lines.some((line) => line.includes("id: proc_1"))).toBe(true);
     expect(lines.some((line) => line.includes("status: running"))).toBe(true);
     expect(lines.some((line) => line.includes("stream: both"))).toBe(true);
-    expect(lines.some((line) => line.includes("filter: hello"))).toBe(true);
+    expect(lines.some((line) => line.includes('filter: "hello"'))).toBe(true);
   });
 
   it("buildExpanded shows empty message when content has no output", () => {
@@ -222,6 +222,93 @@ describe("output render", () => {
     const lines = container.render(80);
 
     expect(lines.some((line) => line.includes("No output yet"))).toBe(true);
+  });
+
+  it("buildCollapsed separates the header from the output with an empty line", () => {
+    const content = makeContent({ stdout: ["latest output"] });
+
+    const container = buildCollapsed(content, makeDetails(), theme);
+    const lines = container.render(80);
+
+    const headerIndex = lines.findIndex((line) => line.includes("running"));
+    const outputIndex = lines.findIndex((line) =>
+      line.includes("latest output"),
+    );
+
+    expect(headerIndex).toBeGreaterThanOrEqual(0);
+    expect(outputIndex).toBeGreaterThan(headerIndex);
+    expect(
+      lines.slice(headerIndex + 1, outputIndex).some((line) => line === ""),
+    ).toBe(true);
+  });
+
+  it("buildCollapsed keeps the empty separator when a filter is present", () => {
+    const content = makeContent({
+      stdout: ["latest output"],
+      pattern: "latest",
+      mode: "literal",
+    });
+    const details = makeDetails({ pattern: "latest", mode: "literal" });
+
+    const container = buildCollapsed(content, details, theme);
+    const lines = container.render(80);
+
+    const filterIndex = lines.findIndex((line) => line.includes("filter:"));
+    const outputIndex = lines.findIndex((line) =>
+      line.includes("latest output"),
+    );
+
+    expect(filterIndex).toBeGreaterThanOrEqual(0);
+    expect(outputIndex).toBeGreaterThan(filterIndex);
+    expect(
+      lines.slice(filterIndex + 1, outputIndex).some((line) => line === ""),
+    ).toBe(true);
+  });
+
+  it("buildCollapsed wraps a literal string filter in double quotes", () => {
+    const content = makeContent({
+      stdout: ["line"],
+      pattern: 'say "hi"',
+      mode: "literal",
+    });
+    const details = makeDetails({ pattern: 'say "hi"', mode: "literal" });
+
+    const lines = buildCollapsed(content, details, theme).render(80);
+    const filterLine = lines.find((line) => line.includes("filter:"));
+
+    expect(filterLine).toBeDefined();
+    expect(filterLine).toContain(`filter: 'say "hi"'`);
+  });
+
+  it("buildCollapsed wraps a regex filter in slashes", () => {
+    const content = makeContent({
+      stdout: ["line"],
+      pattern: "err.*",
+      mode: "regex",
+    });
+    const details = makeDetails({ pattern: "err.*", mode: "regex" });
+
+    const lines = buildCollapsed(content, details, theme).render(80);
+    const filterLine = lines.find((line) => line.includes("filter:"));
+
+    expect(filterLine).toBeDefined();
+    expect(filterLine).toContain("filter: /err.*/");
+    expect(filterLine).not.toContain("(regex)");
+  });
+
+  it("buildCollapsed wraps a plain literal filter in double quotes", () => {
+    const content = makeContent({
+      stdout: ["line"],
+      pattern: "hello",
+      mode: "literal",
+    });
+    const details = makeDetails({ pattern: "hello", mode: "literal" });
+
+    const lines = buildCollapsed(content, details, theme).render(80);
+    const filterLine = lines.find((line) => line.includes("filter:"));
+
+    expect(filterLine).toBeDefined();
+    expect(filterLine).toContain('filter: "hello"');
   });
 
   it("buildFooter renders log paths from details", () => {

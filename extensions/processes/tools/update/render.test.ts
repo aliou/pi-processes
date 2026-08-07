@@ -39,8 +39,8 @@ describe("findRemovedMatchers", () => {
     const output = component.render(200).join("\n");
     expect(output).toContain("<error>- </error>");
     expect(output).toContain("<success>+ </success>");
-    expect(output).toContain("<accent>old</accent>");
-    expect(output).toContain("<accent>new</accent>");
+    expect(output).toContain('<accent>"old"</accent>');
+    expect(output).toContain('<accent>"new"</accent>');
   });
 
   it("uses an operation-first collapsed summary", () => {

@@ -15,6 +15,8 @@ export function buildMatcherLine(
   const attentionTone =
     on === "turn" ? "warning" : on === "context" ? "success" : "muted";
 
+  const pattern = quoteFilter(formatPatternForDisplay(matcher.pattern), mode);
+
   return new Text(
     [
       prefix,
@@ -22,11 +24,20 @@ export function buildMatcherLine(
       "  ",
       theme.bold(theme.fg(attentionTone, `${on}${repeat}`)),
       "  ",
-      theme.fg("accent", formatPatternForDisplay(matcher.pattern)),
+      theme.fg("accent", pattern),
     ].join(""),
     0,
     0,
   );
+}
+
+export function quoteFilter(
+  pattern: string,
+  mode: "literal" | "regex",
+): string {
+  if (mode === "regex") return `/${pattern}/`;
+  if (pattern.includes('"')) return `'${pattern}'`;
+  return `"${pattern}"`;
 }
 
 export function formatPatternForDisplay(pattern: string): string {

@@ -22,7 +22,7 @@ describe("watch rendering", () => {
     );
 
     expect(line.render(200).map((rendered) => rendered.trimEnd())).toEqual([
-      '[stderr] regex  context (repeat)  ERROR\\nretry\\t"quoted"',
+      '[stderr] regex  context (repeat)  /ERROR\\nretry\\t"quoted"/',
     ]);
   });
 
@@ -32,6 +32,32 @@ describe("watch rendering", () => {
         `ready|"started"\nnext\tstep${String.fromCharCode(27)}[31m`,
       ),
     ).toBe('ready|"started"\\nnext\\tstep\\x1b[31m');
+  });
+
+  it("wraps literal patterns in double quotes and regex in slashes", () => {
+    const literal = buildMatcherLine(
+      { pattern: "ready", mode: "literal" },
+      theme,
+    )
+      .render(200)[0]
+      .trimEnd();
+    expect(literal).toContain('"ready"');
+
+    const regex = buildMatcherLine({ pattern: "err.*", mode: "regex" }, theme)
+      .render(200)[0]
+      .trimEnd();
+    expect(regex).toContain("/err.*/");
+  });
+
+  it("wraps a literal pattern containing a double quote in single quotes", () => {
+    const line = buildMatcherLine(
+      { pattern: 'say "hi"', mode: "literal" },
+      theme,
+    )
+      .render(200)[0]
+      .trimEnd();
+    expect(line).toContain(`'say "hi"'`);
+    expect(line).not.toContain('"say');
   });
 
   it("uses distinct tones for attention and pattern", () => {
@@ -48,7 +74,7 @@ describe("watch rendering", () => {
       .trimEnd();
 
     expect(line).toContain(
-      "<bold><success>context</success></bold>  <accent>ready</accent>",
+      '<bold><success>context</success></bold>  <accent>"ready"</accent>',
     );
   });
 });

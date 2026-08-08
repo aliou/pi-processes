@@ -1,5 +1,32 @@
 # @aliou/pi-processes
 
+## 0.10.5
+
+### Patch Changes
+
+- 4ffc66e: Tweak process output and watch matcher rendering.
+
+  Collapsed process output now separates the header from the preview with an
+  empty line, and the `filter:` label uses a distinct tone from the pattern
+  value. Pattern filters are quoted: double quotes for literal matches, single
+  quotes when the literal contains a double quote, and slashes for regex.
+  Expanded watch matcher lines in `start` and `update` apply the same quoting.
+
+- c7f60f6: Improve the expanded process notification message (log match or process end).
+
+  The expanded detail line now honors the `outputPad` setting instead of a
+  hardcoded value, no longer leaves a blank line between the summary and
+  detail line, and colors each field to match existing conventions elsewhere
+  in the extension (status/exit tone, accent pattern). Log match
+  notifications now surface the matched pattern and stream in the expanded
+  view, and kill notifications surface signal details.
+
+  The `attention` field is renamed to `notify` and reads in plain language
+  (`now` / `next turn` / `silent`) instead of the raw `turn` / `context` /
+  `ignore` enum. The log match `stream` field no longer repeats `literal` or
+  `regex`, since the pattern itself is now quoted (`"..."`) or slash-wrapped
+  (`/.../`) to show that.
+
 ## 0.10.4
 
 ### Patch Changes

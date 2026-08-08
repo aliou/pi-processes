@@ -1,0 +1,53 @@
+--- a/pi-harness.ts
++++ b/pi-harness.ts
+@@ -37,6 +37,10 @@
+ 	model?: PiCodingAgentModelSelection;
+ 	noTools?: CreateAgentSessionOptions["noTools"];
+ 	transformSystemPrompt?: (defaultPrompt: string) => string;
++	/** pi-processes patch: load local extensions into the isolated eval session. */
++	additionalExtensionPaths?: string[];
++	/** pi-processes patch: load local skills into the isolated eval session. */
++	additionalSkillPaths?: string[];
+ };
+ 
+ type PiCodingAgentHarnessWithOutput<TOutput extends JsonValue> = PiCodingAgentHarnessOptions & {
+@@ -45,7 +49,7 @@
+ 
+ export function resolveModelSelection(
+ 	explicitModel: PiCodingAgentModelSelection | undefined,
+-	environment: { PI_PROVIDER?: string; PI_MODEL?: string } = process.env,
++	environment: Record<string, string | undefined> = process.env,
+ ): PiCodingAgentModelSelection {
+ 	const provider = (explicitModel?.provider ?? environment.PI_PROVIDER)?.trim();
+ 	const id = (explicitModel?.id ?? environment.PI_MODEL)?.trim();
+@@ -133,9 +137,13 @@
+ 			agentDir,
+ 			modelRuntime,
+ 			settingsManager: SettingsManager.inMemory(),
+-			...(options.transformSystemPrompt
+-				? { resourceLoaderOptions: { systemPromptOverride: () => transformedSystemPrompt } }
+-				: {}),
++			resourceLoaderOptions: {
++				...(options.transformSystemPrompt
++					? { systemPromptOverride: () => transformedSystemPrompt }
++					: {}),
++				...(options.additionalExtensionPaths ? { additionalExtensionPaths: options.additionalExtensionPaths } : {}),
++				...(options.additionalSkillPaths ? { additionalSkillPaths: options.additionalSkillPaths } : {}),
++			},
+ 		});
+ 		signal?.throwIfAborted();
+ 		sessionManager = SessionManager.create(cwd, join(root, "sessions"));
+@@ -163,8 +171,11 @@
+ 		signal?.addEventListener("abort", abort, { once: true });
+ 		try {
+ 			signal?.throwIfAborted();
+-			if (evalSession.extensionRunner.getExtensionPaths().length !== 0) {
+-				throw new Error("Expected an isolated eval session to start without extensions.");
++			const expectedExtensionPaths = options.additionalExtensionPaths?.length ?? 0;
++			if (evalSession.extensionRunner.getExtensionPaths().length !== expectedExtensionPaths) {
++				throw new Error(
++					`Expected the isolated eval session to load exactly ${expectedExtensionPaths} extension(s), got ${evalSession.extensionRunner.getExtensionPaths().length}.`,
++				);
+ 			}
+ 			const steps = typeof input === "string" ? [{ type: "prompt" as const, content: input }] : input;
+ 			let response: string | undefined;

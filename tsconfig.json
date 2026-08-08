@@ -11,5 +11,7 @@
     "noEmit": true
   },
   "include": ["src/**/*", "extensions/**/*", "tests/**/*"],
-  "exclude": ["node_modules"]
+  // tests/evals has its own tsconfig: it depends on the gitignored vendored
+  // pi-evals harness, so `pnpm typecheck` must stay green without a sync.
+  "exclude": ["node_modules", "tests/evals"]
 }

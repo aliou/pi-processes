@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    // The vendored pi-evals sources import each other with explicit .ts
+    // extensions. Our own eval files must not (biome forbids it).
+    "allowImportingTsExtensions": true
+  },
+  "include": ["**/*"],
+  "exclude": ["vendor/**/upstream-package.json"]
+}

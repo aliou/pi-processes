@@ -67,10 +67,12 @@
     "ts-json-schema-generator": "^2.9.0",
     "typebox": "1.1.38",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.5",
+    "vitest-evals": "0.15.0"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "typecheck:evals": "tsc --noEmit -p tests/evals/tsconfig.json",
     "lint": "biome check",
     "format": "biome check --write",
     "gen:schema": "ts-json-schema-generator --path extensions/processes/config/types.ts --type ProcessConfig --no-type-check -o schema.json",
@@ -81,6 +83,7 @@
     "version": "changeset version",
     "test": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:evals": "vitest run --config tests/evals/vitest.config.ts",
     "release": "pnpm changeset publish"
   },
   "packageManager": "pnpm@11.5.1",

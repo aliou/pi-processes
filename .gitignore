@@ -11,6 +11,7 @@ build/
 .env
 .env.local
 .env*.local
+.env.test
 
 # IDE
 .vscode/
@@ -38,5 +39,13 @@ result-*
 
 # Pi
 .pi/
+
+# Vendored pi-evals harness (see .pi/skills/sync-pi-evals) and eval run artifacts
+tests/evals/vendor/
+.eval/
+
+# Eval agent dir is generated at run time by tests/evals/global-setup.ts. models.json
+# embeds the private Aperture base URL, so nothing in here is committed.
+tests/evals/agent-dir/
 .agents/demos/
 .agents/plans/*.md

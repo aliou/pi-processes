@@ -71,6 +71,12 @@ pnpm typecheck:evals                         # free, no model calls
 
 First run `pnpm typecheck:evals`; it needs the vendored harness present but costs nothing.
 
+### Artifacts
+
+The vendored reporter only writes artifacts when `PI_EVAL_ARTIFACT_DIR` is set. `vitest.config.ts` defaults it to
+`.eval/` (gitignored) and creates the directory, so local runs produce them too. The reporter runs in the main
+process, so this is set on `process.env` rather than `test.env`.
+
 ### Configuration
 
 `vitest.config.ts` pins everything that decides which model runs, so an ambient `PI_PROVIDER=anthropic` in your
@@ -102,7 +108,9 @@ A green eval is worthless if it passed for the wrong reason.
    extension failed to load and there was no `process` tool at all.
 2. Invert a new eval once — flip the prompt to induce the bad behavior and confirm it fails. An assertion that has
    never failed has not been tested.
-3. Read the transcript. Runs write native Pi session JSONL under `.eval/`, indexed by `runs.jsonl`.
+3. Read the transcript. Runs write `.eval/runs.jsonl` (one record per run: test, harness, token usage, timings)
+   and the native Pi session JSONL under `.eval/sessions/<hash>/session.jsonl`. These contain prompts, responses,
+   and tool output. CI uploads both as the `eval-artifacts` artifact.
 4. Repeat before concluding. Single runs are noisy.
 
 Prefer deterministic assertions on tool calls over judges. Tool discipline is mechanical; reserve `createJudge` for

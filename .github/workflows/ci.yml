@@ -50,6 +50,11 @@ jobs:
   evals:
     if: github.event_name == 'workflow_dispatch' && inputs.run_evals
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Lets the Tailscale action request an OIDC token from GitHub, which it
+      # exchanges for a short-lived Tailscale API token. No long-lived secret.
+      id-token: write
     steps:
       - uses: actions/checkout@v6
 
@@ -72,11 +77,13 @@ jobs:
         run: pnpm typecheck:evals
 
       - name: Connect to Tailscale
-        uses: tailscale/github-action@v3
+        uses: tailscale/github-action@v4
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
+          audience: ${{ secrets.TS_AUDIENCE }}
+          # Required even with one authorized tag: the action mints an ephemeral
+          # auth key via the API, and tags are a parameter of key creation.
+          tags: tag:ci-evals
 
       - name: Run evals
         env:

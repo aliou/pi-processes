@@ -45,6 +45,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check changesets
+        run: pnpm check:changesets
+
       - name: Get release info
         id: release-info
         run: |

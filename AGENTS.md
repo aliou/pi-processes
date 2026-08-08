@@ -26,6 +26,7 @@ During UI tests that require processes to be running, either give the user a pro
 - `pnpm format` — Biome check with write
 - `pnpm gen:schema` — regenerate `schema.json` from `extensions/processes/config/types.ts`
 - `pnpm check:schema` — verify `schema.json` is up to date
+- `pnpm check:changesets` — validate `.changeset/*.md` frontmatter, package names, and bump types
 - `pnpm test` — Unit tests
 - `pnpm test:e2e` — End-to-end tests
 - `pnpm changeset` — Add a changeset

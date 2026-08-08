@@ -33,6 +33,9 @@ jobs:
       - name: Check schema
         run: pnpm check:schema
 
+      - name: Check changesets
+        run: pnpm check:changesets
+
       - name: Unit tests
         run: pnpm test
 

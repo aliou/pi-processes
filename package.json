@@ -77,6 +77,7 @@
     "format": "biome check --write",
     "gen:schema": "ts-json-schema-generator --path extensions/processes/config/types.ts --type ProcessConfig --no-type-check -o schema.json",
     "check:schema": "ts-json-schema-generator --path extensions/processes/config/types.ts --type ProcessConfig --no-type-check -o /tmp/pi-processes-schema-check.json && diff -q schema.json /tmp/pi-processes-schema-check.json",
+    "check:changesets": "node scripts/check-changesets.ts",
     "check:lockfile": "pnpm install --frozen-lockfile --ignore-scripts",
     "prepare": "[ -d .git ] && husky || true",
     "changeset": "changeset",

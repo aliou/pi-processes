@@ -1,5 +1,5 @@
 ---
-"pi-processes": patch
+"@aliou/pi-processes": patch
 ---
 
 Tweak process output and watch matcher rendering.

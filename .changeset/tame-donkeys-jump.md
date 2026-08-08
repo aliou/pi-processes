@@ -1,5 +1,5 @@
 ---
-"pi-processes": patch
+"@aliou/pi-processes": patch
 ---
 
 Improve the expanded process notification message (log match or process end).

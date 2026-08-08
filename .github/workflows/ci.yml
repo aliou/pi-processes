@@ -3,12 +3,6 @@ name: CI
 on:
   push:
   pull_request:
-  workflow_dispatch:
-    inputs:
-      run_evals:
-        description: "Run the eval suite (makes real, paid model calls)"
-        type: boolean
-        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -44,49 +38,3 @@ jobs:
 
       - name: E2E tests
         run: pnpm test:e2e
-
-  # Evals make real, paid model calls against Aperture over Tailscale, so they
-  # never run on push or pull_request. Trigger manually with run_evals=true.
-  evals:
-    if: github.event_name == 'workflow_dispatch' && inputs.run_evals
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      # Lets the Tailscale action request an OIDC token from GitHub, which it
-      # exchanges for a short-lived Tailscale API token. No long-lived secret.
-      id-token: write
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: pnpm/action-setup@v5
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "22"
-          cache: "pnpm"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      # tests/evals/vendor/ is gitignored, so CI vendors the harness itself
-      # using the same script the sync-pi-evals skill runs locally.
-      - name: Vendor pi-evals harness
-        run: ./.agents/skills/sync-pi-evals/scripts/sync-pi-evals.sh
-
-      - name: Typecheck evals
-        run: pnpm typecheck:evals
-
-      - name: Connect to Tailscale
-        uses: tailscale/github-action@v4
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          audience: ${{ secrets.TS_AUDIENCE }}
-          # Required even with one authorized tag: the action mints an ephemeral
-          # auth key via the API, and tags are a parameter of key creation.
-          tags: tag:ci-evals
-
-      - name: Run evals
-        env:
-          APERTURE_BASE_URL: ${{ secrets.APERTURE_BASE_URL }}
-          APERTURE_API_KEY: ${{ secrets.APERTURE_API_KEY }}
-        run: pnpm test:evals

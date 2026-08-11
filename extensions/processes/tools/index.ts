@@ -3,7 +3,8 @@ import {
   defineTool,
   type ExtensionAPI,
   type ExtensionContext,
-  type Theme,
+  Theme,
+  type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { type Component, Container, Text } from "@earendil-works/pi-tui";
 
@@ -105,11 +106,32 @@ async function execute(
   }
 }
 
+/** pi's declared renderCall signature, per its public ToolDefinition type. */
+type RenderCallFn = NonNullable<ToolDefinition["renderCall"]>;
+/** pi's third renderCall argument (ToolRenderContext — not root-exported). */
+type RenderCallFnContext = Parameters<RenderCallFn>[2];
+
+/**
+ * pi invokes renderCall as (args, theme, context) where theme is pi's Theme
+ * class instance. Detecting that exact class distinguishes pi's argument
+ * order from OMP's (args, options, theme), where the second argument is a
+ * plain options object.
+ */
+function isPiTheme(value: unknown): value is Theme {
+  return value instanceof Theme;
+}
+
 function renderProcessCall(
   args: ProcessesParamsType,
-  theme: Theme,
-  context?: { expanded?: boolean },
+  second: Theme | RenderCallFnContext,
+  third?: RenderCallFnContext | Theme,
 ): Component {
+  const usesPiOrder = isPiTheme(second);
+  const theme = usesPiOrder ? second : (third as Theme);
+  const context = (usesPiOrder ? third : second) as
+    | RenderCallFnContext
+    | undefined;
+
   switch (args.action) {
     case "start":
       return new ToolLayout().setHeader(

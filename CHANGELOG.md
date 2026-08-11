@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.10.8
+
+### Patch Changes
+
+- d5643bc: Detect tool render themes by shape instead of class identity so Pi and oh-my-pi render process calls correctly when package copies differ.
+
 ## 0.10.7
 
 ### Patch Changes

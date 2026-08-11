@@ -11,10 +11,10 @@
  *
  * renderProcessCall must render under both orders.
  */
-import {
-  type ExtensionAPI,
-  type Theme,
-  type ToolDefinition,
+import type {
+  ExtensionAPI,
+  Theme,
+  ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
 

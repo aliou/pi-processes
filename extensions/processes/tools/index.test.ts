@@ -13,7 +13,7 @@
  */
 import {
   type ExtensionAPI,
-  Theme,
+  type Theme,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
@@ -32,13 +32,8 @@ type HostRenderCall = (
   third?: RenderCallFnContext | Theme,
 ) => ReturnType<RenderCallFn>;
 
-/** pi's theme: a real Theme instance (passes `instanceof Theme`). */
-const piTheme = Object.create(Theme.prototype) as Theme;
-piTheme.fg = (_color: string, text: string) => text;
-piTheme.bold = (text: string) => text;
-
-/** OMP's theme: same surface, but not a pi Theme instance. */
-const ompTheme = {
+/** Theme-like object, as passed by host Pi/OMP package copies. */
+const theme = {
   fg: (_color: string, text: string) => text,
   bold: (text: string) => text,
 } as Theme;
@@ -54,7 +49,7 @@ function captureRenderCall(): HostRenderCall {
 describe("renderCall host argument order", () => {
   it("renders with pi order: (args, theme, context)", () => {
     const renderCall = captureRenderCall();
-    const component = renderCall({ action: "list" }, piTheme, {
+    const component = renderCall({ action: "list" }, theme, {
       expanded: false,
     } as RenderCallFnContext);
     expect(component.render(80).join("\n")).toContain("Process:");
@@ -65,7 +60,7 @@ describe("renderCall host argument order", () => {
     const component = renderCall(
       { action: "list" },
       { expanded: false, isPartial: true } as RenderCallFnContext,
-      ompTheme,
+      theme,
     );
     expect(component.render(80).join("\n")).toContain("Process:");
   });

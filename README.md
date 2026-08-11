@@ -117,6 +117,46 @@ Available settings include:
 - Linux: supported
 - Windows: not supported
 
+## Similar but different
+
+Pi has several process, terminal, and background-task extensions. pi-processes focuses on explicit LLM-managed background processes, log inspection, watches that can wake the agent, and Pi UI surfaces for `/ps`, logs, dock, and status.
+
+See [pi.dev/packages](https://pi.dev/packages) for the full registry of Pi extensions.
+
+### Background command managers
+
+These packages are closest when you want shell commands, dev servers, watchers, or logs to keep running while Pi continues the conversation.
+
+- [pi-background-tasks](https://pi.dev/packages/pi-background-tasks): durable background shell tasks plus delegated child Pi workflows.
+- [@99percentpeople/pi-background-tasks](https://pi.dev/packages/%4099percentpeople/pi-background-tasks): background commands and attachable PTY/TUI sessions, with SSH Remote integration.
+- [@richardgill/pi-background-bash](https://github.com/richardgill/pi-extensions/tree/main/extensions/background-bash): replaces `bash` with session-owned local process groups and adds `bash_process` for list, peek, and kill.
+- [pi-bash-bg](https://pi.dev/packages/pi-bash-bg): minimal `&` support for Pi's bash tool, detaching background processes and keeping output out of the context window.
+- [pi-tian-background-terminals](https://pi.dev/packages/pi-tian-background-terminals): replaces Pi's built-in Bash with automatic background yielding, completion notifications, and a `/ps` viewer.
+- [pi-better-background-tasks](https://pi.dev/packages/pi-better-background-tasks): durable background shell tasks, watchers, logs, and status inspection.
+- [pi-patty-bg-tasks](https://pi.dev/packages/pi-patty-bg-tasks): Claude Code-style background tasks with auto-backgrounding, attach, file-backed output, and cooperative steering.
+- [@mjakl/pi-processes](https://pi.dev/packages/%40mjakl/pi-processes): stripped-down pi-processes fork with the `process` tool, a single `/ps` overlay, a compact status line, and fewer commands/settings.
+- [@haemmid/pi-processes](https://pi.dev/packages/%40haemmid/pi-processes): pi-web-focused pi-processes fork for dev-server automation, with `ensure`, `restart`, and `wait` actions for Astro/Vite-style workflows.
+- [pi-processes-git-bash](https://pi.dev/packages/pi-processes-git-bash): pi-processes fork for Windows users through Git Bash.
+
+### Terminal and shell replacements
+
+These packages are a better fit when you want a different shell substrate, PTY behavior, or platform-specific terminal support.
+
+- [pi-unified-exec](https://pi.dev/packages/pi-unified-exec): Codex-style long-lived shell sessions with stdin, PTY, REPL, SSH, dev-server, and disk-log support.
+- [pi-live-terminal](https://pi.dev/packages/pi-live-terminal): tmux-backed command runner with a live terminal widget.
+- [@aliaksei-raketski/pi-tmux-bash](https://pi.dev/packages/%40aliaksei-raketski/pi-tmux-bash): runs model-facing shell commands in managed tmux windows.
+- [@4fu/pi-pwsh](https://pi.dev/packages/%404fu/pi-pwsh): persistent PowerShell tasks for Pi on Windows, with ConPTY sessions and user requests.
+- [pi-pwsh-notify](https://pi.dev/packages/pi-pwsh-notify): PowerShell shell with background jobs and completion/server-ready notifications.
+
+### Monitors, schedulers, and visibility
+
+These packages are more about watching, waking, or surfacing process state than replacing pi-processes directly.
+
+- [pi-event-monitor](https://pi.dev/packages/pi-event-monitor): event-driven shell-stream and file watchers that wake the session on process exit, matching output, or file writes.
+- [pi-monitor-plugin](https://pi.dev/packages/pi-monitor-plugin): background jobs, monitors, loops, schedules, and idle-aware notifications.
+- [pi-tripwire](https://pi.dev/packages/pi-tripwire): footer visibility for agent-spawned localhost servers; not a process runner itself.
+- [@cortexkit/aft-pi](https://pi.dev/packages/%40cortexkit/aft-pi): broader Agent File Tools package that includes background bash tasks, PTY sessions, and output compression alongside code-analysis tools.
+
 ## Troubleshooting
 
 ### Pi started something and I want to see more output

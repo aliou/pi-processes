@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.10.9
+
+### Patch Changes
+
+- 6e76b70: Update `@aliou/sh` from ^0.1.0 to ^0.2.2. Adapts `shell-utils` word stringification to the new AST: structured parameter expansions (`exp`/`slice`/`replace`/`index`), typed arithmetic expressions, and the new `BraceExp`/`ExtGlob` word parts.
+
 ## 0.10.8
 
 ### Patch Changes

@@ -45,7 +45,7 @@
   "dependencies": {
     "@aliou/pi-utils-settings": "^0.19.1",
     "@aliou/pi-utils-ui": "^0.5.0",
-    "@aliou/sh": "^0.1.0"
+    "@aliou/sh": "^0.2.2"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",

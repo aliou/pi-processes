@@ -1,13 +1,15 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.8/schema.json",
   "plugins": [
+    "./node_modules/@aliou/biome-plugins/plugins/no-buried-await.grit",
+    "./node_modules/@aliou/biome-plugins/plugins/no-emojis.grit",
+    "./node_modules/@aliou/biome-plugins/plugins/no-empty-catch.grit",
     "./node_modules/@aliou/biome-plugins/plugins/no-inline-imports.grit",
+    "./node_modules/@aliou/biome-plugins/plugins/no-inner-types.grit",
+    "./node_modules/@aliou/biome-plugins/plugins/no-is-record.grit",
     "./node_modules/@aliou/biome-plugins/plugins/no-js-import-extension.grit",
     "./node_modules/@aliou/biome-plugins/plugins/no-ts-import-extension.grit",
-    "./node_modules/@aliou/biome-plugins/plugins/no-emojis.grit",
-    "./node_modules/@aliou/biome-plugins/plugins/no-inner-types.grit",
-    "./node_modules/@aliou/biome-plugins/plugins/no-buried-await.grit",
-    "./node_modules/@aliou/biome-plugins/plugins/no-empty-catch.grit",
+    "./node_modules/@aliou/biome-plugins/plugins/no-unimported-text.grit",
     "./plugins/no-pi-tui-truncate.grit"
   ],
   "vcs": {

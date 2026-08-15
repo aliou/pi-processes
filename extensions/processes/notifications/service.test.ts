@@ -169,40 +169,40 @@ describe("NotificationService", () => {
   it.each([
     { name: "successful", success: true, exitCode: 0 },
     { name: "failed", success: false, exitCode: 1 },
-  ])("suppresses $name exit notification for intentional stop", async ({
-    success,
-    exitCode,
-  }) => {
-    const fakeManager = createFakeManager();
-    const spy = createNotificationSpy();
-    const registry = createNotificationRegistry();
+  ])(
+    "suppresses $name exit notification for intentional stop",
+    async ({ success, exitCode }) => {
+      const fakeManager = createFakeManager();
+      const spy = createNotificationSpy();
+      const registry = createNotificationRegistry();
 
-    registry.register("proc_1", { onSuccess: "turn", onFailure: "turn" });
-    registry.markIntentionalStop("proc_1");
+      registry.register("proc_1", { onSuccess: "turn", onFailure: "turn" });
+      registry.markIntentionalStop("proc_1");
 
-    const service = createNotificationService({
-      events: spy.events,
-      manager: fakeManager as never,
-      registry,
-      getProcess: (id) => processes.get(id) ?? null,
-    });
+      const service = createNotificationService({
+        events: spy.events,
+        manager: fakeManager as never,
+        registry,
+        getProcess: (id) => processes.get(id) ?? null,
+      });
 
-    fakeManager.emit({
-      type: "process_ended",
-      info: makeInfo({
-        id: "proc_1",
-        success,
-        exitCode,
-        endReason: "exit",
-      }),
-    });
-    await flushQueuedMicrotasks();
+      fakeManager.emit({
+        type: "process_ended",
+        info: makeInfo({
+          id: "proc_1",
+          success,
+          exitCode,
+          endReason: "exit",
+        }),
+      });
+      await flushQueuedMicrotasks();
 
-    expect(spy.emitted).toHaveLength(0);
-    expect(registry.get("proc_1")).toBeNull();
+      expect(spy.emitted).toHaveLength(0);
+      expect(registry.get("proc_1")).toBeNull();
 
-    service.dispose();
-  });
+      service.dispose();
+    },
+  );
 
   it("emits a context notification for a killed process with default config when not intentional", async () => {
     const fakeManager = createFakeManager();

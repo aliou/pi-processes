@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.8/schema.json",
   "plugins": [
     "./node_modules/@aliou/biome-plugins/plugins/no-inline-imports.grit",
     "./node_modules/@aliou/biome-plugins/plugins/no-js-import-extension.grit",
@@ -29,7 +29,7 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "preset": "recommended"
     }
   },
   "formatter": {

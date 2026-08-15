@@ -54,7 +54,7 @@
     "typebox": "*"
   },
   "devDependencies": {
-    "@aliou/biome-plugins": "^0.8.1",
+    "@aliou/biome-plugins": "^0.12.0",
     "@biomejs/biome": "^2.5.8",
     "@changesets/cli": "^2.27.11",
     "@earendil-works/pi-ai": "0.84.1",

@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 
 import { assert, expect } from "vitest";
-import { getManager } from "../../src/get-manager";
+import { ProcessManager } from "../../src/manager";
 import { test } from "./fixtures";
 import { collectEvents } from "./utils";
 
@@ -9,7 +9,7 @@ test("kills a real running process and clears finished logs", async ({
   cwd,
   addScript,
 }) => {
-  using manager = getManager();
+  using manager = new ProcessManager();
   const events = collectEvents(manager);
   addScript("wait-for-file.sh");
 

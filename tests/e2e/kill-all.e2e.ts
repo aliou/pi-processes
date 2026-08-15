@@ -1,11 +1,11 @@
 import { expect } from "vitest";
-import { getManager } from "../../src/get-manager";
+import { ProcessManager } from "../../src/manager";
 import { LIVE_STATUSES } from "../../src/types";
 import { test } from "./fixtures";
 import { waitForEndedCount } from "./utils";
 
 test("killAll stops real live processes", async ({ cwd, addScript }) => {
-  using manager = getManager();
+  using manager = new ProcessManager();
   addScript("wait-for-file.sh");
 
   const first = manager.start("first-live", "./wait-for-file.sh never", cwd);

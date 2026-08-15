@@ -1,5 +1,5 @@
 import { assert, expect } from "vitest";
-import { getManager } from "../../src/get-manager";
+import { ProcessManager } from "../../src/manager";
 import { test } from "./fixtures";
 import { waitForEnd } from "./utils";
 
@@ -8,7 +8,7 @@ test("records a real process that fails by itself", async ({
   addFile,
   addScript,
 }) => {
-  using manager = getManager();
+  using manager = new ProcessManager();
   addScript("crash-on-file.sh");
 
   const info = manager.start(

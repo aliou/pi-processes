@@ -1,5 +1,5 @@
 import { expect } from "vitest";
-import { getManager } from "../../src/get-manager";
+import { ProcessManager } from "../../src/manager";
 import { test } from "./fixtures";
 import { collectEvents, waitForEnd } from "./utils";
 
@@ -11,7 +11,7 @@ import { collectEvents, waitForEnd } from "./utils";
 test("emits process_ended once for a process that exits on its own", async ({
   cwd,
 }) => {
-  using manager = getManager();
+  using manager = new ProcessManager();
   const events = collectEvents(manager);
 
   const info = manager.start("short-lived", "sleep 0.2; echo done", cwd);

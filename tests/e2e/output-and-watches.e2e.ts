@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 
 import { assert, expect } from "vitest";
-import { getManager } from "../../src/get-manager";
+import { ProcessManager } from "../../src/manager";
 import type { ManagerEvent } from "../../src/types";
 import { test } from "./fixtures";
 import { collectEvents, waitForEnd } from "./utils";
@@ -10,7 +10,7 @@ test("runs a real process and records logs, events, and output", async ({
   cwd,
   addScript,
 }) => {
-  using manager = getManager();
+  using manager = new ProcessManager();
   const events = collectEvents(manager);
   addScript("emit-output.sh");
 

@@ -1,12 +1,12 @@
 import { assert, expect } from "vitest";
-import { getManager } from "../../src/get-manager";
+import { ProcessManager } from "../../src/manager";
 import { test } from "./fixtures";
 import { waitForEnd } from "./utils";
 
 test("writes to stdin of a real process and then rejects writes after exit", async ({
   cwd,
 }) => {
-  using manager = getManager();
+  using manager = new ProcessManager();
 
   const info = manager.start(
     "stdin",

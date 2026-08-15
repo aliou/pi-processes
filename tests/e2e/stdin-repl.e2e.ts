@@ -1,5 +1,5 @@
 import { assert, expect } from "vitest";
-import { getManager } from "../../src/get-manager";
+import { ProcessManager } from "../../src/manager";
 import { test } from "./fixtures";
 import { waitForEnd } from "./utils";
 
@@ -9,7 +9,7 @@ test("drives an interactive stdin repl across multiple lines and quits", async (
 }) => {
   addScript("stdin-echo.sh");
 
-  using manager = getManager();
+  using manager = new ProcessManager();
 
   const info = manager.start("stdin-repl", "./stdin-echo.sh", cwd);
 
@@ -36,7 +36,7 @@ test("closing stdin with end:true drives the EOF path to a clean exit", async ({
 }) => {
   addScript("stdin-echo.sh");
 
-  using manager = getManager();
+  using manager = new ProcessManager();
 
   const info = manager.start("stdin-repl", "./stdin-echo.sh", cwd);
 

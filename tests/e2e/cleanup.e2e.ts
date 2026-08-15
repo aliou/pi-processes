@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 
 import { assert, expect } from "vitest";
-import { getManager } from "../../src/get-manager";
+import { ProcessManager } from "../../src/manager";
 import { test } from "./fixtures";
 import { waitForEnd } from "./utils";
 
@@ -9,7 +9,7 @@ test("cleanup stops a real live process and removes logs", async ({
   cwd,
   addScript,
 }) => {
-  using manager = getManager();
+  using manager = new ProcessManager();
   addScript("wait-for-file.sh");
 
   const cleanupTarget = manager.start(

@@ -1,14 +1,14 @@
 import { join } from "node:path";
 
 import { expect } from "vitest";
-import { getManager } from "../../src/get-manager";
+import { ProcessManager } from "../../src/manager";
 import { test } from "./fixtures";
 import { collectEvents } from "./utils";
 
 test("captures async spawn error for a non-existent cwd without crashing", async ({
   cwd,
 }) => {
-  using manager = getManager();
+  using manager = new ProcessManager();
   const events = collectEvents(manager);
 
   // The cwd does not exist, so the spawn fails during initialization:

@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { getManager } from "../../src/get-manager";
+import { ProcessManager } from "../../src/manager";
 import { isWindowsPlatform } from "../../src/utils/platform";
 import { registerClearCommand } from "./commands/clear";
 import { registerKillCommand } from "./commands/kill";
@@ -40,7 +40,7 @@ export default async function processesExtension(
   await loadProcessConfig();
   registerMigrationMessageNotifications(pi);
 
-  const manager = getManager({
+  const manager = new ProcessManager({
     getConfiguredShellPath: () => configLoader.getConfig().execution.shellPath,
   });
   const notifications = createNotificationRegistry();

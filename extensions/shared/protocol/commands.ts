@@ -1,4 +1,4 @@
-import type { KillResult } from "../types";
+import type { KillResult } from "../../../src/types";
 
 // UI emits, core handles then calls reply.
 

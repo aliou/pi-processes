@@ -1,7 +1,7 @@
 import { createEventBus } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
-import type { ProcessProtocolNotificationPayload } from "../../../src/protocol";
-import { CHANNELS } from "../../../src/protocol";
+import type { ProcessProtocolNotificationPayload } from "../../shared/protocol";
+import { CHANNELS } from "../../shared/protocol";
 import { MESSAGE_TYPE_PROCESS_NOTIFICATION } from "../constants";
 import { registerNotificationDelivery } from "./notifications";
 

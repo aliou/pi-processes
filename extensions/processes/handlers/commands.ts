@@ -1,12 +1,12 @@
 import type { EventBus } from "@earendil-works/pi-coding-agent";
 
 import type { ProcessManager } from "../../../src/manager";
+import type { KillResult } from "../../../src/types";
 import {
   CHANNELS,
   type CommandClearPayload,
   type CommandKillPayload,
-} from "../../../src/protocol";
-import type { KillResult } from "../../../src/types";
+} from "../../shared/protocol";
 import type { NotificationRegistry } from "../notifications/registry";
 import { killIntentionally } from "./kill-process";
 

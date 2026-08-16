@@ -1,12 +1,12 @@
 import type { EventBus } from "@earendil-works/pi-coding-agent";
+import type { ProcessInfo } from "../../src/types";
 import {
   CHANNELS,
   type ProcessProtocolConfig,
   type RequestConfigPayload,
   type RequestGetPayload,
   type RequestListPayload,
-} from "../../src/protocol";
-import type { ProcessInfo } from "../../src/types";
+} from "../shared/protocol";
 
 export function requestProcessList(events: EventBus): ProcessInfo[] {
   let processes: ProcessInfo[] = [];

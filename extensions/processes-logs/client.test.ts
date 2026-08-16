@@ -1,13 +1,13 @@
 import { createEventBus } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
+import type { ProcessInfo } from "../../src/types";
+import { DEFAULT_CONFIG } from "../processes/config";
 import type {
   RequestConfigPayload,
   RequestGetPayload,
   RequestListPayload,
-} from "../../src/protocol";
-import { CHANNELS } from "../../src/protocol";
-import type { ProcessInfo } from "../../src/types";
-import { DEFAULT_CONFIG } from "../processes/config";
+} from "../shared/protocol";
+import { CHANNELS } from "../shared/protocol";
 import { requestConfig, requestProcess, requestProcessList } from "./client";
 
 function makeInfo(overrides: Partial<ProcessInfo> = {}): ProcessInfo {

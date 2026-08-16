@@ -3,7 +3,7 @@ import type { EventBus, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
   CHANNELS,
   type ProcessProtocolNotificationPayload,
-} from "../../../src/protocol";
+} from "../../shared/protocol";
 import {
   attentionToSendOptions,
   sendProcessNotificationMessage,

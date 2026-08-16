@@ -1,9 +1,9 @@
 import { createEventBus } from "@earendil-works/pi-coding-agent";
 import { assert, describe, expect, it } from "vitest";
-import type { ProcessProtocolNotificationPayload } from "../../../src/protocol";
-import { CHANNELS } from "../../../src/protocol";
 import type { ProcessInfo } from "../../../src/types";
 import { flushQueuedMicrotasks } from "../../../tests/utils/async";
+import type { ProcessProtocolNotificationPayload } from "../../shared/protocol";
+import { CHANNELS } from "../../shared/protocol";
 
 import { createNotificationRegistry } from "./registry";
 import { createNotificationService } from "./service";

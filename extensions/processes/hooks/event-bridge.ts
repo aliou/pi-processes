@@ -1,7 +1,7 @@
 import type { EventBus } from "@earendil-works/pi-coding-agent";
 
 import type { ProcessManager } from "../../../src/manager";
-import { CHANNELS } from "../../../src/protocol";
+import { CHANNELS } from "../../shared/protocol";
 
 export function registerEventBridge(
   events: EventBus,

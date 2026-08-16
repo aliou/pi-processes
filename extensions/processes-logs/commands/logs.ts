@@ -4,9 +4,9 @@ import type {
   ExtensionCommandContext,
   Theme,
 } from "@earendil-works/pi-coding-agent";
-import type { ProcessProtocolConfig } from "../../../src/protocol";
 import type { ProcessInfo } from "../../../src/types";
 import { sanitizeForDisplay } from "../../shared/display-text";
+import type { ProcessProtocolConfig } from "../../shared/protocol";
 import { requestConfig, requestProcess, requestProcessList } from "../client";
 import { allProcessCompletions } from "../completions";
 import { LogOverlayComponent } from "../components/log-overlay-component";

@@ -5,7 +5,7 @@
  * Runtime config uses the shared protocol shape returned by REQUEST_CONFIG.
  */
 
-import type { ProcessProtocolConfig } from "../../../src/protocol";
+import type { ProcessProtocolConfig } from "../../shared/protocol";
 
 export interface ExecutionConfig {
   /** Absolute shell executable used to run process commands. */

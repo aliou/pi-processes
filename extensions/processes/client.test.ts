@@ -1,8 +1,8 @@
 import { createEventBus } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import type { CommandKillPayload } from "../../src/protocol";
-import { CHANNELS } from "../../src/protocol";
 import type { KillResult, ProcessInfo } from "../../src/types";
+import type { CommandKillPayload } from "../shared/protocol";
+import { CHANNELS } from "../shared/protocol";
 import { requestKill } from "./client";
 
 function makeInfo(overrides: Partial<ProcessInfo> = {}): ProcessInfo {

@@ -1,4 +1,4 @@
-import type { ProcessInfo } from "../types";
+import type { ProcessInfo } from "../../../src/types";
 
 // Core emits, UI listens.
 

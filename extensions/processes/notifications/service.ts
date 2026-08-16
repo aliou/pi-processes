@@ -1,8 +1,8 @@
 import type { EventBus } from "@earendil-works/pi-coding-agent";
 
 import type { ProcessManager } from "../../../src/manager";
-import { CHANNELS } from "../../../src/protocol";
 import type { ManagerEvent, ProcessInfo } from "../../../src/types";
+import { CHANNELS } from "../../shared/protocol";
 import { classifyProcessEnd } from "./classify";
 import {
   type CompiledLogMatcher,

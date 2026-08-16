@@ -8,16 +8,16 @@ import {
   type TUI,
   visibleWidth,
 } from "@earendil-works/pi-tui";
+import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
+import { formatRuntime } from "../../../src/utils/format";
+import { truncateForDisplay } from "../../shared/display-text";
+import { renderProcessTab } from "../../shared/process-tabs";
 import {
   CHANNELS,
   type ProcessesChangedPayload,
   type ProcessProtocolConfig,
   type ProcessProtocolNotificationPayload,
-} from "../../../src/protocol";
-import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
-import { formatRuntime } from "../../../src/utils/format";
-import { truncateForDisplay } from "../../shared/display-text";
-import { renderProcessTab } from "../../shared/process-tabs";
+} from "../../shared/protocol";
 import { truncateToWidth } from "../../shared/truncate";
 import { LineComponent, LinesComponent, RuleComponent } from "../../shared/ui";
 import { requestProcessList } from "../client";

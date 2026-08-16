@@ -6,7 +6,6 @@ import {
   type LogsSubscribePayload,
   type LogsUnsubscribePayload,
 } from "../../../src/protocol";
-import { isRecord } from "../../../src/utils/is-record";
 import { buildDroppedOutputLine } from "../../shared/line-buffer";
 
 interface LogSubscriber {
@@ -22,7 +21,6 @@ export function registerLogSubscriptions(
 
   const disposeSubscribe = events.on(CHANNELS.LOGS_SUBSCRIBE, (payload) => {
     const request = payload as LogsSubscribePayload;
-    if (!isLogsSubscribePayload(request)) return;
 
     const processInfo = manager.get(request.processId);
 
@@ -51,7 +49,6 @@ export function registerLogSubscriptions(
 
   const disposeUnsubscribe = events.on(CHANNELS.LOGS_UNSUBSCRIBE, (payload) => {
     const request = payload as LogsUnsubscribePayload;
-    if (!isLogsUnsubscribePayload(request)) return;
 
     subscribers.delete(request.subscriberId);
   });
@@ -111,34 +108,4 @@ function removeStaleSubscribers(
   for (const [subscriberId, subscriber] of subscribers.entries()) {
     if (!manager.get(subscriber.processId)) subscribers.delete(subscriberId);
   }
-}
-
-function isLogsSubscribePayload(
-  payload: LogsSubscribePayload,
-): payload is LogsSubscribePayload {
-  return (
-    isRecord(payload) &&
-    typeof payload.subscriberId === "string" &&
-    typeof payload.processId === "string" &&
-    isOptionalNumber(payload.tailLines) &&
-    isReply(payload)
-  );
-}
-
-function isLogsUnsubscribePayload(
-  payload: LogsUnsubscribePayload,
-): payload is LogsUnsubscribePayload {
-  return isRecord(payload) && typeof payload.subscriberId === "string";
-}
-
-function isReply(
-  payload: unknown,
-): payload is { reply: (...args: never[]) => void } {
-  return isRecord(payload) && typeof payload.reply === "function";
-}
-
-function isOptionalNumber(value: unknown): value is number | undefined {
-  return (
-    value === undefined || (typeof value === "number" && Number.isFinite(value))
-  );
 }

@@ -108,31 +108,6 @@ describe("registerLogSubscriptions", () => {
     });
   });
 
-  it("ignores malformed subscription payloads", () => {
-    const events = createEventBus();
-    const fake = createFakeManager();
-    const chunk = vi.fn();
-    const appendedText = [{ type: "stdout" as const, text: "line" }];
-
-    registerLogSubscriptions(events, fake.manager);
-    events.on(CHANNELS.LOGS_CHUNK, chunk);
-    events.emit(CHANNELS.LOGS_SUBSCRIBE, null);
-    events.emit(CHANNELS.LOGS_SUBSCRIBE, { subscriberId: "sub_1" });
-    events.emit(CHANNELS.LOGS_SUBSCRIBE, {
-      subscriberId: "sub_1",
-      processId: "proc_1",
-      tailLines: "bad",
-      reply: vi.fn(),
-    });
-    events.emit(CHANNELS.LOGS_UNSUBSCRIBE, null);
-    events.emit(CHANNELS.LOGS_UNSUBSCRIBE, { processId: "proc_1" });
-    fake.emit({ type: "process_output_changed", id: "proc_1", appendedText });
-
-    expect(fake.manager.get).not.toHaveBeenCalled();
-    expect(fake.manager.getCombinedOutput).not.toHaveBeenCalled();
-    expect(chunk).not.toHaveBeenCalled();
-  });
-
   it("emits chunks to matching subscribers only", () => {
     const events = createEventBus();
     const fake = createFakeManager();

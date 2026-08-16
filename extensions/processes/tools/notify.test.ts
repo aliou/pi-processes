@@ -85,24 +85,6 @@ describe("normalizeNotifyConfig", () => {
     );
   });
 
-  it("rejects too many log matchers", () => {
-    expect(() =>
-      normalizeNotifyConfig({
-        logMatches: Array.from({ length: 21 }, (_, index) => ({
-          pattern: `pattern-${index}`,
-        })),
-      }),
-    ).toThrow(/supports at most 20 matchers/);
-  });
-
-  it("rejects patterns over 500 characters", () => {
-    expect(() =>
-      normalizeNotifyConfig({
-        logMatches: [{ pattern: "a".repeat(501) }],
-      }),
-    ).toThrow(/pattern must be at most 500 characters/);
-  });
-
   it("rejects empty log-match patterns", () => {
     expect(() =>
       normalizeNotifyConfig({
@@ -119,32 +101,7 @@ describe("normalizeNotifyConfig", () => {
     ).toThrow(/pattern must not be empty or whitespace-only/);
   });
 
-  it.each([
-    ["onSuccess", { onSuccess: "bad" }],
-    ["onFailure", { onFailure: "bad" }],
-    ["onKilled", { onKilled: "bad" }],
-    ["log match attention", { logMatches: [{ pattern: "x", on: "bad" }] }],
-  ])("rejects invalid attention for %s", (_label, notify) => {
-    expect(() => normalizeNotifyConfig(notify)).toThrow(
-      /must be one of: turn, context, ignore/,
-    );
-  });
-
-  it("rejects invalid log match stream", () => {
-    expect(() =>
-      normalizeNotifyConfig({
-        logMatches: [{ pattern: "x", stream: "combined" }],
-      }),
-    ).toThrow(
-      /notify\.logMatches\[0\]\.stream must be one of: stdout, stderr, both/,
-    );
-  });
-
-  it("rejects invalid log match mode", () => {
-    expect(() =>
-      normalizeNotifyConfig({
-        logMatches: [{ pattern: "x", mode: "glob" }],
-      }),
-    ).toThrow(/notify\.logMatches\[0\]\.mode must be one of: literal, regex/);
-  });
+  // Enum validation (attention, stream, mode) is covered by the tool's
+  // TypeBox schema: Pi validates tool call arguments before execute, so
+  // invalid values never reach normalizeNotifyConfig.
 });

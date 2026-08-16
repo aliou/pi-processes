@@ -1,7 +1,6 @@
 import type { ProcessManager } from "../../../../src/manager";
 import type { ProcessInfo } from "../../../../src/types";
 import { LIVE_STATUSES } from "../../../../src/types";
-import { isRecord } from "../../../../src/utils/is-record";
 import type {
   LogMatcherConfig,
   NotificationRegistry,
@@ -187,7 +186,7 @@ function applyWatchUpdate(
   }
 
   if (mode === "append" || mode === "replace") {
-    const normalized = normalizeLogMatchItems(items, {
+    const normalized = normalizeLogMatchItems(items as never, {
       actionLabel: "process update",
       pathPrefix: "watches.items",
     });
@@ -205,46 +204,22 @@ function applyWatchUpdate(
   throw new Error(`unsupported watch update mode: ${String(mode)}`);
 }
 
-interface RawRemoveItem {
-  index?: number;
-  pattern?: string;
-  mode?: string;
-  stream?: string;
-  repeat?: boolean;
-  on?: string;
-}
+// Watch items arrive already validated against the WatchUpdateItemParams
+// schema (Pi validates tool call arguments before execute). Only semantic
+// checks the schema cannot express remain here.
+type WatchUpdateItem = NonNullable<
+  NonNullable<ProcessesParamsType["watches"]>["items"]
+>[number];
 
-function normalizeWatchRemoveSpecs(items: unknown[]): WatchRemoveSpec[] {
-  return items.map((raw, index) => {
-    if (!isRecord(raw)) {
-      throw new Error(
-        `process update watches.items[${index}] must be an object`,
-      );
-    }
-
-    const item = raw as RawRemoveItem;
-
+function normalizeWatchRemoveSpecs(
+  items: WatchUpdateItem[],
+): WatchRemoveSpec[] {
+  return items.map((item, index) => {
     if (item.index !== undefined) {
-      if (
-        typeof item.index !== "number" ||
-        !Number.isInteger(item.index) ||
-        item.index < 0
-      ) {
-        throw new Error(
-          `process update watches.items[${index}].index must be a non-negative integer`,
-        );
-      }
-
       return { index: item.index };
     }
 
     if (item.pattern !== undefined) {
-      if (typeof item.pattern !== "string") {
-        throw new Error(
-          `process update watches.items[${index}].pattern must be a string`,
-        );
-      }
-
       if (item.pattern.trim().length === 0) {
         throw new Error(
           `process update watches.items[${index}].pattern must not be empty`,
@@ -265,10 +240,10 @@ function normalizeWatchRemoveSpecs(items: unknown[]): WatchRemoveSpec[] {
 
       return {
         pattern: item.pattern,
-        mode: item.mode as WatchRemoveSpec["mode"],
-        stream: item.stream as WatchRemoveSpec["stream"],
+        mode: item.mode,
+        stream: item.stream,
         repeat: item.repeat,
-        on: item.on as WatchRemoveSpec["on"],
+        on: item.on,
       };
     }
 

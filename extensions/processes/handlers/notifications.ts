@@ -4,7 +4,6 @@ import {
   CHANNELS,
   type ProcessProtocolNotificationPayload,
 } from "../../../src/protocol";
-import { isRecord } from "../../../src/utils/is-record";
 import {
   attentionToSendOptions,
   sendProcessNotificationMessage,
@@ -83,8 +82,8 @@ export function registerNotificationDelivery(
 
   const disposeListener = events.on(
     CHANNELS.NOTIFICATION,
-    (payload: unknown) => {
-      if (!isNotificationPayload(payload)) return;
+    (rawPayload: unknown) => {
+      const payload = rawPayload as ProcessProtocolNotificationPayload;
 
       if (payload.kind === "log_match") {
         const now = performance.now();
@@ -112,37 +111,4 @@ export function registerNotificationDelivery(
     disposeListener();
     resetWindow();
   };
-}
-
-function isNotificationPayload(
-  payload: unknown,
-): payload is ProcessProtocolNotificationPayload {
-  if (!isRecord(payload)) return false;
-  if (!isNotificationKind(payload.kind)) return false;
-  if (typeof payload.processId !== "string") return false;
-  if (typeof payload.processName !== "string") return false;
-  if (typeof payload.command !== "string") return false;
-  if (typeof payload.timestamp !== "number") return false;
-  if (typeof payload.summary !== "string") return false;
-  if (
-    payload.attention !== "turn" &&
-    payload.attention !== "context" &&
-    payload.attention !== "ignore"
-  ) {
-    return false;
-  }
-  return true;
-}
-
-function isNotificationKind(
-  value: unknown,
-): value is ProcessProtocolNotificationPayload["kind"] {
-  return (
-    value === "success" ||
-    value === "failure" ||
-    value === "crash" ||
-    value === "killed" ||
-    value === "log_match" ||
-    value === "log_match_suppressed"
-  );
 }

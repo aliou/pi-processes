@@ -3,14 +3,14 @@ import type {
   ExtensionContext,
   Theme,
 } from "@earendil-works/pi-coding-agent";
+import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
+import { buildDroppedOutputLine, trimToBudget } from "../../shared/line-buffer";
 import {
   CHANNELS,
   type CommandPinPayload,
   type ProcessesOutputChangedPayload,
   type ProcessProtocolNotificationPayload,
-} from "../../../src/protocol";
-import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
-import { buildDroppedOutputLine, trimToBudget } from "../../shared/line-buffer";
+} from "../../shared/protocol";
 import {
   type ProcessLogLine,
   requestCombinedOutput,

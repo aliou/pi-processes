@@ -9,7 +9,7 @@ import {
   type RequestListPayload,
   type RequestLogFilesPayload,
   type RequestOutputPayload,
-} from "../../../src/protocol";
+} from "../../shared/protocol";
 import type { ProcessProtocolConfig } from "../config";
 
 export function registerRequestHandlers(

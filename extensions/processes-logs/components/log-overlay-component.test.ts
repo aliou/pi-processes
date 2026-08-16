@@ -1,8 +1,8 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
 import { describe, expect, it, vi } from "vitest";
-import { CHANNELS } from "../../../src/protocol";
 import type { ProcessInfo } from "../../../src/types";
+import { CHANNELS } from "../../shared/protocol";
 import type { ProcessLogLine } from "../logs-client";
 import { LogOverlayComponent } from "./log-overlay-component";
 

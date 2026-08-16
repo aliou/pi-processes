@@ -4,7 +4,7 @@ import {
   type LogsChunkPayload,
   type LogsSubscribePayload,
   type LogsUnsubscribePayload,
-} from "../../src/protocol";
+} from "../shared/protocol";
 export type ProcessLogLine = { type: "stdout" | "stderr"; text: string };
 
 export interface LogsConnection {

@@ -2,8 +2,8 @@ import { createEventBus } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ProcessManager } from "../../../src/manager";
-import { CHANNELS } from "../../../src/protocol";
 import type { ProcessInfo } from "../../../src/types";
+import { CHANNELS } from "../../shared/protocol";
 import type { ProcessProtocolConfig } from "../config";
 import { DEFAULT_CONFIG } from "../config";
 import { registerRequestHandlers } from "./requests";

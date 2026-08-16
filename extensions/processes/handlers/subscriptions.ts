@@ -1,12 +1,12 @@
 import type { EventBus } from "@earendil-works/pi-coding-agent";
 
 import type { ProcessManager } from "../../../src/manager";
+import { buildDroppedOutputLine } from "../../shared/line-buffer";
 import {
   CHANNELS,
   type LogsSubscribePayload,
   type LogsUnsubscribePayload,
-} from "../../../src/protocol";
-import { buildDroppedOutputLine } from "../../shared/line-buffer";
+} from "../../shared/protocol";
 
 interface LogSubscriber {
   subscriberId: string;

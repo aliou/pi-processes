@@ -1,7 +1,7 @@
 import { createEventBus } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
-import type { LogsSubscribePayload } from "../../src/protocol";
-import { CHANNELS } from "../../src/protocol";
+import type { LogsSubscribePayload } from "../shared/protocol";
+import { CHANNELS } from "../shared/protocol";
 import { connectToProcessLogs } from "./logs-client";
 
 describe("connectToProcessLogs", () => {

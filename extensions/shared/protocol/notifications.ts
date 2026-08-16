@@ -2,7 +2,7 @@ import type {
   ProcessEndReason,
   ProcessSignalInfo,
   ProcessStatus,
-} from "../types";
+} from "../../../src/types";
 
 /**
  * Notification event payload broadcast on {@link CHANNELS.NOTIFICATION}.

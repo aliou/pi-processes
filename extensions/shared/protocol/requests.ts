@@ -1,4 +1,4 @@
-import type { ProcessInfo } from "../types";
+import type { ProcessInfo } from "../../../src/types";
 
 // UI emits, core listens and calls reply synchronously.
 // Reply callbacks make this an in-process protocol, not serializable IPC/RPC.

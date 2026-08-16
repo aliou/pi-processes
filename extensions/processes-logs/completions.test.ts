@@ -1,8 +1,8 @@
 import { createEventBus } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import type { RequestListPayload } from "../../src/protocol";
-import { CHANNELS } from "../../src/protocol";
 import type { ProcessInfo } from "../../src/types";
+import type { RequestListPayload } from "../shared/protocol";
+import { CHANNELS } from "../shared/protocol";
 import { allProcessCompletions } from "./completions";
 
 function makeInfo(overrides: Partial<ProcessInfo> = {}): ProcessInfo {

@@ -8,11 +8,6 @@ import {
   type TUI,
   visibleWidth,
 } from "@earendil-works/pi-tui";
-import {
-  CHANNELS,
-  type ProcessesOutputChangedPayload,
-  type ProcessProtocolConfig,
-} from "../../../src/protocol";
 import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
 import { formatRuntime } from "../../../src/utils/format";
 import {
@@ -21,6 +16,11 @@ import {
 } from "../../shared/display-text";
 import { buildDroppedOutputLine, trimToBudget } from "../../shared/line-buffer";
 import { renderLogLine } from "../../shared/log-line";
+import {
+  CHANNELS,
+  type ProcessesOutputChangedPayload,
+  type ProcessProtocolConfig,
+} from "../../shared/protocol";
 import { truncateToWidth } from "../../shared/truncate";
 import { LineComponent, LinesComponent, statusColor } from "../../shared/ui";
 import {

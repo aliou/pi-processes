@@ -120,43 +120,6 @@ describe("registerRequestHandlers", () => {
     expect(reply).toHaveBeenCalledWith(config);
   });
 
-  it("ignores malformed request payloads", () => {
-    const events = createEventBus();
-    const manager = {
-      list: vi.fn(() => []),
-      get: vi.fn(() => null),
-      getOutput: vi.fn(() => null),
-      getCombinedOutput: vi.fn(() => null),
-      getLogFiles: vi.fn(() => null),
-      getFileSize: vi.fn(() => null),
-    } as unknown as ProcessManager;
-
-    registerRequestHandlers(events, manager, getConfig);
-    events.emit(CHANNELS.REQUEST_LIST, null);
-    events.emit(CHANNELS.REQUEST_LIST, {});
-    events.emit(CHANNELS.REQUEST_GET, { id: 123, reply: vi.fn() });
-    events.emit(CHANNELS.REQUEST_OUTPUT, {
-      id: "proc_1",
-      tailLines: "bad",
-      reply: vi.fn(),
-    });
-    events.emit(CHANNELS.REQUEST_COMBINED_OUTPUT, {
-      id: "proc_1",
-      tailLines: Number.NaN,
-      reply: vi.fn(),
-    });
-    events.emit(CHANNELS.REQUEST_LOG_FILES, { id: "proc_1" });
-    events.emit(CHANNELS.REQUEST_FILE_SIZE, { reply: vi.fn() });
-    events.emit(CHANNELS.REQUEST_CONFIG, null);
-
-    expect(manager.list).not.toHaveBeenCalled();
-    expect(manager.get).not.toHaveBeenCalled();
-    expect(manager.getOutput).not.toHaveBeenCalled();
-    expect(manager.getCombinedOutput).not.toHaveBeenCalled();
-    expect(manager.getLogFiles).not.toHaveBeenCalled();
-    expect(manager.getFileSize).not.toHaveBeenCalled();
-  });
-
   it("disposes event listeners", () => {
     const events = createEventBus();
     const manager = { list: vi.fn(() => []) } as unknown as ProcessManager;

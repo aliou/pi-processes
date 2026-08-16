@@ -5,8 +5,6 @@ import {
   type LogsSubscribePayload,
   type LogsUnsubscribePayload,
 } from "../../src/protocol";
-import { isRecord } from "../../src/utils/is-record";
-
 export type ProcessLogLine = { type: "stdout" | "stderr"; text: string };
 
 export interface LogsConnection {
@@ -29,8 +27,7 @@ export function connectToProcessLogs(
 
   const disposeChunkListener = events.on(CHANNELS.LOGS_CHUNK, (raw) => {
     if (disposed) return;
-    if (!isLogsChunkPayload(raw)) return;
-    const chunk = raw;
+    const chunk = raw as LogsChunkPayload;
     if (chunk.subscriberId !== subscriberId || chunk.processId !== processId)
       return;
 
@@ -80,22 +77,4 @@ export function connectToProcessLogs(
       events.emit(CHANNELS.LOGS_UNSUBSCRIBE, unsubscribePayload);
     },
   };
-}
-
-function isLogsChunkPayload(payload: unknown): payload is LogsChunkPayload {
-  return (
-    isRecord(payload) &&
-    typeof payload.subscriberId === "string" &&
-    typeof payload.processId === "string" &&
-    Array.isArray(payload.lines) &&
-    payload.lines.every(isProcessLogLine)
-  );
-}
-
-function isProcessLogLine(line: unknown): line is ProcessLogLine {
-  return (
-    isRecord(line) &&
-    (line.type === "stdout" || line.type === "stderr") &&
-    typeof line.text === "string"
-  );
 }

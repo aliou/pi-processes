@@ -73,10 +73,6 @@ export interface ConfigV0100 {
  * - widget.showStatusWidget is preserved (still controls the status widget).
  */
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function setIfDefined<T extends object, K extends keyof T>(
   target: T,
   key: K,
@@ -120,10 +116,11 @@ export function needsConfigV094ToV0100Migration(
     return false;
   }
 
-  const root = config as Record<string, unknown>;
-  const widget = isRecord(root.widget) ? root.widget : undefined;
-
-  return widget?.dockDefaultState === "hidden";
+  // Widen to string | undefined: the incoming config predates the migration,
+  // so its dockDefaultState can be "hidden" even though the static type says
+  // it cannot.
+  const dockDefaultState: string | undefined = config.widget?.dockDefaultState;
+  return dockDefaultState === "hidden";
 }
 
 export function migrateConfigV094ToV0100(config: ConfigV094): ConfigV0100 {

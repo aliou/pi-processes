@@ -6,12 +6,11 @@ import type {
 import {
   CHANNELS,
   type CommandPinPayload,
+  type ProcessesOutputChangedPayload,
   type ProcessProtocolNotificationPayload,
 } from "../../../src/protocol";
 import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
-import { isRecord } from "../../../src/utils/is-record";
 import { buildDroppedOutputLine, trimToBudget } from "../../shared/line-buffer";
-import { isOutputChangedPayload } from "../../shared/output-payload";
 import {
   type ProcessLogLine,
   requestCombinedOutput,
@@ -349,11 +348,8 @@ export function setupDockWidgets(
     scheduleRefresh();
   };
 
-  const handleOutputChanged = (payload: unknown) => {
-    if (!isOutputChangedPayload(payload)) {
-      scheduleRefresh();
-      return;
-    }
+  const handleOutputChanged = (rawPayload: unknown) => {
+    const payload = rawPayload as ProcessesOutputChangedPayload;
     if (
       (!payload.appendedText || payload.appendedText.length === 0) &&
       !payload.droppedLines
@@ -383,7 +379,6 @@ export function setupDockWidgets(
 
   const handlePin = (payload: unknown) => {
     const command = payload as CommandPinPayload;
-    if (!isCommandPinPayload(command)) return;
     // COMMAND_PIN can arrive before the dock's throttled CHANGED refresh has
     // run. Refresh the local snapshot first so expand/pin renders immediately
     // against the current process list.
@@ -427,8 +422,9 @@ export function setupDockWidgets(
     }),
   );
   disposers.push(
-    events.on(CHANNELS.NOTIFICATION, (payload) => {
-      if (!isLogMatchNotification(payload)) return;
+    events.on(CHANNELS.NOTIFICATION, (rawPayload) => {
+      const payload = rawPayload as ProcessProtocolNotificationPayload;
+      if (payload.kind !== "log_match" || !payload.logMatch) return;
       const list = notifyMarkers.get(payload.processId) ?? [];
       list.push({ line: payload.logMatch.line, timestamp: payload.timestamp });
       if (list.length > MAX_NOTIFY_MARKERS_PER_PROCESS) {
@@ -484,30 +480,6 @@ function isLogsConnectionError(
   connection: LogsConnection | { ok: false; error: string },
 ): connection is { ok: false; error: string } {
   return "ok" in connection && connection.ok === false;
-}
-
-function isLogMatchNotification(
-  payload: unknown,
-): payload is ProcessProtocolNotificationPayload & {
-  kind: "log_match";
-  logMatch: NonNullable<ProcessProtocolNotificationPayload["logMatch"]>;
-} {
-  return (
-    isRecord(payload) &&
-    payload.kind === "log_match" &&
-    typeof payload.processId === "string" &&
-    typeof payload.timestamp === "number" &&
-    isRecord(payload.logMatch) &&
-    typeof payload.logMatch.line === "string"
-  );
-}
-
-function isCommandPinPayload(payload: unknown): payload is CommandPinPayload {
-  return (
-    isRecord(payload) &&
-    (typeof payload.id === "string" || payload.id === null) &&
-    typeof payload.reply === "function"
-  );
 }
 
 function safeReply<T>(reply: (result: T) => void, result: T): void {

@@ -7,7 +7,6 @@ import {
   type CommandKillPayload,
 } from "../../../src/protocol";
 import type { KillResult } from "../../../src/types";
-import { isRecord } from "../../../src/utils/is-record";
 import type { NotificationRegistry } from "../notifications/registry";
 import { killIntentionally } from "./kill-process";
 
@@ -19,7 +18,6 @@ export function registerCommandHandlers(
   const disposers = [
     events.on(CHANNELS.COMMAND_KILL, (payload) => {
       const command = payload as CommandKillPayload;
-      if (!isCommandKillPayload(command)) return;
 
       void killIntentionally(manager, notifications, command.id, {
         signal: command.signal,
@@ -31,7 +29,6 @@ export function registerCommandHandlers(
     }),
     events.on(CHANNELS.COMMAND_CLEAR, (payload) => {
       const command = payload as CommandClearPayload;
-      if (!isCommandClearPayload(command)) return;
 
       safeReply(command.reply, manager.clearFinished());
     }),
@@ -40,42 +37,6 @@ export function registerCommandHandlers(
   return () => {
     for (const dispose of disposers) dispose();
   };
-}
-
-function isCommandKillPayload(
-  payload: CommandKillPayload,
-): payload is CommandKillPayload {
-  return (
-    isRecord(payload) &&
-    typeof payload.id === "string" &&
-    isOptionalSignal(payload.signal) &&
-    isOptionalNumber(payload.timeoutMs) &&
-    isReply(payload)
-  );
-}
-
-function isCommandClearPayload(
-  payload: CommandClearPayload,
-): payload is CommandClearPayload {
-  return isRecord(payload) && isReply(payload);
-}
-
-function isReply(
-  payload: unknown,
-): payload is { reply: (...args: never[]) => void } {
-  return isRecord(payload) && typeof payload.reply === "function";
-}
-
-function isOptionalSignal(
-  signal: unknown,
-): signal is NodeJS.Signals | undefined {
-  return signal === undefined || typeof signal === "string";
-}
-
-function isOptionalNumber(value: unknown): value is number | undefined {
-  return (
-    value === undefined || (typeof value === "number" && Number.isFinite(value))
-  );
 }
 
 function safeReply<T>(reply: (result: T) => void, result: T): void {

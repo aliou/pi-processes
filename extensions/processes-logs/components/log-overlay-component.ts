@@ -16,7 +16,6 @@ import {
 } from "../../../src/protocol";
 import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
 import { formatRuntime } from "../../../src/utils/format";
-import { isRecord } from "../../../src/utils/is-record";
 import { truncateForDisplay } from "../../shared/display-text";
 import { renderProcessTab } from "../../shared/process-tabs";
 import { truncateToWidth } from "../../shared/truncate";
@@ -89,7 +88,7 @@ export class LogOverlayComponent implements Component {
     this.refreshProcesses(opts.initialProcessId);
     this.disposers.push(
       opts.events.on(CHANNELS.CHANGED, (payload) => {
-        if (isChangedPayload(payload)) this.handleProcessesChanged(payload);
+        this.handleProcessesChanged(payload as ProcessesChangedPayload);
       }),
     );
     this.disposers.push(
@@ -99,8 +98,9 @@ export class LogOverlayComponent implements Component {
     );
   }
 
-  private handleNotification(payload: unknown): void {
-    if (!isLogMatchNotification(payload)) return;
+  private handleNotification(rawPayload: unknown): void {
+    const payload = rawPayload as ProcessProtocolNotificationPayload;
+    if (payload.kind !== "log_match" || !payload.logMatch) return;
     const mark: NotifyMatchMark = {
       pattern: payload.logMatch.pattern,
       line: payload.logMatch.line,
@@ -654,35 +654,4 @@ function centeredBlock(
   const leftPad = Math.max(0, Math.floor((width - visibleWidth(content)) / 2));
   lines[row] = truncateToWidth(`${" ".repeat(leftPad)}${content}`, width);
   return lines;
-}
-
-function isChangedPayload(
-  payload: unknown,
-): payload is ProcessesChangedPayload {
-  return (
-    isRecord(payload) &&
-    (payload.reason === "started" ||
-      payload.reason === "ended" ||
-      payload.reason === "cleared")
-  );
-}
-
-function isLogMatchNotification(
-  payload: unknown,
-): payload is ProcessProtocolNotificationPayload & {
-  kind: "log_match";
-  logMatch: NonNullable<ProcessProtocolNotificationPayload["logMatch"]>;
-} {
-  if (!isRecord(payload)) return false;
-  if (payload.kind !== "log_match") return false;
-  if (typeof payload.processId !== "string") return false;
-  if (typeof payload.timestamp !== "number") return false;
-  const logMatch = payload.logMatch;
-  if (!isRecord(logMatch)) return false;
-  if (typeof logMatch.pattern !== "string") return false;
-  if (typeof logMatch.line !== "string") return false;
-  if (logMatch.stream !== "stdout" && logMatch.stream !== "stderr")
-    return false;
-  if (typeof logMatch.matcherIndex !== "number") return false;
-  return true;
 }

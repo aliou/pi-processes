@@ -57,23 +57,6 @@ describe("registerNotificationDelivery", () => {
     expect(options.deliverAs).toBe("steer");
   });
 
-  it("ignores malformed payloads", () => {
-    const events = createEventBus();
-    const sendMessage = vi.fn();
-    registerNotificationDelivery(events, piWithSendMessage(sendMessage));
-
-    events.emit(CHANNELS.NOTIFICATION, null);
-    events.emit(CHANNELS.NOTIFICATION, {});
-    events.emit(CHANNELS.NOTIFICATION, { kind: "success" });
-    events.emit(CHANNELS.NOTIFICATION, { ...makePayload(), attention: 5 });
-    events.emit(CHANNELS.NOTIFICATION, {
-      ...makePayload(),
-      kind: "unknown",
-    });
-
-    expect(sendMessage).not.toHaveBeenCalled();
-  });
-
   it("stops delivering after the disposer is called", () => {
     const events = createEventBus();
     const sendMessage = vi.fn();

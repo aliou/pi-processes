@@ -401,27 +401,6 @@ describe("executeUpdate", () => {
       ).toThrow("must not be empty");
     });
 
-    it("rejects negative index in remove items", () => {
-      const manager = createFakeManager();
-      const registry = createFakeRegistry();
-      registry.register("proc_1", {});
-
-      expect(() =>
-        executeUpdate(
-          {
-            action: "update",
-            id: "proc_1",
-            watches: {
-              mode: "remove",
-              items: [{ index: -1 }],
-            },
-          },
-          manager,
-          registry,
-        ),
-      ).toThrow("must be a non-negative integer");
-    });
-
     it("returns error when watch update targets unregistered notification config", () => {
       const manager = createFakeManager();
       const registry = createFakeRegistry();

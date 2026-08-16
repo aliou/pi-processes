@@ -48,7 +48,7 @@ export const PROCESS_NOTIFY_LOG_MATCH_STREAMS = [
   "both",
 ] as const;
 
-const NotifyLogMatchParams = Type.Object({
+export const NotifyLogMatchParams = Type.Object({
   pattern: Type.String({
     maxLength: MAX_NOTIFY_PATTERN_LENGTH,
     description:
@@ -140,7 +140,7 @@ const NotifyProperties = {
   ),
 };
 
-const NotifyParams = Type.Object(NotifyProperties, {
+export const NotifyParams = Type.Object(NotifyProperties, {
   description:
     "Notify settings. Attention: turn wakes an idle agent, context only reaches an agent still working, ignore never notifies.",
 });
@@ -247,6 +247,9 @@ export const ProcessesParams = Type.Object({
 });
 
 export type ProcessesParamsType = Static<typeof ProcessesParams>;
+
+export type NotifyParamsType = Static<typeof NotifyParams>;
+export type NotifyLogMatchParamsType = Static<typeof NotifyLogMatchParams>;
 
 export type ProcessAction = ProcessesParamsType["action"];
 export type ProcessListStatusFilter =

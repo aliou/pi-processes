@@ -65,6 +65,7 @@ When a feature needs a human in the loop (visual layout, keybinding feel, widget
 - `s` cycles sort (status, started, name)
 - `f` cycles filter (all, running, finished)
 - `/` opens a name quick filter; `enter` applies, `esc` clears
+- `?` opens the keybinds overlay (`?`, `esc`, `enter`, `q`, `ctrl+c` close it)
 - `q` or `esc` closes
 
 ### /ps:logs overlay
@@ -73,10 +74,26 @@ When a feature needs a human in the loop (visual layout, keybinding feel, widget
 - `tab` / `shift+tab` switch process tabs (viewer state is cached per process)
 - `g/G` jump to top or bottom
 - `j/k` or arrow keys scroll
+- `pgup/pgdn` scroll by a full viewport
+- `ctrl+u`/`ctrl+d` scroll by half a viewport
 - `s` switches between combined, stdout, and stderr
 - `f` toggles follow mode
+- `w` toggles soft wrap
 - `/` enters search, `n/N` cycles matches, `esc` clears search
+- `?` opens the keybinds overlay (`?`, `esc`, `enter`, `q`, `ctrl+c` close it)
 - `q` or `esc` closes
+
+### Footer hints and the keybinds overlay
+
+- Single-letter shortcuts whose key letter occurs in their word render as the
+  word with the key letter highlighted (accent + bold): `wrap`, `follow`,
+  `clear`, `sort`, `filter`, `kill`.
+- Hints whose key is not in the word keep the classic `<key> <word>` display
+  (`q close`, `/ search`, `j/k scroll`).
+- When the hint list does not fit the footer width, a leading `? more`
+  affordance appears and remaining hints are dropped from the right.
+- `?` opens a stacked keybinds panel (herdr-style groups: scrolling, view,
+  tabs, general — plus a search group while a search is active).
 
 ### Dock and pin
 

@@ -218,6 +218,11 @@ export class LogFileViewer {
       visible.length,
       Math.max(Math.min(height, visible.length), rawEnd),
     );
+    // Write the clamped end back so the anchor always matches the screen.
+    // Otherwise scrolling mutates a stale anchor while the clamp above
+    // swallows the change, leaving a dead zone of up to a screenful of
+    // scroll keypresses.
+    if (!this.follow && this.anchorEnd !== null) this.anchorEnd = end;
     const start = Math.max(0, end - height);
     const matchSet = new Set(this.searchMatches);
     const currentMatchIndex =
@@ -301,6 +306,9 @@ export class LogFileViewer {
       totalDisplayRows,
       Math.max(Math.min(height, totalDisplayRows), rawEnd),
     );
+    // Same anchor normalization as the truncated path: keep the stored
+    // anchor truthful so scrollBy starts from the rendered bottom edge.
+    if (!this.follow && this.anchorEnd !== null) this.anchorEnd = end;
     const start = Math.max(0, end - height);
 
     const rendered = rows.slice(start, end).map((row) => row.text);

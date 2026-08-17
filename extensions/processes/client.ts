@@ -15,6 +15,8 @@ import {
   type CommandKillPayload,
   type CommandPinPayload,
   type CommandPinResult,
+  type CommandStartPayload,
+  type CommandStartResult,
   type ProcessProtocolConfig,
   type RequestCombinedOutputPayload,
   type RequestConfigPayload,
@@ -23,6 +25,26 @@ import {
 } from "../shared/protocol";
 
 export type ProcessLogLine = { type: "stdout" | "stderr"; text: string };
+
+/**
+ * Start a managed process via the core extension's protocol channel. Resolves
+ * when the core handler replies. The started process is fully visible to the
+ * agent via the `process` tool (list, output, stop, etc.).
+ */
+export function requestStart(
+  events: EventBus,
+  options: { name: string; command: string; cwd?: string },
+): Promise<CommandStartResult> {
+  return new Promise((resolve) => {
+    const payload: CommandStartPayload = {
+      name: options.name,
+      command: options.command,
+      cwd: options.cwd,
+      reply: (result) => resolve(result),
+    };
+    events.emit(CHANNELS.COMMAND_START, payload);
+  });
+}
 
 export function requestProcessList(events: EventBus): ProcessInfo[] {
   let processes: ProcessInfo[] = [];

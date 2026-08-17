@@ -2,7 +2,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 
-import { displayTextOf, renderLogLine } from "./log-line";
+import { displayTextOf, renderLogLine, renderLogLineWrap } from "./log-line";
 
 const ESC = String.fromCodePoint(0x001b);
 
@@ -79,6 +79,28 @@ describe("renderLogLine", () => {
     expect(line.endsWith(`${ESC}[0m`)).toBe(true);
   });
 
+  it("shows a → indicator when a line is truncated", () => {
+    const line = renderLogLine(
+      { type: "stdout", text: "the quick brown fox jumps over the lazy dog" },
+      { theme, width: 10 },
+    );
+
+    expect(visibleWidth(line)).toBe(10);
+    expect(line).toContain("→");
+    // The tail is clipped.
+    expect(line).not.toContain("lazy");
+  });
+
+  it("does not show → when the line fits", () => {
+    const line = renderLogLine(
+      { type: "stdout", text: "short" },
+      { theme, width: 10 },
+    );
+
+    expect(line.trimEnd()).toBe("short");
+    expect(line).not.toContain("→");
+  });
+
   it("tones stderr and match state by priority", () => {
     const stderr = renderLogLine(
       { type: "stderr", text: "err" },
@@ -125,5 +147,102 @@ describe("renderLogLine", () => {
     expect(
       displayTextOf({ type: "stdout", text: `${ESC}[31mred${ESC}[0m` }),
     ).toBe("red");
+  });
+});
+
+describe("renderLogLineWrap", () => {
+  const theme = makeTheme();
+
+  it("returns a single padded row for short text", () => {
+    const rows = renderLogLineWrap(
+      { type: "stdout", text: "hi" },
+      { theme, width: 6 },
+    );
+    expect(rows).toEqual(["hi    "]);
+  });
+
+  it("wraps a long line into multiple display rows", () => {
+    const rows = renderLogLineWrap(
+      { type: "stdout", text: "the quick brown fox jumps" },
+      { theme, width: 10 },
+    );
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+    // The first row should not have the continuation prefix.
+    expect(rows[0].trimEnd()).toBe("the quick");
+    // Continuation rows should have the ↳ prefix (styled by the test theme).
+    expect(rows[1]).toContain("↳");
+    // The full text should be visible across all rows. Strip styling
+    // tags and the continuation prefix to reconstruct the text.
+    const combined = rows
+      .map((r) =>
+        r
+          .replace(/\[\/?\w+\]/gu, "")
+          .replace(/↳ /gu, "")
+          .trimEnd(),
+      )
+      .join("");
+    expect(combined).toContain("the quick");
+    expect(combined).toContain("brown");
+    expect(combined).toContain("fox");
+    expect(combined).toContain("jumps");
+  });
+
+  it("tones stderr rows with warning colour", () => {
+    const rows = renderLogLineWrap(
+      { type: "stderr", text: "error happened here" },
+      { theme, width: 10 },
+    );
+    for (const row of rows) {
+      // stderr is toned with [warning]...[/warning]; continuation rows have
+      // the dim ↳ prefix before the tone.
+      expect(row).toContain("[warning]");
+    }
+  });
+
+  it("applies search-current emphasis to all wrapped chunks", () => {
+    const rows = renderLogLineWrap(
+      { type: "stdout", text: "match this long line" },
+      { theme, width: 6, emphasis: "search-current" },
+    );
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+    for (const row of rows) {
+      // search-current is toned with [b][inv]...[/inv][/b]; continuation
+      // rows have the dim ↳ prefix before the tone.
+      expect(row).toContain("[b]");
+      expect(row).toContain("[inv]");
+    }
+  });
+
+  it("carries SGR colour across wrapped chunks", () => {
+    const text = `${ESC}[31mred text that keeps going and going${ESC}[0m`;
+    const rows = renderLogLineWrap(
+      { type: "stdout", text },
+      { theme, width: 10 },
+    );
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+    // First chunk starts with red SGR.
+    expect(rows[0].includes(`${ESC}[31m`)).toBe(true);
+    // Continuation chunks should also contain the red SGR (re-opened).
+    expect(rows[1].includes(`${ESC}[31m`)).toBe(true);
+  });
+
+  it("continuation rows have a dim ↳ prefix", () => {
+    const rows = renderLogLineWrap(
+      { type: "stdout", text: "the quick brown fox jumps" },
+      { theme, width: 10 },
+    );
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+    // First row: no continuation prefix.
+    expect(rows[0]).not.toContain("↳");
+    // Continuation rows: have the dim ↳ prefix.
+    for (const row of rows.slice(1)) {
+      expect(row).toContain("↳");
+    }
+  });
+
+  it("returns empty array for zero width", () => {
+    expect(
+      renderLogLineWrap({ type: "stdout", text: "hi" }, { theme, width: 0 }),
+    ).toEqual([]);
   });
 });

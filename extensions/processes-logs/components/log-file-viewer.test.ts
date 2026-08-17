@@ -274,4 +274,139 @@ describe("LogFileViewer", () => {
 
     expect(underline).toHaveBeenCalledTimes(1);
   });
+
+  it("defaults to truncation (no wrap)", () => {
+    const viewer = new LogFileViewer(
+      [{ type: "stdout", text: "the quick brown fox jumps over the lazy dog" }],
+      makeTheme(),
+      { followEnabled: false, maxBufferLines: 10 },
+    );
+
+    expect(viewer.isWrapEnabled()).toBe(false);
+
+    const rows = trimLines(viewer.render(10, 1));
+    expect(rows).toHaveLength(1);
+    // Truncated: the tail is clipped, not wrapped. A → indicator is shown.
+    expect(rows[0]).not.toContain("lazy");
+    expect(rows[0]).toContain("→");
+  });
+
+  it("toggles wrap mode and shows full content across multiple rows", () => {
+    const viewer = new LogFileViewer(
+      [{ type: "stdout", text: "the quick brown fox jumps over the lazy dog" }],
+      makeTheme(),
+      { followEnabled: false, maxBufferLines: 10 },
+    );
+
+    viewer.toggleWrap();
+    expect(viewer.isWrapEnabled()).toBe(true);
+
+    // With width 10, this 43-char line should wrap into multiple rows.
+    const rows = viewer.render(10, 10);
+    expect(rows.length).toBe(10); // padded to height
+
+    // Skip leading empty padding rows to find the content rows.
+    const content = rows.filter((r) => r.trimEnd().length > 0);
+    expect(content.length).toBeGreaterThanOrEqual(2);
+
+    // The first content row is the start of the line (no continuation prefix).
+    expect(content[0].trimEnd()).toContain("the quick");
+    // Continuation rows have the ↳ prefix.
+    expect(content[1]).toContain("↳");
+
+    // The full content should be visible somewhere in the rendered rows.
+    const combined = content
+      .map((r) => r.replace(/↳ /gu, "").trimEnd())
+      .join("");
+    expect(combined).toContain("the quick");
+    expect(combined).toContain("brown");
+    expect(combined).toContain("lazy");
+    expect(combined).toContain("dog");
+  });
+
+  it("wrap mode viewport scrolls by display rows", () => {
+    const viewer = new LogFileViewer(
+      [
+        { type: "stdout", text: "aaaa aaaa aaaa aaaa aaaa" },
+        { type: "stdout", text: "bbbb bbbb bbbb bbbb bbbb" },
+      ],
+      makeTheme(),
+      { followEnabled: false, maxBufferLines: 10 },
+    );
+
+    viewer.toggleWrap();
+    // Each 24-char line wraps to 3 rows at width 10 → 6 total display rows.
+    const allRows = trimLines(viewer.render(10, 6));
+    expect(allRows).toHaveLength(6);
+    expect(allRows[0]).toContain("aaaa");
+    expect(allRows[5]).toContain("bbbb");
+
+    // Scroll up by 3 display rows (positive delta = earlier content) to
+    // see only the first logical line's wrapped chunks.
+    viewer.scrollBy(3);
+    const scrolled = trimLines(viewer.render(10, 3));
+    expect(scrolled).toHaveLength(3);
+    for (const row of scrolled) {
+      expect(row).toContain("aaaa");
+    }
+  });
+
+  it("wrap mode status shows 'wrap' indicator", () => {
+    const viewer = new LogFileViewer(
+      [{ type: "stdout", text: "short" }],
+      makeTheme(),
+      { followEnabled: false, maxBufferLines: 10 },
+    );
+
+    const withoutWrap = viewer.getStatusParts();
+    expect(withoutWrap.right.join(" ")).not.toContain("wrap");
+
+    viewer.toggleWrap();
+    // Need a render first so lastRenderWidth is set.
+    viewer.render(20, 5);
+    const withWrap = viewer.getStatusParts();
+    expect(withWrap.right.join(" ")).toContain("wrap");
+  });
+
+  it("wrap mode preserves search match emphasis across wrapped chunks", () => {
+    const bold = vi.fn((text: string) => text);
+    const inverse = vi.fn((text: string) => text);
+    const theme = {
+      ...makeTheme(),
+      bold,
+      inverse,
+    } as unknown as Theme;
+    const viewer = new LogFileViewer(
+      [{ type: "stdout", text: "match this long line that wraps around" }],
+      theme,
+      { followEnabled: false, maxBufferLines: 10 },
+    );
+
+    viewer.toggleWrap();
+    viewer.setSearch("match");
+
+    viewer.render(10, 6);
+    // The current search match is bold+inverse; all wrapped chunks of that
+    // logical line should be toned.
+    expect(inverse).toHaveBeenCalled();
+    expect(bold).toHaveBeenCalled();
+  });
+
+  it("toggling wrap off returns to truncation", () => {
+    const viewer = new LogFileViewer(
+      [{ type: "stdout", text: "the quick brown fox jumps over the lazy dog" }],
+      makeTheme(),
+      { followEnabled: false, maxBufferLines: 10 },
+    );
+
+    viewer.toggleWrap();
+    expect(viewer.isWrapEnabled()).toBe(true);
+    viewer.toggleWrap();
+    expect(viewer.isWrapEnabled()).toBe(false);
+
+    const rows = trimLines(viewer.render(10, 1));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).not.toContain("lazy");
+    expect(rows[0]).toContain("→");
+  });
 });

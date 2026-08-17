@@ -4,7 +4,7 @@ import {
   type Component,
   Input,
   Key,
-  matchesKey,
+  parseKey,
   type TUI,
   visibleWidth,
 } from "@earendil-works/pi-tui";
@@ -21,6 +21,15 @@ import {
   type ProcessesOutputChangedPayload,
   type ProcessProtocolConfig,
 } from "../../shared/protocol";
+import {
+  SHORTCUTS_KEY,
+  type ShortcutHint,
+  ShortcutHintsComponent,
+} from "../../shared/shortcut-hints";
+import {
+  type ShortcutGroup,
+  showShortcutsOverlay,
+} from "../../shared/shortcuts-overlay";
 import { truncateToWidth } from "../../shared/truncate";
 import { LineComponent, LinesComponent, statusColor } from "../../shared/ui";
 import {
@@ -92,6 +101,8 @@ export class OverviewComponent implements Component {
   private runningProcessCount = 0;
   private readonly disposers: Array<() => void> = [];
   private disposed = false;
+  /** Disposer for the "?" shortcuts overlay, when open. */
+  private shortcutsHelp: (() => void) | null = null;
 
   constructor(private readonly opts: OverviewOptions) {
     this.configureFilterInput();
@@ -123,6 +134,34 @@ export class OverviewComponent implements Component {
     return panel.render(width);
   }
 
+  /**
+   * Key dispatch for normal mode, keyed by parsed key id. Close keys are
+   * handled in `handleInput` before the table is consulted.
+   */
+  private readonly keyActions: Record<string, () => void> = {
+    [Key.down]: () => this.moveSelection(1),
+    [Key.up]: () => this.moveSelection(-1),
+    [Key.enter]: () => void this.pinSelected(),
+    j: () => this.moveSelection(1),
+    k: () => this.moveSelection(-1),
+    J: () => this.scrollPreview(1),
+    K: () => this.scrollPreview(-1),
+    g: () => {
+      this.previewOffset = 0;
+      this.requestRender();
+    },
+    G: () => {
+      this.previewOffset = Math.max(0, this.previewLines.length - 1);
+      this.requestRender();
+    },
+    x: () => this.killSelected(),
+    c: () => this.clearFinished(),
+    s: () => this.cycleSort(),
+    f: () => this.cycleFilter(),
+    "/": () => this.startQuickFilter(),
+    [SHORTCUTS_KEY]: () => this.openShortcutsHelp(),
+  };
+
   handleInput(data: string): void {
     if (this.mode === "filter-typing") {
       this.filterInput.handleInput?.(data);
@@ -130,30 +169,13 @@ export class OverviewComponent implements Component {
       return;
     }
 
-    if (matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c"))) {
+    const key = parseKey(data);
+    if (key === "escape" || key === "ctrl+c" || key === "q" || key === "Q") {
       this.close();
       return;
     }
-    if (data === "q" || data === "Q") {
-      this.close();
-      return;
-    }
-    if (matchesKey(data, Key.down) || data === "j") this.moveSelection(1);
-    else if (matchesKey(data, Key.up) || data === "k") this.moveSelection(-1);
-    else if (data === "J") this.scrollPreview(1);
-    else if (data === "K") this.scrollPreview(-1);
-    else if (data === "g") {
-      this.previewOffset = 0;
-      this.requestRender();
-    } else if (data === "G") {
-      this.previewOffset = Math.max(0, this.previewLines.length - 1);
-      this.requestRender();
-    } else if (data === "x") this.killSelected();
-    else if (data === "c") this.clearFinished();
-    else if (data === "s") this.cycleSort();
-    else if (data === "f") this.cycleFilter();
-    else if (data === "/") this.startQuickFilter();
-    else if (matchesKey(data, Key.enter)) void this.pinSelected();
+
+    this.keyActions[key ?? ""]?.();
   }
 
   invalidate(): void {}
@@ -161,6 +183,8 @@ export class OverviewComponent implements Component {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.shortcutsHelp?.();
+    this.shortcutsHelp = null;
     for (const dispose of this.disposers.splice(0)) dispose();
   }
 
@@ -450,6 +474,19 @@ export class OverviewComponent implements Component {
     this.opts.onClose();
   }
 
+  /**
+   * Open the "?" shortcuts overlay on top of the overview. While open it
+   * captures input; closing it restores focus here. Disposed with the
+   * overview so a background close cannot leave it behind.
+   */
+  private openShortcutsHelp(): void {
+    if (this.shortcutsHelp) return;
+    this.shortcutsHelp = showShortcutsOverlay(this.opts.tui, {
+      theme: this.opts.theme,
+      groups: this.shortcutGroups(),
+    });
+  }
+
   private requestRender(): void {
     this.opts.tui.requestRender();
   }
@@ -661,35 +698,65 @@ export class OverviewComponent implements Component {
   }
 
   private buildFooter(): Component {
-    return new LineComponent((width) => this.renderFooterLine(width));
+    if (this.mode === "filter-typing") {
+      return new LineComponent((width) => {
+        const dim = (value: string) => this.opts.theme.fg("dim", value);
+        const rendered = this.filterInput.render(60)[0] ?? "";
+        return truncateToWidth(
+          `${dim("/")}${rendered}  ${dim("enter")} apply  ${dim("esc")} cancel`,
+          width,
+          "",
+          true,
+        );
+      });
+    }
+    return new ShortcutHintsComponent(
+      () => this.overviewHints(),
+      this.opts.theme,
+    );
   }
 
-  private renderFooterLine(width: number): string {
-    const t = this.opts.theme;
-    const dim = (value: string) => t.fg("dim", value);
-
-    if (this.mode === "filter-typing") {
-      const rendered = this.filterInput.render(60)[0] ?? "";
-      return truncateToWidth(
-        `${dim("/")}${rendered}  ${dim("enter")} apply  ${dim("esc")} cancel`,
-        width,
-        "",
-        true,
-      );
-    }
-
-    const keys = [
-      `${dim("j/k")} move`,
-      `${dim("J/K")} scroll`,
-      `${dim("enter")} ${this.renderPinHint()}`,
-      `${dim("x")} kill`,
-      `${dim("c")} clear`,
-      `${dim("s")} sort`,
-      `${dim("f")} filter`,
-      `${dim("/")} find`,
-      `${dim("q")} close`,
+  /** Footer hint list for the overview. */
+  private overviewHints(): ShortcutHint[] {
+    return [
+      { key: "j/k", label: "move" },
+      { key: "J/K", label: "scroll" },
+      { key: "enter", label: this.renderPinHint() },
+      { key: "x", label: "kill" },
+      { key: "c", label: "clear" },
+      { key: "s", label: "sort" },
+      { key: "f", label: "filter" },
+      { key: "/", label: "find" },
+      { key: "g/G", label: "top/bot" },
+      { key: "q", label: "close" },
     ];
-    return truncateToWidth(keys.join("  "), width, "", true);
+  }
+
+  /** Groups for the "?" shortcuts overlay. */
+  private shortcutGroups(): ShortcutGroup[] {
+    return [
+      {
+        title: "list",
+        rows: [
+          { keys: "j / k", description: "move selection" },
+          { keys: "g / G", description: "preview top / bottom" },
+          { keys: "enter", description: this.renderPinHint() },
+          { keys: "x", description: "kill" },
+          { keys: "c", description: "clear finished" },
+          { keys: "s", description: "sort" },
+          { keys: "f", description: "filter" },
+          { keys: "/", description: "find by name" },
+        ],
+      },
+      {
+        title: "preview",
+        rows: [{ keys: "J / K", description: "scroll output" }],
+      },
+      {
+        title: "general",
+        rows: [{ keys: "q", description: "close" }],
+      },
+    ];
   }
 }
 

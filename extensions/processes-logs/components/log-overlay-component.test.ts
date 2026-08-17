@@ -17,6 +17,7 @@ const theme = {
 } as unknown as Theme;
 
 const TAB = "\t";
+const ESC = String.fromCharCode(27);
 
 function makeProcess(overrides: Partial<ProcessInfo> = {}): ProcessInfo {
   return {
@@ -196,5 +197,143 @@ describe("LogOverlayComponent wrap toggle", () => {
     // Wrap should still be enabled (cached viewer preserves it).
     // We verify by checking the footer contains the wrap indicator.
     expect(footer(overlay, width)).toContain("wrap");
+  });
+});
+
+// --- page scrolling ---
+
+const PAGE_DOWN = `${ESC}[6~`;
+const PAGE_UP = `${ESC}[5~`;
+const CTRL_D = String.fromCharCode(4);
+const CTRL_U = String.fromCharCode(21);
+
+/** Log lines in the paging fixtures. */
+const TOTAL_LINES = 50;
+/** Terminal rows in the paging fixtures. */
+const TERMINAL_ROWS = 40;
+/** Viewport height (logRows()) for TERMINAL_ROWS under makeConfig(). */
+const VIEWPORT_ROWS = 24;
+/** Half-viewport rows scrolled by ctrl+u / ctrl+d. */
+const HALF_PAGE_ROWS = VIEWPORT_ROWS / 2;
+
+/** Overlay over a single process with `count` log lines. */
+function makePagedOverlay(count: number, tuiOverrides: object = {}) {
+  const proc = makeProcess();
+  const initialLines: Record<string, ProcessLogLine[]> = {
+    proc_1: Array.from({ length: count }, (_, i) => ({
+      type: "stdout" as const,
+      text: `line ${i}`,
+    })),
+  };
+  const events = makeEvents([proc], initialLines);
+  const tui = {
+    requestRender: () => {},
+    terminal: { rows: TERMINAL_ROWS, columns: 120 },
+    ...tuiOverrides,
+  } as unknown as TUI;
+  const overlay = new LogOverlayComponent({
+    events: events as never,
+    tui: tui as never,
+    theme: theme as never,
+    config: makeConfig(),
+    onClose: () => {},
+    initialProcessId: "proc_1",
+  });
+  return { overlay };
+}
+
+describe("LogOverlayComponent page scrolling", () => {
+  it("pageDown leaves follow mode and moves the viewport", () => {
+    const { overlay } = makePagedOverlay(TOTAL_LINES);
+    expect(footer(overlay, 120)).toContain("following");
+
+    overlay.handleInput(PAGE_DOWN);
+    const after = footer(overlay, 120);
+    expect(after).not.toContain("following");
+    expect(after).toContain(`L${TOTAL_LINES}/${TOTAL_LINES}`);
+  });
+
+  it("pageUp scrolls up by a full viewport", () => {
+    const { overlay } = makePagedOverlay(TOTAL_LINES);
+    overlay.handleInput(PAGE_DOWN); // stop following
+
+    overlay.handleInput(PAGE_UP);
+    expect(footer(overlay, 120)).toContain(
+      `L${TOTAL_LINES - VIEWPORT_ROWS}/${TOTAL_LINES}`,
+    );
+  });
+
+  it("ctrl+d / ctrl+u scroll by half a viewport", () => {
+    const { overlay } = makePagedOverlay(TOTAL_LINES);
+    overlay.handleInput(PAGE_DOWN); // stop following
+
+    overlay.handleInput(CTRL_U);
+    expect(footer(overlay, 120)).toContain(
+      `L${TOTAL_LINES - HALF_PAGE_ROWS}/${TOTAL_LINES}`,
+    );
+
+    overlay.handleInput(CTRL_D);
+    expect(footer(overlay, 120)).toContain(`L${TOTAL_LINES}/${TOTAL_LINES}`);
+  });
+
+  it("pageUp clamps so the viewport never ends above its own height", () => {
+    const { overlay } = makePagedOverlay(TOTAL_LINES);
+    overlay.handleInput(PAGE_DOWN);
+    overlay.handleInput(PAGE_UP);
+    overlay.handleInput(PAGE_UP);
+    expect(footer(overlay, 120)).toContain(`L${VIEWPORT_ROWS}/${TOTAL_LINES}`);
+  });
+});
+
+// --- "?" shortcuts overlay ---
+
+/** Width wide enough for the stacked keybinds panel to render untruncated. */
+const KEYBINDS_PANEL_WIDTH = 48;
+
+describe("LogOverlayComponent shortcuts overlay", () => {
+  function makeOverlayWithTui() {
+    const hide = vi.fn();
+    const shown: { component: unknown; options: unknown }[] = [];
+    const tui = {
+      requestRender: () => {},
+      terminal: { rows: 40, columns: 120 },
+      showOverlay: vi.fn((component: unknown, options: unknown) => {
+        shown.push({ component, options });
+        return { hide };
+      }),
+    };
+    const { overlay } = makePagedOverlay(5, { showOverlay: tui.showOverlay });
+    return { overlay, hide, shown };
+  }
+
+  it("opens a stacked overlay with ? and closes it via the overlay's esc", () => {
+    const { overlay, hide, shown } = makeOverlayWithTui();
+
+    overlay.handleInput("?");
+    expect(shown.length).toBe(1);
+
+    const help = shown[0]?.component as {
+      handleInput: (data: string) => void;
+      render: (width: number) => string[];
+    };
+    const lines = help.render(KEYBINDS_PANEL_WIDTH).join("\n");
+    expect(lines).toContain("keybinds");
+    expect(lines).toContain("esc close");
+    help.handleInput(`${ESC}`);
+    expect(hide).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the shortcuts overlay when the log overlay closes", () => {
+    const { overlay, hide } = makeOverlayWithTui();
+    overlay.handleInput("?");
+    overlay.handleInput("q");
+    expect(hide).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not open a second shortcuts overlay while one is open", () => {
+    const { overlay, shown } = makeOverlayWithTui();
+    overlay.handleInput("?");
+    overlay.handleInput("?");
+    expect(shown.length).toBe(1);
   });
 });

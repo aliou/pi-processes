@@ -196,6 +196,7 @@ export class LogOverlayComponent implements Component {
     else if (data === "G") this.viewer?.scrollToBottom();
     else if (data === "s") this.viewer?.cycleStreamFilter();
     else if (data === "f") this.viewer?.toggleFollow();
+    else if (data === "w") this.viewer?.toggleWrap();
     else if (data === "/") this.startSearch();
 
     this.opts.tui.requestRender();
@@ -631,8 +632,11 @@ export class LogOverlayComponent implements Component {
         ? accent("stderr")
         : dim("stderr");
 
+    const wrapOn = this.viewer?.isWrapEnabled() ?? false;
+    const wrap = wrapOn ? accent("wrap") : dim("wrap");
+
     return truncateToWidth(
-      `${dim("tab/shift+tab")} switch  ${dim("g/G")} top/bot  ${dim("j/k")} scroll  ${dim("/")} search  ${dim("s:")}${stdout}${dim("+")}${stderr}  ${dim("f")} follow  ${dim("q")} close`,
+      `${dim("tab/shift+tab")} switch  ${dim("g/G")} top/bot  ${dim("j/k")} scroll  ${dim("/")} search  ${dim("s:")}${stdout}${dim("+")}${stderr}  ${dim("f")} follow  ${dim("w:")}${wrap}  ${dim("q")} close`,
       width,
     );
   }

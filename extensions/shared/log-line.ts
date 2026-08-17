@@ -16,7 +16,7 @@ import {
   sanitizeForDisplay,
   stripSgr,
 } from "./display-text";
-import { truncateToWidth } from "./truncate";
+import { truncateToWidth, wrapToWidth } from "./truncate";
 
 export interface DisplayLogLine {
   type: "stdout" | "stderr";
@@ -56,11 +56,58 @@ export function renderLogLine(
   const prefixWidth = visibleWidth(prefix);
   const textWidth = Math.max(1, width - prefixWidth);
   const safe = sanitizeForDisplay(line.text);
+  // Use "→" as the truncation indicator so the user can see that a line
+  // was clipped (wrap mode is available via the `w` key in the overlay).
   const text = closeSgr(
-    truncateToWidth(plain ? stripSgr(safe) : safe, textWidth, "", true),
+    truncateToWidth(plain ? stripSgr(safe) : safe, textWidth, "→", true),
   );
 
   return `${prefix}${toneLogText(text, line.type, emphasis, theme)}`;
+}
+
+/**
+ * Wrap a log line into multiple display rows instead of truncating.
+ *
+ * Each returned row is toned (by stream / match state) and padded to `width`.
+ * SGR state is carried across wrapped chunks so colours survive wrapping.
+ * Continuation rows (every row after the first) are indented with a dim
+ * `continuationPrefix` so the user can visually distinguish a wrapped chunk
+ * from a new log line — matching `less`/`journalctl` behaviour.
+ * Used by the `/ps:logs` overlay soft-wrap mode; `renderLogLine` (truncate)
+ * remains the default for the `/ps` preview and dock.
+ */
+export function renderLogLineWrap(
+  line: DisplayLogLine,
+  options: RenderLogLineOptions,
+): string[] {
+  const {
+    theme,
+    width,
+    emphasis = "none",
+    prefix = "",
+    plain = false,
+  } = options;
+  if (width <= 0) return [];
+
+  const prefixWidth = visibleWidth(prefix);
+  const textWidth = Math.max(1, width - prefixWidth);
+  const safe = sanitizeForDisplay(line.text);
+  const source = plain ? stripSgr(safe) : safe;
+
+  // Continuation rows get a dim arrow indent so wrapped chunks are
+  // visually distinct from new log lines.
+  const contMarker = "↳ ";
+  const contIndent = visibleWidth(contMarker);
+
+  const wrapped = wrapToWidth(source, textWidth, contIndent);
+
+  return wrapped.map((row, index) => {
+    const toned = toneLogText(row, line.type, emphasis, theme);
+    if (index === 0) {
+      return `${prefix}${toned}`;
+    }
+    return `${theme.fg("dim", contMarker)}${toned}`;
+  });
 }
 
 /** Text of a log line as the views display it, for match comparisons. */

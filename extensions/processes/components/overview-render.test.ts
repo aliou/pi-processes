@@ -523,3 +523,116 @@ describe("overview panel render width safety", () => {
     ).toHaveLength(requestsBefore);
   });
 });
+
+// --- minimal footer hints + "?" shortcuts overlay ---
+
+const ANSI_ESC = String.fromCharCode(27);
+const ANSI_CODES: Record<string, string> = { dim: "2", accent: "36" };
+/** Emits real ANSI so width math stays correct while styles stay visible. */
+const ansiTheme = {
+  fg: (color: string, text: string) =>
+    `${ANSI_ESC}[${ANSI_CODES[color] ?? "0"}m${text}${ANSI_ESC}[0m`,
+  bg: (_color: string, text: string) => text,
+  bold: (text: string) => `${ANSI_ESC}[1m${text}${ANSI_ESC}[22m`,
+} as unknown;
+
+const DIM = (text: string) => `${ANSI_ESC}[2m${text}${ANSI_ESC}[0m`;
+const ACCENT = (text: string) => `${ANSI_ESC}[36m${text}${ANSI_ESC}[0m`;
+const BOLD = (text: string) => `${ANSI_ESC}[1m${text}${ANSI_ESC}[22m`;
+
+function makeFooterComponent(tuiOverrides: object = {}, themeOverride = theme) {
+  const processes = [
+    makeProcess({ id: "proc_1", name: "dev", status: "running" }),
+  ];
+  const events = makeEvents(processes);
+  const tui = {
+    requestRender: () => {},
+    terminal: { rows: 24, columns: TERMINAL_WIDTH },
+    ...tuiOverrides,
+  } as unknown;
+  return new OverviewComponent({
+    events: events as never,
+    tui: tui as never,
+    theme: themeOverride as never,
+    config: makeConfig() as never,
+    onClose: () => {},
+  });
+}
+
+/** Width the full overview hint list fits in. */
+const TERMINAL_WIDTH = 112;
+/** Width too narrow for the full hint list (forces the ? more collapse). */
+const NARROW_WIDTH = 40;
+/** Width wide enough for the stacked keybinds panel to render untruncated. */
+const PANEL_WIDTH = 48;
+
+describe("overview footer shortcut hints", () => {
+  it("renders single-letter keys inside their word (minimal hints)", () => {
+    const component = makeFooterComponent({}, ansiTheme);
+    const footer = component.render(TERMINAL_WIDTH).join("\n");
+    // c clear / s sort / f filter collapse to the word with the key letter
+    // highlighted in accent + bold.
+    expect(footer).toContain(`${ACCENT(BOLD("c"))}lear`);
+    expect(footer).toContain(`${ACCENT(BOLD("s"))}ort`);
+    expect(footer).toContain(`${ACCENT(BOLD("f"))}ilter`);
+    // Multi-char and non-matching keys keep the classic display.
+    expect(footer).toContain(`${DIM("j/k")} move`);
+    expect(footer).toContain(`${DIM("enter")} ${ACCENT("pin")}`);
+    expect(footer).toContain(`${DIM("q")} close`);
+  });
+
+  it("prefixes the ? affordance when the footer overflows", () => {
+    const component = makeFooterComponent({}, ansiTheme);
+    const footer = component.render(NARROW_WIDTH).join("\n");
+    expect(footer).toContain(`${ACCENT(BOLD("?"))}${DIM(" more")}`);
+    // Everything must still fit the panel width.
+    for (const line of component.render(NARROW_WIDTH)) {
+      expect(visibleWidth(line)).toBeLessThanOrEqual(NARROW_WIDTH);
+    }
+  });
+});
+
+describe("overview shortcuts overlay", () => {
+  function makeWithHelp() {
+    const hide = vi.fn();
+    const shown: { component: unknown }[] = [];
+    const tui = {
+      requestRender: () => {},
+      showOverlay: vi.fn((component: unknown) => {
+        shown.push({ component });
+        return { hide };
+      }),
+    };
+    return {
+      component: makeFooterComponent({ showOverlay: tui.showOverlay }),
+      hide,
+      shown,
+    };
+  }
+
+  it("opens a stacked shortcuts overlay with ?", () => {
+    const { component, shown } = makeWithHelp();
+    component.handleInput("?");
+    expect(shown.length).toBe(1);
+  });
+
+  it("hides the shortcuts overlay when the overview closes", () => {
+    const { component, hide } = makeWithHelp();
+    component.handleInput("?");
+    component.handleInput("q");
+    expect(hide).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders the shortcuts list inside the stacked overlay", () => {
+    const { component, shown } = makeWithHelp();
+    component.handleInput("?");
+    const help = shown[0]?.component as {
+      render: (width: number) => string[];
+    };
+    const rendered = help.render(PANEL_WIDTH).join("\n");
+    expect(rendered).toContain("keybinds");
+    expect(rendered).toContain("move selection");
+    expect(rendered).toContain("clear finished");
+    expect(rendered).toContain("esc close");
+  });
+});

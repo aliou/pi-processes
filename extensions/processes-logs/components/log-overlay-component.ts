@@ -4,7 +4,7 @@ import {
   type Component,
   Input,
   Key,
-  matchesKey,
+  parseKey,
   type TUI,
   visibleWidth,
 } from "@earendil-works/pi-tui";
@@ -18,6 +18,15 @@ import {
   type ProcessProtocolConfig,
   type ProcessProtocolNotificationPayload,
 } from "../../shared/protocol";
+import {
+  renderShortcutHints,
+  SHORTCUTS_KEY,
+  type ShortcutHint,
+} from "../../shared/shortcut-hints";
+import {
+  type ShortcutGroup,
+  showShortcutsOverlay,
+} from "../../shared/shortcuts-overlay";
 import { truncateToWidth } from "../../shared/truncate";
 import { LineComponent, LinesComponent, RuleComponent } from "../../shared/ui";
 import { requestProcessList } from "../client";
@@ -81,6 +90,8 @@ export class LogOverlayComponent implements Component {
    * survive a round-trip. Mirrors the notifyMarkers persistence pattern.
    */
   private readonly viewers = new Map<string, LogFileViewer>();
+  /** Disposer for the "?" shortcuts overlay, when open. */
+  private shortcutsHelp: (() => void) | null = null;
 
   constructor(private readonly opts: LogOverlayOptions) {
     this.configureSearchInput();
@@ -144,6 +155,31 @@ export class LogOverlayComponent implements Component {
     return panel.render(width);
   }
 
+  /**
+   * Key dispatch for normal mode, keyed by parsed key id. Close keys and
+   * the mode-specific search keys are handled in `handleInput` before the
+   * table is consulted.
+   */
+  private readonly keyActions: Record<string, () => void> = {
+    [Key.tab]: () => this.selectRelative(1),
+    [Key.shift("tab")]: () => this.selectRelative(-1),
+    [Key.down]: () => this.viewer?.scrollBy(-1),
+    [Key.up]: () => this.viewer?.scrollBy(1),
+    [Key.pageDown]: () => this.viewer?.scrollBy(-this.logRows()),
+    [Key.pageUp]: () => this.viewer?.scrollBy(this.logRows()),
+    [Key.ctrl("d")]: () => this.viewer?.scrollBy(-this.halfPageRows()),
+    [Key.ctrl("u")]: () => this.viewer?.scrollBy(this.halfPageRows()),
+    j: () => this.viewer?.scrollBy(-1),
+    k: () => this.viewer?.scrollBy(1),
+    g: () => this.viewer?.scrollToTop(),
+    G: () => this.viewer?.scrollToBottom(),
+    s: () => this.viewer?.cycleStreamFilter(),
+    f: () => this.viewer?.toggleFollow(),
+    w: () => this.viewer?.toggleWrap(),
+    "/": () => this.startSearch(),
+    [SHORTCUTS_KEY]: () => this.openShortcutsHelp(),
+  };
+
   handleInput(data: string): void {
     if (this.mode === "search-typing") {
       this.searchInput.handleInput?.(data);
@@ -151,25 +187,27 @@ export class LogOverlayComponent implements Component {
       return;
     }
 
+    const key = parseKey(data);
+
     if (this.mode === "search-active") {
-      if (matchesKey(data, Key.escape)) {
+      if (key === "escape") {
         this.viewer?.clearSearch();
         this.searchInput.setValue("");
         this.mode = "normal";
         this.opts.tui.requestRender();
         return;
       }
-      if (data === "n") {
+      if (key === "n") {
         this.viewer?.nextMatch();
         this.opts.tui.requestRender();
         return;
       }
-      if (data === "N") {
+      if (key === "N") {
         this.viewer?.previousMatch();
         this.opts.tui.requestRender();
         return;
       }
-      if (data === "/") {
+      if (key === "/") {
         this.searchInput.setValue(this.viewer?.getSearchInfo()?.query ?? "");
         this.mode = "search-typing";
         this.opts.tui.requestRender();
@@ -177,27 +215,12 @@ export class LogOverlayComponent implements Component {
       }
     }
 
-    if (
-      matchesKey(data, Key.escape) ||
-      matchesKey(data, Key.ctrl("c")) ||
-      data === "q" ||
-      data === "Q"
-    ) {
+    if (key === "escape" || key === "ctrl+c" || key === "q" || key === "Q") {
       this.close();
       return;
     }
 
-    if (matchesKey(data, Key.tab)) this.selectRelative(1);
-    else if (matchesKey(data, Key.shift("tab"))) this.selectRelative(-1);
-    else if (matchesKey(data, Key.down) || data === "j")
-      this.viewer?.scrollBy(-1);
-    else if (matchesKey(data, Key.up) || data === "k") this.viewer?.scrollBy(1);
-    else if (data === "g") this.viewer?.scrollToTop();
-    else if (data === "G") this.viewer?.scrollToBottom();
-    else if (data === "s") this.viewer?.cycleStreamFilter();
-    else if (data === "f") this.viewer?.toggleFollow();
-    else if (data === "w") this.viewer?.toggleWrap();
-    else if (data === "/") this.startSearch();
+    this.keyActions[key ?? ""]?.();
 
     this.opts.tui.requestRender();
   }
@@ -224,6 +247,8 @@ export class LogOverlayComponent implements Component {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.shortcutsHelp?.();
+    this.shortcutsHelp = null;
     if (this.renderTimer) {
       clearTimeout(this.renderTimer);
       this.renderTimer = null;
@@ -317,6 +342,24 @@ export class LogOverlayComponent implements Component {
   private close(): void {
     this.dispose();
     this.opts.onClose();
+  }
+
+  /** Rows scrolled by ctrl+u / ctrl+d (half a viewport). */
+  private halfPageRows(): number {
+    return Math.max(1, Math.floor(this.logRows() / 2));
+  }
+
+  /**
+   * Open the "?" shortcuts overlay on top of this overlay. While open it
+   * captures input; closing it restores focus here. Disposed with the
+   * overlay so a background close (auto-hide, kill) cannot leave it behind.
+   */
+  private openShortcutsHelp(): void {
+    if (this.shortcutsHelp) return;
+    this.shortcutsHelp = showShortcutsOverlay(this.opts.tui, {
+      theme: this.opts.theme,
+      groups: this.shortcutGroups(),
+    });
   }
 
   private refreshProcesses(preferredProcessId?: string): void {
@@ -605,40 +648,98 @@ export class LogOverlayComponent implements Component {
 
     const leftPrefix = this.message ?? statusLeft.join("  ");
     const prefix = leftPrefix ? `${leftPrefix}  ` : "";
-    const keys = this.renderFooterKeys(
+    const keys = renderShortcutHints(
+      this.footerHints(),
+      this.opts.theme,
       Math.max(1, width - visibleWidth(prefix)),
     );
     return truncateToWidth(`${prefix}${keys}`, width);
   }
 
-  private renderFooterKeys(width: number): string {
-    const dim = (value: string) => this.opts.theme.fg("dim", value);
-    const accent = (value: string) => this.opts.theme.fg("accent", value);
-
+  /** Footer hint list; search mode adds its extra keys up front. */
+  private footerHints(): ShortcutHint[] {
+    const hints: ShortcutHint[] = [];
     if (this.mode === "search-active") {
-      return truncateToWidth(
-        `${dim("n")} next  ${dim("N")} prev  ${dim("/")} edit  ${dim("esc")} clear  ${dim("j/k")} scroll  ${dim("q")} close`,
-        width,
+      hints.push(
+        { key: "n", label: "next" },
+        { key: "N", label: "prev" },
+        { key: "/", label: "edit" },
+        { key: "esc", label: "clear" },
       );
     }
-
     const streamFilter = this.viewer?.getStreamFilter() ?? "both";
-    const stdout =
-      streamFilter === "both" || streamFilter === "stdout"
-        ? accent("stdout")
-        : dim("stdout");
-    const stderr =
-      streamFilter === "both" || streamFilter === "stderr"
-        ? accent("stderr")
-        : dim("stderr");
-
+    const stream = (on: boolean) => (on ? "accent" : "dim");
     const wrapOn = this.viewer?.isWrapEnabled() ?? false;
-    const wrap = wrapOn ? accent("wrap") : dim("wrap");
-
-    return truncateToWidth(
-      `${dim("tab/shift+tab")} switch  ${dim("g/G")} top/bot  ${dim("j/k")} scroll  ${dim("/")} search  ${dim("s:")}${stdout}${dim("+")}${stderr}  ${dim("f")} follow  ${dim("w:")}${wrap}  ${dim("q")} close`,
-      width,
+    hints.push(
+      {
+        key: "w",
+        label: [{ text: "wrap", style: wrapOn ? "accent" : "dim" }],
+      },
+      { key: "f", label: "follow" },
+      { key: "/", label: "search" },
+      {
+        key: "s",
+        label: [
+          { text: "stdout", style: stream(streamFilter !== "stderr") },
+          { text: "+", style: "dim" },
+          { text: "stderr", style: stream(streamFilter !== "stdout") },
+        ],
+      },
+      { key: "j/k", label: "scroll" },
+      { key: "pgup/pgdn", label: "page" },
+      { key: "^u/^d", label: "half-page" },
+      { key: "q", label: "close" },
+      { key: "g/G", label: "top/bot" },
+      { key: "tab/shift+tab", label: "switch" },
     );
+    return hints;
+  }
+
+  /**
+   * Groups for the "?" shortcuts overlay. The search group is only present
+   * while a search is active; every other key works in both modes.
+   */
+  private shortcutGroups(): ShortcutGroup[] {
+    const groups: ShortcutGroup[] = [];
+    if (this.mode === "search-active") {
+      groups.push({
+        title: "search",
+        rows: [
+          { keys: "n / N", description: "next / previous match" },
+          { keys: "/", description: "edit query" },
+          { keys: "esc", description: "clear search" },
+        ],
+      });
+    }
+    groups.push(
+      {
+        title: "scrolling",
+        rows: [
+          { keys: "j / k", description: "line up / down" },
+          { keys: "pgup / pgdn", description: "page up / down" },
+          { keys: "ctrl+u / ctrl+d", description: "half page up / down" },
+          { keys: "g / G", description: "top / bottom" },
+        ],
+      },
+      {
+        title: "view",
+        rows: [
+          { keys: "w", description: "wrap long lines" },
+          { keys: "f", description: "follow newest output" },
+          { keys: "s", description: "stream: stdout + stderr" },
+          { keys: "/", description: "search" },
+        ],
+      },
+      {
+        title: "tabs",
+        rows: [{ keys: "tab / shift+tab", description: "switch process" }],
+      },
+      {
+        title: "general",
+        rows: [{ keys: "q", description: "close" }],
+      },
+    );
+    return groups;
   }
 }
 

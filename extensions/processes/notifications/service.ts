@@ -90,6 +90,9 @@ export function createNotificationService(deps: NotificationServiceDeps): {
     const kind = classifyProcessEnd(info);
 
     if (isIntentionalStop) {
+      const details = buildLifecycleDetails(info, kind, "context");
+      events.emit(CHANNELS.NOTIFICATION, details);
+
       cleanupMatcherState(info.id);
       registry.unregister(info.id);
       return;

@@ -134,7 +134,7 @@ describe("NotificationService", () => {
     service.dispose();
   });
 
-  it("suppresses killed notification for intentional stop", async () => {
+  it("emits a context notification for an intentionally killed process", async () => {
     const fakeManager = createFakeManager();
     const spy = createNotificationSpy();
     const registry = createNotificationRegistry();
@@ -161,7 +161,11 @@ describe("NotificationService", () => {
     });
     await flushQueuedMicrotasks();
 
-    expect(spy.emitted).toHaveLength(0);
+    expect(spy.emitted).toHaveLength(1);
+    expect(spy.emitted[0].attention).toBe("context");
+    expect(spy.emitted[0].kind).toBe("killed");
+    expect(spy.emitted[0].processId).toBe("proc_1");
+    expect(registry.get("proc_1")).toBeNull();
 
     service.dispose();
   });
@@ -170,7 +174,7 @@ describe("NotificationService", () => {
     { name: "successful", success: true, exitCode: 0 },
     { name: "failed", success: false, exitCode: 1 },
   ])(
-    "suppresses $name exit notification for intentional stop",
+    "emits a context notification for an intentionally stopped $name process",
     async ({ success, exitCode }) => {
       const fakeManager = createFakeManager();
       const spy = createNotificationSpy();
@@ -197,7 +201,8 @@ describe("NotificationService", () => {
       });
       await flushQueuedMicrotasks();
 
-      expect(spy.emitted).toHaveLength(0);
+      expect(spy.emitted).toHaveLength(1);
+      expect(spy.emitted[0].attention).toBe("context");
       expect(registry.get("proc_1")).toBeNull();
 
       service.dispose();

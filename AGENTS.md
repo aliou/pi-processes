@@ -60,8 +60,13 @@ Avoid fixed sleeps in both unit and e2e tests. Prefer event-driven helpers that 
 - `plugins/` - repo-local Biome GritQL lint plugins, registered in `biome.json`
 - `skills/` - shipped package skills consumed by Pi
 - `.agents/skills/` - local repo-only skills for development workflows
+- `docs/` - documentation and design notes (current behavior, architecture, canonical references, future design proposals). See `docs/README.md` for the index.
 
-Future design notes live in `docs/future-persistent-manager.md` and `docs/future-cleanup-hooks.md`. Keep implemented behavior in living docs and put new active plans under `.agents/plans/`.
+## Documentation
+
+`docs/` holds both living docs (current behavior) and future-design notes (proposed work, prefixed `future-`). When a change to lifecycle, notifications, config, or public behavior lands, update the relevant `docs/` entry (start with `docs/notifications.md` for notification/event flow) and retire the matching future-design note by folding its landed behavior into a living doc.
+
+When adding a doc, name it for its subject (`docs/notifications.md`, not `docs/new-foo.md`) and add it to `docs/README.md`. Anchor call-stack nodes to real symbols and plain repo paths, never line numbers.
 
 ## Rendering conventions
 

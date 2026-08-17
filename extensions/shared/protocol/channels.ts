@@ -15,6 +15,7 @@ export const CHANNELS = {
   REQUEST_CONFIG: "processes:request:config",
 
   // Command channels (UI -> core, callback)
+  COMMAND_START: "processes:command:start",
   COMMAND_KILL: "processes:command:kill",
   COMMAND_CLEAR: "processes:command:clear",
   // Pin handled by the dock extension, if loaded.

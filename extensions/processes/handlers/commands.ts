@@ -6,6 +6,7 @@ import {
   CHANNELS,
   type CommandClearPayload,
   type CommandKillPayload,
+  type CommandStartPayload,
 } from "../../shared/protocol";
 import type { NotificationRegistry } from "../notifications/registry";
 import { killIntentionally } from "./kill-process";
@@ -16,6 +17,24 @@ export function registerCommandHandlers(
   notifications: NotificationRegistry,
 ): () => void {
   const disposers = [
+    events.on(CHANNELS.COMMAND_START, (payload) => {
+      const command = payload as CommandStartPayload;
+
+      try {
+        const info = manager.start(
+          command.name,
+          command.command,
+          command.cwd ?? process.cwd(),
+        );
+        notifications.register(info.id, {});
+        safeReply(command.reply, { ok: true, process: info });
+      } catch (err) {
+        safeReply(command.reply, {
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }),
     events.on(CHANNELS.COMMAND_KILL, (payload) => {
       const command = payload as CommandKillPayload;
 

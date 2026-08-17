@@ -1,6 +1,17 @@
-import type { KillResult } from "../../../src/types";
+import type { KillResult, ProcessInfo } from "../../../src/types";
 
 // UI emits, core handles then calls reply.
+
+export interface CommandStartPayload {
+  name: string;
+  command: string;
+  cwd?: string;
+  reply: (result: CommandStartResult) => void;
+}
+
+export type CommandStartResult =
+  | { ok: true; process: ProcessInfo }
+  | { ok: false; error: string };
 
 export interface CommandKillPayload {
   id: string;

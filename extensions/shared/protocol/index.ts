@@ -10,6 +10,8 @@ export type {
   CommandKillPayload,
   CommandPinPayload,
   CommandPinResult,
+  CommandStartPayload,
+  CommandStartResult,
 } from "./commands";
 export type {
   LogsChunkPayload,

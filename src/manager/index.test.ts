@@ -1,3 +1,4 @@
+import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 
@@ -892,5 +893,174 @@ describe("output retrieval", () => {
     const sizes = manager.getFileSize(info.id);
     assert(sizes, "file sizes should exist");
     expect(sizes.stdout).toBeGreaterThan(0);
+  });
+});
+
+// --- Adopt ---
+
+describe("adopt", () => {
+  function makeAdoptableChild(): FakeChildProcess {
+    const child = new FakeChildProcess();
+    if (child.pid !== undefined) fakeProcesses.set(child.pid, child);
+    return child;
+  }
+
+  function asChildProcess(child: FakeChildProcess): ChildProcess {
+    return child as unknown as ChildProcess;
+  }
+
+  it("adopts a running child and returns running ProcessInfo", () => {
+    using manager = new ProcessManager();
+    const child = makeAdoptableChild();
+
+    const info = manager.adopt("bg", "sleep 60", "/tmp", asChildProcess(child));
+
+    expect(info.id).toMatch(/^proc_[0-9a-f]{4}$/);
+    expect(info).toEqual(
+      expect.objectContaining({
+        name: "bg",
+        command: "sleep 60",
+        cwd: "/tmp",
+        pid: child.pid,
+        status: "running",
+      }),
+    );
+  });
+
+  it("backdates startTime when provided", () => {
+    using manager = new ProcessManager();
+    const child = makeAdoptableChild();
+    const startTime = Date.now() - 30_000;
+
+    const info = manager.adopt(
+      "bg",
+      "sleep 60",
+      "/tmp",
+      asChildProcess(child),
+      {
+        startTime,
+      },
+    );
+
+    expect(info.startTime).toBe(startTime);
+  });
+
+  it("emits process_started on adoption", () => {
+    using manager = new ProcessManager();
+    const events = collectEvents(manager);
+    const child = makeAdoptableChild();
+
+    const info = manager.adopt("bg", "sleep 60", "/tmp", asChildProcess(child));
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: "process_started",
+        info: expect.objectContaining({ id: info.id }),
+      }),
+    ]);
+  });
+
+  it("prepends initialOutput ahead of post-adoption output", async () => {
+    using manager = new ProcessManager();
+    const child = makeAdoptableChild();
+
+    const info = manager.adopt(
+      "bg",
+      "echo before; echo after",
+      "/tmp",
+      asChildProcess(child),
+      { initialOutput: Buffer.from("before\n") },
+    );
+
+    child.stdout.write("after\n");
+    child.finish(0);
+    await waitForEnd(manager, info.id);
+
+    const output = manager.getOutput(info.id);
+    assert(output, "output should exist");
+    expect(output.stdout.indexOf("before")).toBeGreaterThanOrEqual(0);
+    expect(output.stdout.indexOf("after")).toBeGreaterThan(
+      output.stdout.indexOf("before"),
+    );
+  });
+
+  it("detects exit of an adopted child", async () => {
+    using manager = new ProcessManager();
+    const child = makeAdoptableChild();
+
+    const info = manager.adopt("bg", "sleep 60", "/tmp", asChildProcess(child));
+    child.finish(0);
+    await waitForEnd(manager, info.id);
+
+    const ended = manager.get(info.id);
+    assert(ended, "process should exist");
+    expect(ended.status).toBe("exited");
+    expect(ended.exitCode).toBe(0);
+    expect(ended.success).toBe(true);
+    expect(ended.endReason).toBe("exit");
+  });
+
+  it("finalizes via pending close when child exited before adoption", async () => {
+    using manager = new ProcessManager();
+    const child = makeAdoptableChild();
+    child.stdout.write("done\n");
+    child.finish(0);
+
+    const info = manager.adopt(
+      "bg",
+      "echo done",
+      "/tmp",
+      asChildProcess(child),
+    );
+    await waitForEnd(manager, info.id);
+
+    const ended = manager.get(info.id);
+    assert(ended, "process should exist");
+    expect(ended.status).toBe("exited");
+    expect(ended.exitCode).toBe(0);
+    expect(ended.success).toBe(true);
+  });
+
+  it("finalizes immediately when close fired before adoption", async () => {
+    using manager = new ProcessManager();
+    const child = makeAdoptableChild();
+    child.finish(0);
+    // Let the queued close event fire and the streams settle pre-adoption.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    child.stdout.destroy();
+    child.stderr.destroy();
+
+    const info = manager.adopt("bg", "true", "/tmp", asChildProcess(child));
+
+    const ended = manager.get(info.id);
+    assert(ended, "process should exist");
+    expect(ended.status).toBe("exited");
+    expect(ended.exitCode).toBe(0);
+    expect(ended.success).toBe(true);
+    expect(ended.endReason).toBe("exit");
+  });
+
+  it("kills an adopted process", async () => {
+    using manager = new ProcessManager();
+    const child = makeAdoptableChild();
+
+    const info = manager.adopt("bg", "sleep 60", "/tmp", asChildProcess(child));
+    const result = await manager.kill(info.id);
+
+    expect(result.ok).toBe(true);
+    expect(result.info.status).toBe("killed");
+    expect(child.killed).toBe(true);
+  });
+
+  it("records a spawn-error process when the child has no pid", () => {
+    using manager = new ProcessManager();
+    const child = new FakeChildProcess();
+    child.pid = undefined;
+
+    const info = manager.adopt("bg", "true", "/tmp", asChildProcess(child));
+
+    expect(info.status).toBe("exited");
+    expect(info.endReason).toBe("missing_pid");
+    expect(info.success).toBe(false);
   });
 });

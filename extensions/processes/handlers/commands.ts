@@ -3,12 +3,14 @@ import type { EventBus } from "@earendil-works/pi-coding-agent";
 import type { ProcessManager } from "../../../src/manager";
 import {
   CHANNELS,
+  type CommandAdoptPayload,
   type CommandClearPayload,
   type CommandKillPayload,
 } from "../../../src/protocol";
 import type { KillResult } from "../../../src/types";
 import { isRecord } from "../../../src/utils/is-record";
 import type { NotificationRegistry } from "../notifications/registry";
+import { normalizeNotifyConfig } from "../tools/notify";
 import { killIntentionally } from "./kill-process";
 
 export function registerCommandHandlers(
@@ -35,6 +37,30 @@ export function registerCommandHandlers(
 
       safeReply(command.reply, manager.clearFinished());
     }),
+    events.on(CHANNELS.COMMAND_ADOPT, (payload) => {
+      const command = payload as CommandAdoptPayload;
+      if (!isCommandAdoptPayload(command)) return;
+
+      try {
+        const info = manager.adopt(
+          command.name,
+          command.command,
+          command.cwd,
+          command.child,
+          {
+            initialOutput: command.initialOutput,
+            startTime: command.startTime,
+          },
+        );
+        notifications.register(info.id, normalizeNotifyConfig(undefined));
+        safeReply(command.reply, { ok: true, info });
+      } catch (error) {
+        safeReply(command.reply, {
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }),
   ];
 
   return () => {
@@ -58,6 +84,32 @@ function isCommandClearPayload(
   payload: CommandClearPayload,
 ): payload is CommandClearPayload {
   return isRecord(payload) && isReply(payload);
+}
+
+function isCommandAdoptPayload(
+  payload: CommandAdoptPayload,
+): payload is CommandAdoptPayload {
+  return (
+    isRecord(payload) &&
+    typeof payload.name === "string" &&
+    typeof payload.command === "string" &&
+    typeof payload.cwd === "string" &&
+    isAdoptableChild(payload.child) &&
+    (payload.initialOutput === undefined ||
+      Buffer.isBuffer(payload.initialOutput)) &&
+    isOptionalNumber(payload.startTime) &&
+    isReply(payload)
+  );
+}
+
+function isAdoptableChild(child: unknown): boolean {
+  if (child === null || typeof child !== "object") return false;
+  const candidate = child as { pid?: unknown; on?: unknown; unref?: unknown };
+  return (
+    (candidate.pid === undefined || typeof candidate.pid === "number") &&
+    typeof candidate.on === "function" &&
+    typeof candidate.unref === "function"
+  );
 }
 
 function isReply(

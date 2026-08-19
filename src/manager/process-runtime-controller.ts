@@ -1,6 +1,11 @@
 import type { ChildProcess } from "node:child_process";
 
-import type { KillResult, ManagerEvent, WriteResult } from "../types";
+import type {
+  AdoptProcessOptions,
+  KillResult,
+  ManagerEvent,
+  WriteResult,
+} from "../types";
 import { LIVE_STATUSES } from "../types";
 import { isProcessGroupAlive, killProcessGroup } from "../utils";
 import { spawnCommand } from "../utils/command-executor";
@@ -41,10 +46,44 @@ export class ProcessRuntimeController {
   }
 
   start(name: string, command: string, cwd: string): ManagedProcessRecord {
+    const child = spawnCommand(command, cwd, this.getConfiguredShellPath());
+    return this.register(name, command, cwd, child, {});
+  }
+
+  /**
+   * Adopt an externally spawned child process into the manager.
+   *
+   * The child must have been spawned like `spawnCommand` spawns: in a
+   * detached process group (`detached: true`) with piped stdio, so group
+   * kill and liveness polling behave identically to started processes.
+   *
+   * `initialOutput` is output the adopter captured before handing the
+   * process over; it is appended to the logs ahead of any future stdio.
+   * `startTime` backdates the record to when the command actually began.
+   */
+  adopt(
+    name: string,
+    command: string,
+    cwd: string,
+    child: ChildProcess,
+    opts?: AdoptProcessOptions,
+  ): ManagedProcessRecord {
+    return this.register(name, command, cwd, child, {
+      initialOutput: opts?.initialOutput,
+      startTime: opts?.startTime,
+    });
+  }
+
+  private register(
+    name: string,
+    command: string,
+    cwd: string,
+    child: ChildProcess,
+    opts: AdoptProcessOptions,
+  ): ManagedProcessRecord {
     const id = this.registry.nextId();
     const logPaths = this.logs.createLogs(id);
 
-    const child = spawnCommand(command, cwd, this.getConfiguredShellPath());
     // Spawned commands run in detached process groups so TERM/KILL can target
     // the whole tree. `unref()` keeps the manager's Node process from staying
     // alive only because a managed child still exists; extension shutdown and
@@ -57,7 +96,7 @@ export class ProcessRuntimeController {
       pid: child.pid ?? -1,
       command,
       cwd,
-      startTime: Date.now(),
+      startTime: opts.startTime ?? Date.now(),
       endTime: null,
       status: "running",
       exitCode: null,
@@ -107,12 +146,56 @@ export class ProcessRuntimeController {
       return managed;
     }
 
+    if (opts.initialOutput && opts.initialOutput.length > 0) {
+      this.logs.appendStdout(managed.stdoutFile, opts.initialOutput);
+      this.output.onStdoutChunk(managed, opts.initialOutput);
+    }
+
     this.wireStdioHandlers(managed, child);
 
     this.emit({ type: "process_started", info: formatProcess(managed) });
+    this.finalizeIfAlreadyClosed(managed, child);
     this.ensureWatcherRunning();
 
     return managed;
+  }
+
+  /**
+   * An adopted child may have fully exited (close event fired) before its
+   * handlers were attached here. In that case no close event will ever
+   * reach wireStdioHandlers, so replay the close classification directly.
+   * If the child exited but its streams are still open, the pending close
+   * event will finalize the record through the normal path.
+   */
+  private finalizeIfAlreadyClosed(
+    managed: ManagedProcessRecord,
+    child: ChildProcess,
+  ): void {
+    const exited = child.exitCode !== null || child.signalCode !== null;
+    if (!exited) return;
+
+    const streamsDone =
+      (child.stdout?.destroyed ?? true) && (child.stderr?.destroyed ?? true);
+    if (!streamsDone) return;
+
+    this.releaseRuntimeHandles(managed);
+    if (managed.endTime) return;
+
+    managed.exitCode = child.exitCode;
+    managed.endTime = Date.now();
+    this.output.flush(managed);
+
+    if (child.signalCode) {
+      managed.success = false;
+      managed.endReason = "signal";
+      managed.signal = formatSignalInfo(child.signalCode);
+      this.transition(managed, "killed");
+    } else {
+      managed.success = child.exitCode === 0;
+      managed.endReason = "exit";
+      managed.signal = null;
+      this.transition(managed, "exited");
+    }
   }
 
   transition(managed: ManagedProcessRecord, next: typeof managed.status): void {

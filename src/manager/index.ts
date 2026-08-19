@@ -1,6 +1,8 @@
+import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
 
 import type {
+  AdoptProcessOptions,
   KillResult,
   ManagerEvent,
   ProcessInfo,
@@ -54,6 +56,22 @@ export class ProcessManager {
 
   start(name: string, command: string, cwd: string): ProcessInfo {
     const managed = this.runtime.start(name, command, cwd);
+    return formatProcess(managed);
+  }
+
+  /**
+   * Adopt an externally spawned child process. The child must run in a
+   * detached process group with piped stdio (see
+   * ProcessRuntimeController.adopt for the full contract).
+   */
+  adopt(
+    name: string,
+    command: string,
+    cwd: string,
+    child: ChildProcess,
+    opts?: AdoptProcessOptions,
+  ): ProcessInfo {
+    const managed = this.runtime.adopt(name, command, cwd, child, opts);
     return formatProcess(managed);
   }
 

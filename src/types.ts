@@ -54,6 +54,14 @@ export type ManagerEvent =
     }
   | { type: "processes_changed" };
 
+/** Options for adopting an externally spawned child process. */
+export interface AdoptProcessOptions {
+  /** Output captured by the adopter before handover; prepended to the logs. */
+  initialOutput?: Buffer;
+  /** When the command actually started (epoch ms). Defaults to adoption time. */
+  startTime?: number;
+}
+
 export type KillResult =
   | { ok: true; info: ProcessInfo }
   | { ok: false; info: ProcessInfo; reason: "not_found" | "timeout" | "error" };

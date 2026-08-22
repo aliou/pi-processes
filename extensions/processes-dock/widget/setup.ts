@@ -341,6 +341,9 @@ export function setupDockWidgets(
   };
 
   const handleStarted = () => {
+    // Set synchronously so a process that exits within the scheduleRefresh
+    // throttle window still counts as "seen running" for auto-close.
+    hasSeenRunningProcess = true;
     if (config.widget.dockDefaultState === "expanded") state.actions.expand();
     else if (config.widget.dockDefaultState === "collapsed") {
       state.actions.collapse();

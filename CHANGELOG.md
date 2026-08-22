@@ -1,5 +1,33 @@
 # @aliou/pi-processes
 
+## 0.11.0
+
+### Minor Changes
+
+- 2eff528: The `/ps:logs` overlay now has an opt-in soft-wrap mode (`w` key toggle).
+  When enabled, long log lines expand into multiple display rows instead of
+  being hard-clipped, making full content visible. Truncation remains the
+  default for the `/ps` overview, dock, and the logs overlay.
+- ca7c31d: The `/ps:logs` overlay now supports page scrolling: `PageUp`/`PageDown`
+  move by a full viewport and `ctrl+u`/`ctrl+d` by half a viewport.
+
+  Footers (`/ps` overview and `/ps:logs` overlay) now render compact
+  shortcut hints: when a hint's key letter appears in its word, only the
+  word is shown with the key highlighted in accent + bold ("w wrap" becomes
+  "wrap"). When the hint list does not fit the footer width, a leading
+  "? more" affordance appears; pressing `?` opens a stacked shortcuts
+  overlay listing every available key.
+
+### Patch Changes
+
+- 41a0bfd: Intentional process kills via /ps are now delivered as a context-level
+  notification instead of being fully suppressed. The agent is not woken,
+  but it receives the lifecycle message so it can keep its state accurate.
+- 30163ff: Fixed a dead zone in the `/ps:logs` overlay where up to a screenful of
+  scroll keypresses could be swallowed. The clamped viewport end is now
+  written back to the scroll anchor in both the truncated and full render
+  paths, so every keypress moves the view.
+
 ## 0.10.9
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.11.1
+
+### Patch Changes
+
+- 07ad522: Fix the process dock remaining visible after unpinning a finished process from `/ps` when no managed processes are still running.
+
 ## 0.11.0
 
 ### Minor Changes

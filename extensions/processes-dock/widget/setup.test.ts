@@ -8,7 +8,10 @@ import { createEventBus } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ProcessInfo } from "../../../src/types";
-import type { ProcessProtocolConfig } from "../../shared/protocol";
+import type {
+  CommandPinResult,
+  ProcessProtocolConfig,
+} from "../../shared/protocol";
 import { CHANNELS } from "../../shared/protocol";
 import { setupDockWidgets } from "./setup";
 
@@ -58,6 +61,7 @@ interface Harness {
   widgetState: Map<string, "visible" | "hidden">;
   emitStarted: (info: ProcessInfo) => void;
   emitEnded: (info: ProcessInfo) => void;
+  emitPin: (id: string | null) => CommandPinResult;
   dispose: () => void;
 }
 
@@ -102,18 +106,35 @@ function createHarness(): Harness {
   });
 
   const controller = setupDockWidgets(ctx, events);
+  const upsertProcess = (info: ProcessInfo) => {
+    processList = [
+      ...processList.filter((process) => process.id !== info.id),
+      info,
+    ];
+  };
 
   return {
     widgetState,
     emitStarted: (info: ProcessInfo) => {
-      processList = [info];
+      upsertProcess(info);
       events.emit(CHANNELS.STARTED, info);
       events.emit(CHANNELS.CHANGED, { reason: "started" });
     },
     emitEnded: (info: ProcessInfo) => {
-      processList = [info];
+      upsertProcess(info);
       events.emit(CHANNELS.ENDED, info);
       events.emit(CHANNELS.CHANGED, { reason: "ended" });
+    },
+    emitPin: (id: string | null) => {
+      let result: CommandPinResult | undefined;
+      events.emit(CHANNELS.COMMAND_PIN, {
+        id,
+        reply: (value: CommandPinResult) => {
+          result = value;
+        },
+      });
+      if (!result) throw new Error("COMMAND_PIN did not reply");
+      return result;
     },
     dispose: () => controller?.dispose(),
   };
@@ -174,6 +195,63 @@ describe("dock auto-close", () => {
       vi.advanceTimersByTime(130);
 
       expect(dockIsVisible(h)).toBe(false);
+    } finally {
+      h.dispose();
+    }
+  });
+
+  // Regression: overview unpin bypassed dock auto-close (#104).
+  it("closes when an ended pinned process is unpinned from the overview", () => {
+    const h = createHarness();
+    try {
+      h.emitStarted(makeProcess());
+      vi.advanceTimersByTime(130);
+      expect(h.emitPin("proc_1")).toEqual({ ok: true });
+
+      h.emitEnded(
+        makeProcess({
+          status: "exited",
+          endTime: 2000,
+          exitCode: 0,
+          success: true,
+        }),
+      );
+      vi.advanceTimersByTime(130);
+      expect(dockIsVisible(h)).toBe(true);
+
+      expect(h.emitPin(null)).toEqual({ ok: true });
+
+      expect(dockIsVisible(h)).toBe(false);
+    } finally {
+      h.dispose();
+    }
+  });
+
+  it("stays expanded when a pinned process is unpinned while another is live", () => {
+    const h = createHarness();
+    try {
+      h.emitStarted(makeProcess({ id: "proc_1", name: "api" }));
+      h.emitStarted(
+        makeProcess({ id: "proc_2", name: "worker", startTime: 2000 }),
+      );
+      vi.advanceTimersByTime(130);
+      expect(h.emitPin("proc_1")).toEqual({ ok: true });
+
+      h.emitEnded(
+        makeProcess({
+          id: "proc_1",
+          name: "api",
+          status: "exited",
+          endTime: 3000,
+          exitCode: 0,
+          success: true,
+        }),
+      );
+      vi.advanceTimersByTime(130);
+
+      expect(h.emitPin(null)).toEqual({ ok: true });
+
+      expect(dockIsVisible(h)).toBe(true);
     } finally {
       h.dispose();
     }

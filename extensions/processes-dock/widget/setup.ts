@@ -390,7 +390,7 @@ export function setupDockWidgets(
     if (command.id === null) {
       actions.setFocus(null);
       actions.expand();
-      render();
+      hardRefresh();
       safeReply(command.reply, { ok: true });
       return;
     }

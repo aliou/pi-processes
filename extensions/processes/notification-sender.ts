@@ -12,7 +12,12 @@ export interface ProcessNotificationSendOptions {
   deliverAs: "steer" | "followUp" | "nextTurn";
 }
 
-/** Maps a notification attention level to Pi send-message options. */
+/**
+ * Maps a notification attention level to Pi send-message options.
+ *
+ * `turn` wakes or steers the agent. Other emitted notifications wait for the
+ * next user prompt so they cannot split a tool call from its result.
+ */
 export function attentionToSendOptions(
   attention: Attention,
 ): ProcessNotificationSendOptions {
@@ -20,9 +25,9 @@ export function attentionToSendOptions(
     case "turn":
       return { triggerTurn: true, deliverAs: "steer" };
     case "context":
-      return { triggerTurn: false, deliverAs: "steer" };
+      return { triggerTurn: false, deliverAs: "nextTurn" };
     case "ignore":
-      return { triggerTurn: false, deliverAs: "steer" };
+      return { triggerTurn: false, deliverAs: "nextTurn" };
   }
 }
 

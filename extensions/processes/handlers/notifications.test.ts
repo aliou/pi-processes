@@ -45,7 +45,7 @@ describe("registerNotificationDelivery", () => {
     expect(options.deliverAs).toBe("steer");
   });
 
-  it("maps context attention to a non-turn steer message", () => {
+  it("maps context attention to a non-turn nextTurn message", () => {
     const events = createEventBus();
     const sendMessage = vi.fn();
     registerNotificationDelivery(events, piWithSendMessage(sendMessage));
@@ -54,7 +54,7 @@ describe("registerNotificationDelivery", () => {
 
     const [, options] = sendMessage.mock.calls[0];
     expect(options.triggerTurn).toBe(false);
-    expect(options.deliverAs).toBe("steer");
+    expect(options.deliverAs).toBe("nextTurn");
   });
 
   it("stops delivering after the disposer is called", () => {
@@ -103,7 +103,7 @@ describe("registerNotificationDelivery", () => {
         attention: "context",
       }),
     );
-    expect(options).toEqual({ triggerTurn: false, deliverAs: "steer" });
+    expect(options).toEqual({ triggerTurn: false, deliverAs: "nextTurn" });
 
     dispose();
     vi.useRealTimers();

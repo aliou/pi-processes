@@ -2,7 +2,10 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
 
 import { MESSAGE_TYPE_PROCESS_NOTIFICATION } from "./constants";
-import { sendProcessNotificationMessage } from "./notification-sender";
+import {
+  attentionToSendOptions,
+  sendProcessNotificationMessage,
+} from "./notification-sender";
 import type { ProcessNotificationDetails } from "./notifications/types";
 
 const details: ProcessNotificationDetails = {
@@ -29,6 +32,16 @@ function piWithSendMessage(
 ): ExtensionAPI {
   return { sendMessage } as ExtensionAPI;
 }
+
+describe("attentionToSendOptions", () => {
+  it.each([
+    ["turn", { triggerTurn: true, deliverAs: "steer" }],
+    ["context", { triggerTurn: false, deliverAs: "nextTurn" }],
+    ["ignore", { triggerTurn: false, deliverAs: "nextTurn" }],
+  ] as const)("maps %s attention", (attention, expected) => {
+    expect(attentionToSendOptions(attention)).toEqual(expected);
+  });
+});
 
 describe("sendProcessNotificationMessage", () => {
   it("sends a displayed process notification custom message", () => {

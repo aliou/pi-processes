@@ -20,6 +20,17 @@ UI extensions (`processes-logs`, `processes-dock`) also observe
 `CHANNELS.NOTIFICATION` for display concerns (e.g. log-match highlighting) but
 do not affect delivery.
 
+### Delivery timing
+
+`turn` notifications use Pi's `steer` path. They wake an idle agent or reach an
+active run after its current tool calls finish. `context` and emitted `ignore`
+notifications use `nextTurn`: they do not wake or steer the agent and enter the
+conversation with the next user prompt.
+
+Deferring non-turn notifications also preserves tool-call ordering. Appending a
+custom message during tool execution would place it between the assistant
+`tool_use` and its `tool_result`, which Anthropic rejects.
+
 ## Per-process notify config
 
 Registered by the `process start` and `process update` tools
@@ -51,15 +62,15 @@ execution, output retention, and UI — none of it changes attention or delivery
 An attention level is resolved per event and mapped to Pi send options by
 `attentionToSendOptions` (`extensions/processes/notification-sender.ts`):
 
-| Attention | `triggerTurn` | `deliverAs` | Agent effect                                       |
-| --------- | ------------- | ----------- | -------------------------------------------------- |
-| `turn`    | `true`        | `steer`     | Wakes an idle agent; the message steers the turn.  |
-| `context` | `false`       | `steer`     | Delivered as a steer but does not wake the agent; seen when context returns. |
-| `ignore`  | `false`       | `steer`     | Not emitted for lifecycle events (filtered upstream). For log matches, delivered like `context`. |
+| Attention | `triggerTurn` | `deliverAs` | Agent effect |
+| --------- | ------------- | ----------- | ------------ |
+| `turn` | `true` | `steer` | Wakes an idle agent or steers an active run after its current tool calls. |
+| `context` | `false` | `nextTurn` | Waits for the next user prompt; does not wake or steer the agent. |
+| `ignore` | `false` | `nextTurn` | Suppressed for successful exits and external kills; emitted log matches wait for the next user prompt. Failures are promoted to `context`. |
 
-Every delivered message has `display: true`, so it is visible in the
-conversation regardless of attention. The only difference between `turn` and
-`context` is whether the agent is woken.
+Every delivered message has `display: true` and is persisted when Pi adds it to
+the conversation. A `nextTurn` message is not displayed or persisted until the
+next user prompt.
 
 ## Lifecycle notifications
 
@@ -107,9 +118,9 @@ After resolving attention, the service forces a minimum of `context` for
 - If attention is `ignore` and the kind is `success` or `killed`, the
   notification is suppressed entirely (no emit).
 
-This means `onFailure: "ignore"` cannot fully silence a failed process — it
-becomes a context message. `onSuccess: "ignore"` and `onKilled: "ignore"` do
-fully silence.
+This means `onFailure: "ignore"` cannot silence a failed process — failures
+always notify, so it becomes a context message for the next user prompt.
+`onSuccess: "ignore"` and `onKilled: "ignore"` suppress their notifications.
 
 ### Intentional stops (config bypass)
 
@@ -271,10 +282,10 @@ Matcher behavior:
   progress lines and escape bytes do not fire watches.
 - Lines longer than 10 000 chars are skipped.
 
-Unlike lifecycle events, log-match `on: "ignore"` is **not** filtered by the
-service: it emits on the channel and the delivery listener delivers it like
-`context` (displayed steer, no turn). `on: "context"` and `on: "ignore"` are
-effectively equivalent for log matches today.
+Log-match `on: "ignore"` intentionally retains the match as context rather
+than suppressing it. The delivery listener treats it like `context`, so it does
+not wake or steer the agent and appears with the next user prompt. Use either
+value when a match is useful later but requires no immediate response.
 
 ### Log-match rate limiting
 

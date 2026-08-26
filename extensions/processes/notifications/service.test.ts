@@ -134,7 +134,7 @@ describe("NotificationService", () => {
     service.dispose();
   });
 
-  it("emits a context notification for an intentionally killed process", async () => {
+  it("emits a context notification for an intentional stop despite ignore", async () => {
     const fakeManager = createFakeManager();
     const spy = createNotificationSpy();
     const registry = createNotificationRegistry();
@@ -243,7 +243,7 @@ describe("NotificationService", () => {
     service.dispose();
   });
 
-  it("forces emit for crash even when attention is ignore", async () => {
+  it("promotes an ignored non-zero exit to context", async () => {
     const fakeManager = createFakeManager();
     const spy = createNotificationSpy();
     const registry = createNotificationRegistry();
@@ -269,7 +269,6 @@ describe("NotificationService", () => {
     });
     await flushQueuedMicrotasks();
 
-    // Crash forces display: attention becomes "context"
     expect(spy.emitted).toHaveLength(1);
     expect(spy.emitted[0].kind).toBe("crash");
     expect(spy.emitted[0].attention).toBe("context");
@@ -277,15 +276,12 @@ describe("NotificationService", () => {
     service.dispose();
   });
 
-  it("emits log match notification on output changed", () => {
+  it("suppresses an ignored successful exit", async () => {
     const fakeManager = createFakeManager();
     const spy = createNotificationSpy();
     const registry = createNotificationRegistry();
 
-    processes.set("proc_1", makeInfo({ id: "proc_1" }));
-    registry.register("proc_1", {
-      logMatches: [{ pattern: "ready" }],
-    });
+    registry.register("proc_1", { onSuccess: "ignore" });
 
     const service = createNotificationService({
       events: spy.events,
@@ -295,19 +291,87 @@ describe("NotificationService", () => {
     });
 
     fakeManager.emit({
-      type: "process_output_changed",
-      id: "proc_1",
-      appendedText: [{ type: "stdout", text: "Server ready on port 3000" }],
+      type: "process_ended",
+      info: makeInfo({ id: "proc_1", success: true, exitCode: 0 }),
     });
+    await flushQueuedMicrotasks();
 
-    expect(spy.emitted).toHaveLength(1);
-    expect(spy.emitted[0].kind).toBe("log_match");
-    expect(spy.emitted[0].attention).toBe("turn");
-    expect(spy.emitted[0].logMatch?.pattern).toBe("ready");
+    expect(spy.emitted).toHaveLength(0);
+    expect(registry.get("proc_1")).toBeNull();
 
-    processes.delete("proc_1");
     service.dispose();
   });
+
+  it("suppresses an ignored external kill", async () => {
+    const fakeManager = createFakeManager();
+    const spy = createNotificationSpy();
+    const registry = createNotificationRegistry();
+
+    registry.register("proc_1", { onKilled: "ignore" });
+
+    const service = createNotificationService({
+      events: spy.events,
+      manager: fakeManager as never,
+      registry,
+      getProcess: (id) => processes.get(id) ?? null,
+    });
+
+    fakeManager.emit({
+      type: "process_ended",
+      info: makeInfo({
+        id: "proc_1",
+        status: "killed",
+        success: false,
+        exitCode: null,
+        endReason: "signal",
+      }),
+    });
+    await flushQueuedMicrotasks();
+
+    expect(spy.emitted).toHaveLength(0);
+    expect(registry.get("proc_1")).toBeNull();
+
+    service.dispose();
+  });
+
+  it.each([
+    { configured: undefined, expected: "turn" },
+    { configured: "context", expected: "context" },
+    { configured: "ignore", expected: "ignore" },
+  ] as const)(
+    "emits a log match with $expected attention when configured as $configured",
+    ({ configured, expected }) => {
+      const fakeManager = createFakeManager();
+      const spy = createNotificationSpy();
+      const registry = createNotificationRegistry();
+
+      processes.set("proc_1", makeInfo({ id: "proc_1" }));
+      registry.register("proc_1", {
+        logMatches: [{ pattern: "ready", on: configured }],
+      });
+
+      const service = createNotificationService({
+        events: spy.events,
+        manager: fakeManager as never,
+        registry,
+        getProcess: (id) => processes.get(id) ?? null,
+      });
+
+      fakeManager.emit({
+        type: "process_output_changed",
+        id: "proc_1",
+        appendedText: [{ type: "stdout", text: "Server ready on port 3000" }],
+      });
+
+      expect(spy.emitted).toHaveLength(1);
+      expect(spy.emitted[0].kind).toBe("log_match");
+      expect(spy.emitted[0].attention).toBe(expected);
+      expect(spy.emitted[0].logMatch?.pattern).toBe("ready");
+
+      processes.delete("proc_1");
+      service.dispose();
+    },
+  );
 
   it("does not emit log match notification when no appended text", () => {
     const fakeManager = createFakeManager();
@@ -731,7 +795,6 @@ describe("NotificationService", () => {
 
       await flushQueuedMicrotasks();
 
-      // failure is forced display, so ignore is upgraded to context
       expect(spy.emitted).toHaveLength(1);
       expect(spy.emitted[0].kind).toBe("crash");
       expect(spy.emitted[0].attention).toBe("context");

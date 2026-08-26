@@ -56,7 +56,7 @@ export function registerProcessTool(
       promptGuidelines: [
         "process tool: use process start for long-running commands (dev servers, watchers, builds) instead of shell background patterns like &, nohup, or setsid; give each process a specific name and check process list first when a duplicate would be noisy.",
         "process tool: after process start, do not sleep, poll, or hold your turn. End your turn or move on. Exits and notify.logMatches matches bring you back.",
-        "process tool: attention turn wakes you when idle; context only reaches you if you are still working; ignore never notifies. Keep turn for anything whose result you need.",
+        "process tool: attention turn wakes or steers you now; context waits for the next user prompt. Ignore suppresses successful exits and external kills but retains log matches as context. Failures always notify, with ignore downgraded to context. Keep turn for anything whose result you need immediately.",
         "process tool: use notify.logMatches to get brought back on readiness or error signals instead of polling process output. If a watch is too noisy, use process update (watches.mode append/replace/remove/clear) to fix it without restarting.",
         "process tool: for the full lifecycle (start, list, output, update, write, stop, clear), notify options, use cases, and noisy-watch handling, read the pi-processes skill.",
       ],

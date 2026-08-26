@@ -16,10 +16,9 @@ A started process runs in the background and the manager brings you back when so
 3. The process notifies you when:
    - a `logMatches` pattern hits (readiness, error, progress),
    - the process exits successfully (`onSuccess`, default `turn`),
-   - the process fails or crashes (`onFailure`, default `turn`),
-   - the process is killed externally (`onKilled`, default `context`, which does not wake an idle agent).
-
-   Stopping a process yourself never notifies.
+   - the process fails or crashes (`onFailure`, default `turn`; failures always notify),
+   - the process is killed externally (`onKilled`, default `context`),
+   - you stop the process intentionally (always `context`; notify config does not apply).
 4. When a watch is too noisy or wrong, fix it with `process update` — do not restart the process just to change watches.
 5. `process stop` obsolete live processes and `process clear` finished entries when they are no longer useful.
 
@@ -52,7 +51,7 @@ Good:
 }
 ```
 
-`onSuccess: "context"` here because a dev server exiting cleanly needs no reaction. Keep the default `turn` for builds, tests, and other one-shot commands whose result you need.
+`onSuccess: "context"` here because a dev server exiting cleanly needs no immediate reaction; the result becomes context on the next user prompt. Keep the default `turn` for builds, tests, and other one-shot commands whose result you need immediately.
 
 Optional `cwd` sets the working directory for the spawned command. Omit it to inherit the agent's current working directory.
 
@@ -219,8 +218,8 @@ Good:
 Exit attention:
 
 - `notify.onSuccess` — clean exit. Defaults to `turn`.
-- `notify.onFailure` — failure or crash. Defaults to `turn`.
-- `notify.onKilled` — killed from outside the tool. Defaults to `context`. Stopping a process yourself never notifies.
+- `notify.onFailure` — failure or crash. Defaults to `turn`; `ignore` is downgraded to `context` because failures always notify.
+- `notify.onKilled` — killed from outside the tool. Defaults to `context`. Intentional stops always produce context and bypass this setting.
 
 Log match watches (`notify.logMatches`, up to 20, each pattern up to 500 chars):
 
@@ -232,11 +231,11 @@ Log match watches (`notify.logMatches`, up to 20, each pattern up to 500 chars):
 
 Attention levels:
 
-- `turn` — starts an agent turn. Reaches you even when you are idle.
-- `context` — recorded in the transcript, no turn. It reaches you only if you are still working when the event fires; an idle agent is not woken and sees it on the next user message.
-- `ignore` — recorded, never notifies.
+- `turn` — wakes an idle agent or steers an active run at the next safe boundary.
+- `context` — queued for the next user prompt; it does not wake or steer the agent.
+- `ignore` — suppresses successful-exit and external-kill notifications. Log matches are retained for the next user prompt. Failure and crash notifications are also retained because failures always notify.
 
-Use `context` only when nothing needs to happen in response.
+Use `context` when nothing needs to happen immediately.
 
 ## Use cases
 
@@ -368,7 +367,7 @@ Then pick a `watches.mode`:
 }
 ```
 
-- **Silence without removing** — set the watch's `on` to `ignore` so matches are recorded but do not interrupt.
+- **Retain without interrupting** — set the watch's `on` to `ignore` so matches become context on the next user prompt.
 
 ```json
 {

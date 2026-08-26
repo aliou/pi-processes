@@ -6,12 +6,10 @@ import type { LogMatcherConfig, NotifyConfig } from "../notifications/registry";
 import type { NotifyLogMatchParamsType, NotifyParamsType } from "./schema";
 
 const DEFAULT_NOTIFY_CONFIG = {
-  // A backgrounded process usually outlives the turn that started it, and
-  // "context" only reaches the agent if it happens to still be streaming when
-  // the process ends. Builds, tests, and other one-shot commands are started
-  // precisely because the agent needs the result, so success defaults to a
-  // turn. Long-running servers rarely exit 0, and callers that do not want the
-  // interruption can pass onSuccess: "context".
+  // Builds, tests, and other one-shot commands are started because the agent
+  // needs the result, so success defaults to a turn. Long-running servers
+  // rarely exit 0, and callers that only need the result as future context can
+  // pass onSuccess: "context".
   onSuccess: "turn",
   onFailure: "turn",
   // External kills (outside this manager) surface as context by default so

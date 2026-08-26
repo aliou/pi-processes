@@ -18,6 +18,9 @@ export const CHANNELS = {
   COMMAND_START: "processes:command:start",
   COMMAND_KILL: "processes:command:kill",
   COMMAND_CLEAR: "processes:command:clear",
+  // Other extensions emit this to hand an already-running child process
+  // over to the manager (e.g. backgrounding a foreground tool command).
+  COMMAND_ADOPT: "processes:command:adopt",
   // Pin handled by the dock extension, if loaded.
   COMMAND_PIN: "processes:command:pin",
 

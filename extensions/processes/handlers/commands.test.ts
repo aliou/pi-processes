@@ -1,3 +1,4 @@
+import type { ChildProcess } from "node:child_process";
 import { createEventBus } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
 
@@ -99,6 +100,43 @@ describe("registerCommandHandlers", () => {
     events.emit(CHANNELS.COMMAND_CLEAR, { reply });
 
     expect(reply).toHaveBeenCalledWith(2);
+  });
+
+  it("adopts external children with default notifications", () => {
+    const events = createEventBus();
+    const registry = createNotificationRegistry();
+    const child = { pid: 123 } as ChildProcess;
+    const info = makeInfo({ status: "running", endTime: null, success: null });
+    const manager = {
+      adopt: vi.fn(() => info),
+    } as unknown as ProcessManager;
+    const reply = vi.fn();
+
+    registerCommandHandlers(events, manager, registry);
+    events.emit(CHANNELS.COMMAND_ADOPT, {
+      name: "grep",
+      command: "grep -R needle .",
+      cwd: "/repo",
+      child,
+      initialStdout: Buffer.from("partial output\n"),
+      initialStderr: Buffer.from("early stderr\n"),
+      startTime: 1000,
+      reply,
+    });
+
+    expect(manager.adopt).toHaveBeenCalledWith(
+      "grep",
+      "grep -R needle .",
+      "/repo",
+      child,
+      {
+        initialStdout: Buffer.from("partial output\n"),
+        initialStderr: Buffer.from("early stderr\n"),
+        startTime: 1000,
+      },
+    );
+    expect(registry.get(info.id)).toEqual({});
+    expect(reply).toHaveBeenCalledWith({ ok: true, info });
   });
 
   it("swallows requester reply errors", async () => {

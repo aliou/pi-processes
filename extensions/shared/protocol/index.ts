@@ -6,6 +6,8 @@ export type {
 } from "./broadcasts";
 export { CHANNELS } from "./channels";
 export type {
+  CommandAdoptPayload,
+  CommandAdoptResult,
   CommandClearPayload,
   CommandKillPayload,
   CommandPinPayload,

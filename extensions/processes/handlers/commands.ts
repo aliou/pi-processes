@@ -4,6 +4,7 @@ import type { ProcessManager } from "../../../src/manager";
 import type { KillResult } from "../../../src/types";
 import {
   CHANNELS,
+  type CommandAdoptPayload,
   type CommandClearPayload,
   type CommandKillPayload,
   type CommandStartPayload,
@@ -51,13 +52,36 @@ export function registerCommandHandlers(
 
       safeReply(command.reply, manager.clearFinished());
     }),
+    events.on(CHANNELS.COMMAND_ADOPT, (payload) => {
+      const command = payload as CommandAdoptPayload;
+
+      try {
+        const info = manager.adopt(
+          command.name,
+          command.command,
+          command.cwd,
+          command.child,
+          {
+            initialStdout: command.initialStdout,
+            initialStderr: command.initialStderr,
+            startTime: command.startTime,
+          },
+        );
+        notifications.register(info.id, {});
+        safeReply(command.reply, { ok: true, info });
+      } catch (error) {
+        safeReply(command.reply, {
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }),
   ];
 
   return () => {
     for (const dispose of disposers) dispose();
   };
 }
-
 function safeReply<T>(reply: (result: T) => void, result: T): void {
   try {
     reply(result);

@@ -1,4 +1,5 @@
 export { hasAnsi, stripAnsi } from "./ansi";
+export { clampToTail, trimIncompleteUtf8Suffix } from "./buffer";
 export { resolveShellExecutable, spawnCommand } from "./command-executor";
 export { formatRuntime, formatStatus, formatTimestamp } from "./format";
 export type { LineMatchMode } from "./match-line";

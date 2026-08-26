@@ -13,7 +13,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
+import { trimIncompleteUtf8Suffix } from "../utils/buffer";
 import type { ProcessLogPaths } from "./internal-types";
 import { MAX_LOG_FILE_BYTES, MAX_TAIL_READ_BYTES } from "./limits";
 
@@ -400,23 +400,4 @@ function decodeUtf8Bounded(buffer: Buffer, maxOutputBytes: number): string {
   }
 
   return parts.join("");
-}
-
-function trimIncompleteUtf8Suffix(buffer: Buffer): Buffer {
-  if (buffer.length === 0) return buffer;
-  let lead = buffer.length - 1;
-  while (lead >= 0 && (buffer[lead] & 0xc0) === 0x80) lead--;
-  if (lead < 0) return Buffer.alloc(0);
-  const byte = buffer[lead];
-  const expected =
-    byte < 0x80
-      ? 1
-      : (byte & 0xe0) === 0xc0
-        ? 2
-        : (byte & 0xf0) === 0xe0
-          ? 3
-          : (byte & 0xf8) === 0xf0
-            ? 4
-            : 1;
-  return buffer.length - lead < expected ? buffer.subarray(0, lead) : buffer;
 }

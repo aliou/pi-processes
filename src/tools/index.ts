@@ -149,14 +149,14 @@ export function setupProcessesTools(pi: ExtensionAPI, manager: ProcessManager) {
 - output: Get recent stdout/stderr (requires 'id')
 - logs: Get log file paths to inspect with read tool (requires 'id')
 - kill: Terminate a process (requires 'id')
-- clear: Remove all finished processes from the list
+- clear: Remove all finished processes from the list (finished processes beyond the retention cap are already dropped automatically; their log files stay readable)
 - write: Write to process stdin (requires 'id' and 'input', optional 'end' to close stdin)
 ${
   DEBUG_PREVIEW_ENABLED
     ? "- debug_preview: Temporary renderer preview for process tool UIs (no process side effects)\n  - preview: start | list | output | logs | error (default: start)\n"
     : ""
 }
-Important: You DON'T need to poll or wait for processes. Notifications arrive automatically based on your preferences. Start processes and continue with other work - you'll be informed if something requires attention.
+Important: NEVER poll or wait for a process. Do not call output/list repeatedly, do not sleep, and do not run a second command to watch the first. Completion and alert notices are delivered to you as soon as they happen, even while you are executing other tool calls, whenever alertOnSuccess/alertOnFailure/alertOnKill or a logWatch applies. Start the process, continue with other work, and react when the notice arrives.
 
 Note: User always sees process updates in the UI. The notify flags control whether YOU (the agent) get a turn to react (e.g. check results, fix code, restart).`,
     promptSnippet:
@@ -164,7 +164,7 @@ Note: User always sees process updates in the UI. The notify flags control wheth
     promptGuidelines: [
       "Use the process tool for long-running commands such as dev servers, test watchers, build watchers, and log tails instead of bash.",
       "Avoid shell background patterns such as &, nohup, disown, or setsid when the process tool fits.",
-      "After starting a process, continue other work instead of waiting for it.",
+      "After starting a process, continue other work instead of waiting for it. Never poll with output or list: completion notices arrive on their own, even mid-turn.",
       "Use the pi-processes skill for examples and best practices when a task depends on background processes.",
     ],
 

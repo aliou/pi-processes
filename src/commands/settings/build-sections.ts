@@ -130,6 +130,21 @@ export function buildSettingsSections(
       ],
     },
     {
+      label: "Retention",
+      items: [
+        {
+          id: "retention.maxFinished",
+          label: "Max finished processes",
+          description:
+            "Finished processes kept in the list before the oldest are dropped automatically (0 = keep until /ps:clear)",
+          currentValue: String(
+            tabConfig?.retention?.maxFinished ?? resolved.retention.maxFinished,
+          ),
+          values: ["0", "5", "10", "20", "50"],
+        },
+      ],
+    },
+    {
       label: "Follow Mode",
       items: [
         {

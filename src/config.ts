@@ -68,6 +68,16 @@ export interface ProcessesConfig {
      */
     silenceSeconds?: number;
   };
+  retention?: {
+    /**
+     * How many finished (exited or killed) processes stay in the list. When a
+     * process ends and more than this many are finished, the oldest finished
+     * records are dropped automatically; their log files stay on disk so the
+     * paths returned by `start` and `logs` remain readable. 0 keeps every
+     * finished process until an explicit `clear`. Default 10.
+     */
+    maxFinished?: number;
+  };
 }
 
 export interface ResolvedProcessesConfig {
@@ -103,6 +113,9 @@ export interface ResolvedProcessesConfig {
     enabled: boolean;
     silenceSeconds: number;
   };
+  retention: {
+    maxFinished: number;
+  };
 }
 
 const DEFAULT_CONFIG: ResolvedProcessesConfig = {
@@ -135,6 +148,9 @@ const DEFAULT_CONFIG: ResolvedProcessesConfig = {
   stall: {
     enabled: false,
     silenceSeconds: 45,
+  },
+  retention: {
+    maxFinished: 10,
   },
 };
 

@@ -13,8 +13,9 @@ Use this skill when work needs a long-running command to stay alive while Pi con
 - Avoid shell background patterns when the process tool fits.
 - Give processes stable, clear names.
 - Continue the task after starting a process instead of waiting on it.
-- Inspect output or log files only when needed.
-- Kill and clear processes when they are no longer useful.
+- Never poll: do not call `output` or `list` in a loop, sleep, or run a watcher command. Completion and alert notices reach you mid-turn as soon as they fire.
+- Inspect output or log files only when a notice or the task needs them.
+- Kill processes that are no longer useful. Finished entries are pruned automatically; `clear` is only for tidying early.
 
 ## Good fits
 
@@ -28,9 +29,9 @@ Use this skill when work needs a long-running command to stay alive while Pi con
 
 1. Start the long-running command with a clear name.
 2. Continue the main task.
-3. Inspect `output` or `logs` if something needs attention.
-4. Use alert flags when success or failure should trigger a follow-up turn.
-5. Kill and clear the process when done.
+3. Set `alertOnSuccess` when you must react to a clean exit; failures alert by default. The notice arrives mid-turn.
+4. Inspect `output` or `logs` when a notice says something needs attention.
+5. Kill the process when it is no longer needed.
 
 ## Notes
 

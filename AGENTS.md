@@ -45,6 +45,9 @@ actor/event/flow map.
 
 The tool is **push, not poll** — you never wait on or poll a process. You start
 it, keep working, and get a turn back only when something you opted into fires.
+Every wake is delivered mid-turn (`deliverAs: "steer"`), so a completion reaches
+the agent even while it is running other tool calls; the `start` result states
+which alerts apply so the model has no reason to call `output`/`list` in a loop.
 Three notification controls on `start`:
 
 - `alertOnFailure` (**default true**) — get a turn when the process crashes/exits non-zero.
@@ -81,7 +84,7 @@ The seven actions (dispatched in `src/tools/index.ts` → `src/tools/actions/`):
 | `output` | Recent stdout/stderr tail (fast, capped by config). |
 | `logs` | Returns log file paths; read them with the `read` tool for full history. |
 | `kill` | SIGTERM a process by id (escalates to SIGKILL). |
-| `clear` | Drop finished processes from the list. |
+| `clear` | Drop finished processes from the list and delete their logs. Rarely needed: the manager already prunes finished records past `config.retention.maxFinished` (default 10, oldest first, log files kept) on every process end. |
 | `write` | Send stdin to a running process (`end: true` closes stdin for EOF readers). |
 
 ## Process lifecycle (gotchas)
@@ -94,6 +97,11 @@ The seven actions (dispatched in `src/tools/index.ts` → `src/tools/actions/`):
   `tmpdir()/pi-processes-<timestamp>/`, and the dock polls them every 300ms.
   Only `logWatches` matches and start/end/clear emit events.
 - `LIVE_STATUSES` = `running | terminating | terminate_timeout`.
+- Finished records are bounded: `ProcessManager.pruneFinished(max)` runs after
+  every `process_ended`, drops the oldest non-live records beyond
+  `config.retention.maxFinished` (0 = unbounded) and emits `processes_changed`.
+  Pruning keeps the log files (the paths returned by `start`/`logs` stay
+  readable); only `clearFinished()` deletes them.
 - All processes are killed on session end (`src/hooks/cleanup.ts`).
 - Windows is unsupported — the extension no-ops with a warning on `win32`.
 
@@ -140,11 +148,14 @@ Every `ExtensionAPI` member this extension uses is present in 0.78.0:
   `session_shutdown`. Since Pi 0.77.0 that event also fires on SIGTERM/SIGHUP
   (before terminal writes), so background processes are reaped on signal exits,
   not only clean ones.
-- `sendMessage` accepts `deliverAs: "steer" | "followUp" | "nextTurn"`. The
-  hooks use it deliberately: `process-watch` output wakes deliver as `steer`
-  (react mid-turn, after the current tool calls), while `process-end` lifecycle
-  wakes deliver as `followUp` (wait until the agent has no pending tool calls,
-  so a finishing process never interrupts an in-progress sequence).
+- `sendMessage` accepts `deliverAs: "steer" | "followUp" | "nextTurn"`. Every
+  hook wake — `process-watch` output matches, `process-stall` silence, and
+  `process-end` lifecycle completion — delivers as `steer`: Pi queues it while
+  the current tool calls finish and hands it over before the next LLM call, so
+  the agent learns about it mid-turn. Completion used `followUp` until 0.12.0;
+  that waited until the agent had no pending tool calls at all, so an agent
+  busy polling saw the notice only when it went idle (operator report,
+  2026-09-02). Never move a wake back to `followUp`.
 
 Confirm any Pi API against the installed peer version, not memory.
 

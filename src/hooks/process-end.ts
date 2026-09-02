@@ -55,10 +55,12 @@ export function setupProcessEndHook(pi: ExtensionAPI, manager: ProcessManager) {
       runtime,
     };
 
-    // Lifecycle completion is a follow-up event, not a steering one: a process
-    // ending should not interrupt an in-progress tool sequence. "followUp"
-    // waits until the agent has no more tool calls, then delivers the
-    // completion so the agent can react (check results, restart, fix).
+    // Lifecycle completion is a steering event, like output-pattern and stall
+    // wakes: Pi queues it while the current tool calls finish and delivers it
+    // before the next LLM call, so the agent learns the process ended while it
+    // is still working. "followUp" waited until the agent had no pending tool
+    // calls at all, which meant an agent busy polling never saw the notice
+    // until it went idle - the opposite of push-not-poll.
     safeSendMessage(
       pi,
       {
@@ -67,7 +69,7 @@ export function setupProcessEndHook(pi: ExtensionAPI, manager: ProcessManager) {
         display: true,
         details,
       },
-      { triggerTurn: triggerAgentTurn, deliverAs: "followUp" },
+      { triggerTurn: triggerAgentTurn, deliverAs: "steer" },
     );
   });
 }

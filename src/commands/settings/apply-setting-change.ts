@@ -64,6 +64,10 @@ export function applySettingChange(
       if (!updated.output) updated.output = {};
       updated.output.maxOutputLines = num;
       break;
+    case "retention.maxFinished":
+      if (!updated.retention) updated.retention = {};
+      updated.retention.maxFinished = num;
+      break;
     default:
       return null;
   }

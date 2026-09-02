@@ -105,6 +105,7 @@ Available settings include:
 - shell path override
 - dock defaults
 - follow mode behavior
+- finished-process retention (how many finished entries stay listed; the oldest are dropped automatically, log files are kept)
 - optional background command interception
 
 <!-- VIDEO: {"id":"settings","title":"Adjust process extension settings"} -->

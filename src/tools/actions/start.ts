@@ -187,6 +187,7 @@ export function executeStart(
 
   const message = [
     `Started "${proc.name}" (${proc.id}, PID: ${proc.pid})`,
+    describeAlerts(proc),
     "Log files:",
     `  stdout: ${proc.stdoutFile}`,
     `  stderr: ${proc.stderrFile}`,
@@ -200,6 +201,25 @@ export function executeStart(
       process: proc,
     },
   };
+}
+
+/**
+ * Tell the model which lifecycle events will reach it on their own, so it has
+ * no reason to poll. Delivery is mid-turn (steer), not idle-only.
+ */
+export function describeAlerts(proc: {
+  alertOnSuccess: boolean;
+  alertOnFailure: boolean;
+  alertOnKill: boolean;
+}): string {
+  const alerts: string[] = [];
+  if (proc.alertOnSuccess) alerts.push("success");
+  if (proc.alertOnFailure) alerts.push("failure");
+  if (proc.alertOnKill) alerts.push("external kill");
+  if (alerts.length === 0) {
+    return "Alerts: none. You will not be notified when it ends; use output or logs only when you need the result.";
+  }
+  return `Alerts: ${alerts.join(", ")}. You will be notified as soon as it ends, even mid-turn. Do not poll with output or list.`;
 }
 
 function validateLogWatches(watches?: StartLogWatch[]): string | null {

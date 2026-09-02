@@ -1,5 +1,6 @@
+import { existsSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ManagerEvent } from "./constants";
+import type { ManagerEvent, ProcessInfo } from "./constants";
 import { ProcessManager } from "./manager";
 
 function waitForEnd(manager: ProcessManager, id: string): Promise<void> {
@@ -466,5 +467,60 @@ describe("livenessTick race condition", () => {
     );
     expect(endEvents).toHaveLength(1);
     expect(endEvents[0].info.exitCode).toBe(7);
+  });
+});
+
+describe("finished-process retention", () => {
+  let manager: ProcessManager;
+
+  afterEach(() => {
+    manager.cleanup();
+  });
+
+  async function finishSequentially(count: number): Promise<ProcessInfo[]> {
+    const started: ProcessInfo[] = [];
+    for (let i = 0; i < count; i++) {
+      const info = manager.start(`p${i}`, `echo ${i}`, "/tmp");
+      await waitForEnd(manager, info.id);
+      started.push(info);
+    }
+    return started;
+  }
+
+  it("drops the oldest finished records beyond the cap and keeps their logs", async () => {
+    manager = new ProcessManager({ getMaxFinished: () => 2 });
+    const events = collectEvents(manager);
+    const [first, second, third] = await finishSequentially(3);
+
+    // list() is newest first.
+    expect(manager.list().map((p) => p.id)).toEqual([third.id, second.id]);
+    expect(manager.get(first.id)).toBeNull();
+    expect(existsSync(first.stdoutFile)).toBe(true);
+    expect(
+      events.filter((e) => e.type === "processes_changed").length,
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  it("never prunes a live process", async () => {
+    manager = new ProcessManager({ getMaxFinished: () => 1 });
+    const live = manager.start("live", "sleep 5", "/tmp");
+    await finishSequentially(2);
+
+    const ids = manager.list().map((p) => p.id);
+    expect(ids).toContain(live.id);
+    expect(ids.length).toBe(2);
+  });
+
+  it("keeps every finished record when the cap is 0", async () => {
+    manager = new ProcessManager({ getMaxFinished: () => 0 });
+    await finishSequentially(3);
+    expect(manager.list().length).toBe(3);
+    expect(manager.clearFinished()).toBe(3);
+  });
+
+  it("defaults to no pruning when no cap is supplied", async () => {
+    manager = new ProcessManager();
+    await finishSequentially(2);
+    expect(manager.list().length).toBe(2);
   });
 });

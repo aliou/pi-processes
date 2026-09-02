@@ -164,6 +164,8 @@ LLM calls process(action: "write", id, input)
 
 Any terminal state (exited / killed) → emits "process_ended"
 manager.clear() removes processes in terminal states → emits "processes_changed"
+after "process_ended", pruneFinished(config.retention.maxFinished) drops the
+oldest terminal records beyond the cap (log files kept) → emits "processes_changed"
 ```
 
 ---

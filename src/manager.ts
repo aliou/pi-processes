@@ -51,6 +51,11 @@ interface ManagedProcess extends ProcessInfo {
 
 interface ProcessManagerOptions {
   getConfiguredShellPath?: () => string | undefined;
+  /**
+   * Finished-process retention cap read at every process end. 0 disables
+   * automatic pruning (finished records stay until `clearFinished`).
+   */
+  getMaxFinished?: () => number;
 }
 
 export class ProcessManager {
@@ -60,6 +65,7 @@ export class ProcessManager {
   private events = new EventEmitter();
   private watcher: ReturnType<typeof setInterval> | null = null;
   private getConfiguredShellPath: () => string | undefined;
+  private getMaxFinished: () => number;
 
   private lastOutputEmitAt: Map<string, number> = new Map();
   private pendingOutputEmit: Map<string, NodeJS.Timeout> = new Map();
@@ -69,6 +75,7 @@ export class ProcessManager {
     mkdirSync(this.logDir, { recursive: true });
     this.getConfiguredShellPath =
       options?.getConfiguredShellPath ?? (() => undefined);
+    this.getMaxFinished = options?.getMaxFinished ?? (() => 0);
   }
 
   onEvent(listener: (event: ManagerEvent) => void): () => void {
@@ -128,10 +135,37 @@ export class ProcessManager {
 
     if (next === "exited" || next === "killed") {
       this.emit({ type: "process_ended", info: this.toProcessInfo(managed) });
+      this.pruneFinished(this.getMaxFinished());
     }
 
     this.ensureWatcherRunning();
     this.stopWatcherIfIdle();
+  }
+
+  /**
+   * Drop the oldest finished records beyond `maxFinished`, keeping the list
+   * bounded without an explicit `clear`. Log files stay on disk: the paths
+   * returned by `start` and `logs` remain readable after the record is gone.
+   * `maxFinished <= 0` keeps everything. Returns the pruned ids.
+   */
+  pruneFinished(maxFinished: number): string[] {
+    if (maxFinished <= 0) return [];
+
+    const finished = [...this.processes.values()]
+      .filter((p) => !LIVE_STATUSES.has(p.status))
+      .sort((a, b) => (a.endTime ?? 0) - (b.endTime ?? 0));
+    const excess = finished.length - maxFinished;
+    if (excess <= 0) return [];
+
+    const pruned: string[] = [];
+    for (const managed of finished.slice(0, excess)) {
+      this.clearOutputChangedState(managed.id);
+      this.processes.delete(managed.id);
+      pruned.push(managed.id);
+    }
+
+    this.emit({ type: "processes_changed" });
+    return pruned;
   }
 
   private ensureWatcherRunning(): void {

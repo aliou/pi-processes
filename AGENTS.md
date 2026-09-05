@@ -16,7 +16,7 @@ During UI tests that require processes to be running, either give the user a pro
 
 ## Stack
 
-- TypeScript (strict mode), Node.js >=22.19.0, pnpm 10.26.1, Biome, Changesets
+- TypeScript (strict mode), Node.js >=22.19.0, pnpm 11.5.1, Biome, Changesets
 - The package targets Pi 0.80.3. Keep imported Pi-bundled packages in `peerDependencies` with `"*"` ranges and exact local versions in `devDependencies`: `@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`, and `typebox`.
 
 ## Scripts

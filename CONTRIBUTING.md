@@ -11,7 +11,7 @@ Keep development details, testing notes, internal tool guidance, and docs build 
 Requirements:
 
 - Node.js `22.19.0` or newer
-- pnpm `10.26.1`
+- pnpm `11.5.1`
 
 Install dependencies:
 

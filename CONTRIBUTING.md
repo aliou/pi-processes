@@ -40,7 +40,7 @@ pnpm test:e2e
 
 ## Package metadata
 
-The package targets Pi `0.80.3`.
+The package targets Pi `0.87.0`.
 
 Pi bundles core packages for extensions. Keep direct imports of these packages in `peerDependencies` with `"*"` ranges and exact local versions in `devDependencies`:
 

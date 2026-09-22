@@ -8,11 +8,10 @@ allowBuilds:
   "@google/genai": false
 
 minimumReleaseAgeExclude:
-  - '@earendil-works/pi-agent-core@0.84.1'
-  - '@earendil-works/pi-ai@0.84.1'
-  - '@earendil-works/pi-client@0.84.1'
-  - '@earendil-works/pi-coding-agent@0.84.1'
-  - '@earendil-works/pi-protocol@0.84.1'
-  - '@earendil-works/pi-telemetry@0.84.1'
-  - '@earendil-works/pi-tui@0.84.1'
-  - '@aliou/pi-utils-settings@0.19.1'
+  - '@aliou/pi-utils-settings@0.19.2'
+  - '@earendil-works/chord@0.87.0'
+  - '@earendil-works/pi-agent-core@0.87.0'
+  - '@earendil-works/pi-ai@0.87.0'
+  - '@earendil-works/pi-coding-agent@0.87.0'
+  - '@earendil-works/pi-telemetry@0.87.0'
+  - '@earendil-works/pi-tui@0.87.0'

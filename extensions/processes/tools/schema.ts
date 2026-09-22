@@ -142,7 +142,7 @@ const NotifyProperties = {
 
 export const NotifyParams = Type.Object(NotifyProperties, {
   description:
-    "Notify settings. Attention: turn wakes or steers the agent; context waits for the next user prompt; ignore suppresses successful exits and external kills but retains log matches as context. Failures always notify, with ignore downgraded to context.",
+    "Notify settings. Attention: turn wakes or steers the agent; context persists immediately without waking or steering the agent (mid-run, pi appends it after the current tool results); ignore suppresses successful exits and external kills but retains log matches as context. Failures always notify, with ignore downgraded to context.",
 });
 
 export const ProcessesParams = Type.Object({

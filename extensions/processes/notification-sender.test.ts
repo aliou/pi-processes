@@ -36,8 +36,8 @@ function piWithSendMessage(
 describe("attentionToSendOptions", () => {
   it.each([
     ["turn", { triggerTurn: true, deliverAs: "steer" }],
-    ["context", { triggerTurn: false, deliverAs: "nextTurn" }],
-    ["ignore", { triggerTurn: false, deliverAs: "nextTurn" }],
+    ["context", { triggerTurn: false }],
+    ["ignore", { triggerTurn: false }],
   ] as const)("maps %s attention", (attention, expected) => {
     expect(attentionToSendOptions(attention)).toEqual(expected);
   });

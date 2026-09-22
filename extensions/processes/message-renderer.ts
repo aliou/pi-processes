@@ -150,7 +150,7 @@ function formatAttention(attention: Attention, theme: Theme): string {
     case "turn":
       return theme.bold(theme.fg("warning", "now"));
     case "context":
-      return theme.bold(theme.fg("success", "next turn"));
+      return theme.bold(theme.fg("success", "passive"));
     default:
       return theme.bold(theme.fg("dim", "silent"));
   }

@@ -24,12 +24,16 @@ do not affect delivery.
 
 `turn` notifications use Pi's `steer` path. They wake an idle agent or reach an
 active run after its current tool calls finish. `context` and emitted `ignore`
-notifications use `nextTurn`: they do not wake or steer the agent and enter the
-conversation with the next user prompt.
-
-Deferring non-turn notifications also preserves tool-call ordering. Appending a
-custom message during tool execution would place it between the assistant
-`tool_use` and its `tool_result`, which Anthropic rejects.
+notifications are sent with `triggerTurn: false` and no `deliverAs`: they never
+wake or steer the agent, and they persist as displayed custom messages
+immediately. While a turn is running, Pi holds them and appends once every tool
+result of the turn is in (pi 0.84.4+, [#8537](https://github.com/earendil-works/pi/issues/8537)),
+so they never split a tool call from its result — the failure mode that made
+Anthropic requests 400 (pi 0.84.2–0.84.3). On older pi this option shape is
+unsafe: ≤0.84.1 steers the active run, and 0.84.2–0.84.3 appends mid-run.
+This package targets pi 0.87.0; if you must support older pi, send
+`deliverAs: "nextTurn"` instead — it defers the message until the next user
+prompt on every version.
 
 ## Per-process notify config
 
@@ -65,12 +69,13 @@ An attention level is resolved per event and mapped to Pi send options by
 | Attention | `triggerTurn` | `deliverAs` | Agent effect |
 | --------- | ------------- | ----------- | ------------ |
 | `turn` | `true` | `steer` | Wakes an idle agent or steers an active run after its current tool calls. |
-| `context` | `false` | `nextTurn` | Waits for the next user prompt; does not wake or steer the agent. |
-| `ignore` | `false` | `nextTurn` | Suppressed for successful exits and external kills; emitted log matches wait for the next user prompt. Failures are promoted to `context`. |
+| `context` | `false` | — | Persists and displays immediately; never wakes or steers the agent. Mid-run, Pi appends it after the turn's tool results. |
+| `ignore` | `false` | — | Suppressed for successful exits and external kills; emitted log matches persist without waking the agent. Failures are promoted to `context`. |
 
-Every delivered message has `display: true` and is persisted when Pi adds it to
-the conversation. A `nextTurn` message is not displayed or persisted until the
-next user prompt.
+Every delivered message has `display: true`. A context-level message is visible
+in the UI as soon as Pi appends it (immediately when idle, at the turn's tool
+boundary while running) and participates in model context from the next
+provider request on — no user prompt required.
 
 ## Lifecycle notifications
 
@@ -119,7 +124,8 @@ After resolving attention, the service forces a minimum of `context` for
   notification is suppressed entirely (no emit).
 
 This means `onFailure: "ignore"` cannot silence a failed process — failures
-always notify, so it becomes a context message for the next user prompt.
+always notify, so it becomes a context message: persisted immediately,
+without waking or steering the agent.
 `onSuccess: "ignore"` and `onKilled: "ignore"` suppress their notifications.
 
 ### Intentional stops (config bypass)
@@ -284,7 +290,8 @@ Matcher behavior:
 
 Log-match `on: "ignore"` intentionally retains the match as context rather
 than suppressing it. The delivery listener treats it like `context`, so it does
-not wake or steer the agent and appears with the next user prompt. Use either
+not wake or steer the agent and persists immediately (mid-run, after the
+current turn's tool results). Use either
 value when a match is useful later but requires no immediate response.
 
 ### Log-match rate limiting

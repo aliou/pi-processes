@@ -157,6 +157,13 @@ These packages are more about watching, waking, or surfacing process state than 
 - [pi-tripwire](https://pi.dev/packages/pi-tripwire): footer visibility for agent-spawned localhost servers; not a process runner itself.
 - [@cortexkit/aft-pi](https://pi.dev/packages/%40cortexkit/aft-pi): broader Agent File Tools package that includes background bash tasks, PTY sessions, and output compression alongside code-analysis tools.
 
+## Examples
+
+[`examples/`](./examples) has extension snippets you can copy to `~/.pi/agent/extensions/` and adapt:
+
+- [`bash-background.ts`](./examples/bash-background.ts): overrides the bash tool so a running command can move to pi-processes with a shortcut, a timeout, or after an idle period.
+- [`bash-to-process.ts`](./examples/bash-to-process.ts): intercepts bash calls that use `&`, `nohup`, `setsid`, or `disown`, and starts them as managed processes instead of blocking them outright.
+
 ## Troubleshooting
 
 ### Pi started something and I want to see more output

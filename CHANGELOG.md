@@ -1,5 +1,12 @@
 # @aliou/pi-processes
 
+## 0.13.1
+
+### Patch Changes
+
+- 1a92e29: Fold failed and killed processes into `! N failed` and `■ N killed` summary tokens in the status widget, mirroring the existing `✓ N done` token. A new failure stays individual until the next process starts, then folds into the summaries.
+- 9efa0c8: Inject the session `PI_*` variables (`PI_SESSION_ID`, `PI_SESSION_FILE`, `PI_PROVIDER`, `PI_MODEL`, `PI_REASONING_LEVEL`) into processes started via the `process` tool's `start` action, mirroring the environment pi's bash tool exposes.
+
 ## 0.13.0
 
 ### Minor Changes

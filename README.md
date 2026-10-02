@@ -163,6 +163,7 @@ These packages are more about watching, waking, or surfacing process state than 
 
 - [`bash-background.ts`](./examples/bash-background.ts): overrides the bash tool so a running command can move to pi-processes with a shortcut, a timeout, or after an idle period.
 - [`bash-to-process.ts`](./examples/bash-to-process.ts): intercepts bash calls that use `&`, `nohup`, `setsid`, or `disown`, and starts them as managed processes instead of blocking them outright.
+- [`bash-notify-background.ts`](./examples/bash-notify-background.ts): overrides the bash tool so a command that hits its timeout is handed to pi-processes and keeps running in the background instead of being killed.
 
 ## Troubleshooting
 

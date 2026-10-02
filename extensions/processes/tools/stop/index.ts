@@ -1,13 +1,7 @@
 import type { ProcessManager } from "../../../../src/manager";
-import type { KillResult } from "../../../../src/types";
 import { killIntentionally } from "../../handlers/kill-process";
 import type { NotificationRegistry } from "../../notifications/registry";
-import type { ProcessesParamsType } from "../schema";
-
-export interface StopDetails {
-  action: "stop";
-  result: KillResult;
-}
+import type { ProcessesParamsType, StopDetails } from "../schema";
 
 export async function executeStop(
   params: ProcessesParamsType,

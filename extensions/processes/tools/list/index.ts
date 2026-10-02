@@ -1,46 +1,16 @@
 import type { ProcessManager } from "../../../../src/manager";
 import { LIVE_STATUSES, type ProcessInfo } from "../../../../src/types";
+import type { NotificationRegistry } from "../../notifications/registry";
 import type {
-  LogMatcherConfig,
-  NotificationRegistry,
-} from "../../notifications/registry";
-import type {
+  ListDetails,
+  ListProcess,
   ProcessesParamsType,
+  ProcessListCounts,
   ProcessListSort,
   ProcessListStatusFilter,
 } from "../schema";
 import { formatProcessRuntime } from "../utils";
 import { formatPatternsForModel } from "../watch-format";
-
-/**
- * A process plus its duration computed when the list was produced.
- *
- * For stopped processes this is the actual run duration (endTime - startTime).
- * For running processes it is measured against the list call's reference time.
- */
-export interface ListProcess extends ProcessInfo {
-  duration: string;
-  watches: LogMatcherConfig[];
-}
-
-export interface ListDetails {
-  action: "list";
-  processes: ListProcess[];
-  filters: {
-    limit: number | null;
-    sortBy: ProcessListSort;
-    statuses: ProcessListStatusFilter[];
-  };
-  counts: ProcessListCounts;
-}
-
-export interface ProcessListCounts {
-  running: number;
-  exited: number;
-  failed: number;
-  killed: number;
-  total: number;
-}
 
 export function executeList(
   manager: ProcessManager,

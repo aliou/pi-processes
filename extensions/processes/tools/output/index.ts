@@ -8,36 +8,24 @@ import type { ProcessManager } from "../../../../src/manager";
 import { stripAnsi } from "../../../../src/utils";
 import type { LineMatchMode } from "../../../../src/utils/match-line";
 import { compileLineMatcher } from "../../../../src/utils/match-line";
-import type { ProcessesParamsType } from "../schema";
 import {
   DEFAULT_OUTPUT_TAIL_LINES,
   MAX_OUTPUT_BYTES,
   MAX_OUTPUT_SCAN_LINES,
   MAX_OUTPUT_TAIL_LINES,
+  type OutputDetails,
+  type ProcessesParamsType,
+  type ProcessOutput,
   type ProcessOutputMatchMode,
   type ProcessOutputStream,
 } from "../schema";
 
+export type OutputTruncationDetails = NonNullable<OutputDetails["truncation"]>;
+
 const MAX_OUTPUT_CONTENT_JSON_BYTES = 96 * 1024;
 const MAX_OUTPUT_PROCESS_NAME_BYTES = 256;
 
-export interface OutputDetails {
-  action: "output";
-  id: string;
-  processName: string;
-  processStatus: string;
-  stream: ProcessOutputStream;
-  tailLines: number;
-  pattern: string | null;
-  mode: ProcessOutputMatchMode;
-  stdoutFile: string;
-  stderrFile: string;
-  truncation?: OutputTruncationDetails;
-}
-
-export type OutputTruncationDetails = Omit<TruncationResult, "content">;
-
-interface OutputSelection {
+export interface OutputSelection {
   stdout: string[];
   stderr: string[];
 }
@@ -45,6 +33,14 @@ interface OutputSelection {
 export interface OutputExecutionResult {
   content: string;
   details: OutputDetails;
+  selection: OutputSelection;
+}
+
+export function buildOutputStructuredContent(
+  details: OutputDetails,
+  selection: OutputSelection,
+): ProcessOutput {
+  return { ...details, stdout: selection.stdout, stderr: selection.stderr };
 }
 
 export function executeOutput(
@@ -132,7 +128,7 @@ export function executeOutput(
     details.truncation = truncationDetails;
   }
 
-  return { content, details };
+  return { content, details, selection };
 }
 
 interface OutputContentInput extends OutputSelection {

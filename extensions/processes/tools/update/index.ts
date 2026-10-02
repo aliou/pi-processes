@@ -1,5 +1,4 @@
 import type { ProcessManager } from "../../../../src/manager";
-import type { ProcessInfo } from "../../../../src/types";
 import { LIVE_STATUSES } from "../../../../src/types";
 import type {
   LogMatcherConfig,
@@ -8,23 +7,7 @@ import type {
   WatchUpdateResult,
 } from "../../notifications/registry";
 import { normalizeLogMatchItems } from "../notify";
-import type { ProcessesParamsType } from "../schema";
-
-export interface UpdateDetails {
-  action: "update";
-  ok: boolean;
-  error?: string;
-  process?: ProcessInfo;
-  renamed: boolean;
-  previousName: string | null;
-  watches: {
-    mode: "append" | "replace" | "remove" | "clear" | null;
-    before: LogMatcherConfig[];
-    applied: LogMatcherConfig[];
-    count: number;
-    items: LogMatcherConfig[];
-  };
-}
+import type { ProcessesParamsType, UpdateDetails } from "../schema";
 
 export function executeUpdate(
   params: ProcessesParamsType,

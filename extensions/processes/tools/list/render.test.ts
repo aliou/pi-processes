@@ -4,7 +4,7 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 
 import type { ProcessInfo } from "../../../../src/types";
-import type { ListProcess } from ".";
+import type { ListProcess } from "../schema";
 import { buildCollapsed, formatExpandedProcessLines } from "./render";
 
 const theme = {

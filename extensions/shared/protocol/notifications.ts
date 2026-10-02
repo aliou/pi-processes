@@ -14,7 +14,14 @@ import type {
  * delivery listener converts it back into a persisted custom message, while UI
  * extensions use it for highlighting (e.g. log-match markers).
  */
-export type ProcessProtocolAttention = "turn" | "context" | "ignore";
+export const PROCESS_PROTOCOL_ATTENTIONS = [
+  "turn",
+  "context",
+  "ignore",
+] as const;
+
+export type ProcessProtocolAttention =
+  (typeof PROCESS_PROTOCOL_ATTENTIONS)[number];
 
 export type ProcessProtocolNotificationKind =
   | "success"

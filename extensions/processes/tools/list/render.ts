@@ -6,12 +6,14 @@ import { truncateToWidth } from "../../../shared/truncate";
 import { LinesComponent } from "../../../shared/ui";
 import { formatPatternForDisplay, ProcessActionTitle } from "../components";
 import type {
+  ListDetails,
+  ListProcess,
   ProcessesParamsType,
+  ProcessListCounts,
   ProcessListSort,
   ProcessListStatusFilter,
 } from "../schema";
 import { formatColoredProcessStatus, formatCount } from "../utils";
-import type { ListDetails, ListProcess, ProcessListCounts } from ".";
 
 type CountStatusItem = {
   filter: ProcessListStatusFilter;

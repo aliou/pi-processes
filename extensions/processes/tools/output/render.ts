@@ -4,9 +4,8 @@ import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 import { sanitizeForDisplay } from "../../../shared/display-text";
 import { truncateToWidth } from "../../../shared/truncate";
 import { ProcessActionHeader, quoteFilter } from "../components";
-import type { ProcessesParamsType } from "../schema";
+import type { OutputDetails, ProcessesParamsType } from "../schema";
 import { buildField } from "../utils";
-import type { OutputDetails } from ".";
 
 export function buildHeader(
   args: ProcessesParamsType,

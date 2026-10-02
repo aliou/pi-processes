@@ -92,7 +92,7 @@ describe("renderStatusWidget", () => {
     expect(lines[0]).toContain("1 done");
   });
 
-  it("shows failed processes individually, not in the summary", () => {
+  it("keeps a failed process visible by name while its id is pending", () => {
     const lines = renderStatusWidget(
       [
         makeProcess({
@@ -110,6 +110,8 @@ describe("renderStatusWidget", () => {
         }),
       ],
       theme,
+      200,
+      new Set(["proc_2"]),
     );
     expect(lines).toHaveLength(1);
     // Failed process shown individually with error glyph and name.
@@ -117,6 +119,108 @@ describe("renderStatusWidget", () => {
     expect(lines[0]).toContain("{error:lint}");
     // No done summary since the only finished process failed.
     expect(lines[0]).not.toContain("done");
+  });
+
+  it("folds failed processes into a summary token once no longer pending", () => {
+    const lines = renderStatusWidget(
+      [
+        makeProcess({
+          id: "proc_1",
+          status: "running",
+          name: "dev",
+        }),
+        makeProcess({
+          id: "proc_2",
+          status: "exited",
+          success: false,
+          exitCode: 7,
+          endTime: 2000,
+          name: "lint",
+        }),
+        makeProcess({
+          id: "proc_3",
+          status: "exited",
+          success: false,
+          exitCode: 1,
+          endTime: 1500,
+          name: "typecheck",
+        }),
+      ],
+      theme,
+    );
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).not.toContain("{error:lint}");
+    expect(lines[0]).not.toContain("{error:typecheck}");
+    expect(lines[0]).toContain("{error:!}");
+    expect(lines[0]).toContain("2 failed");
+  });
+
+  it("folds killed processes into a square-glyph summary token", () => {
+    const lines = renderStatusWidget(
+      [
+        makeProcess({
+          id: "proc_1",
+          status: "killed",
+          success: false,
+          endTime: 2000,
+          name: "server",
+        }),
+        makeProcess({
+          id: "proc_2",
+          status: "killed",
+          success: false,
+          endTime: 1500,
+          name: "worker",
+        }),
+      ],
+      theme,
+    );
+    expect(lines[0]).not.toContain("server");
+    expect(lines[0]).not.toContain("worker");
+    expect(lines[0]).toContain("{dim:■}");
+    expect(lines[0]).toContain("2 killed");
+  });
+
+  it("orders summaries after individuals: failed, killed, then done", () => {
+    const lines = renderStatusWidget(
+      [
+        makeProcess({
+          id: "proc_1",
+          status: "running",
+          name: "dev",
+        }),
+        makeProcess({
+          id: "proc_2",
+          status: "exited",
+          success: false,
+          exitCode: 7,
+          endTime: 2000,
+          name: "lint",
+        }),
+        makeProcess({
+          id: "proc_3",
+          status: "killed",
+          success: false,
+          endTime: 1900,
+          name: "server",
+        }),
+        makeProcess({
+          id: "proc_4",
+          status: "exited",
+          success: true,
+          exitCode: 0,
+          endTime: 1800,
+          name: "build",
+        }),
+      ],
+      theme,
+    );
+    const line = lines[0] as string;
+    const order = ["{accent:dev}", "1 failed", "1 killed", "1 done"].map(
+      (token) => line.indexOf(token),
+    );
+    expect(order.every((index) => index >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
   it("renders a failed exit with an error-toned name", () => {
@@ -130,6 +234,8 @@ describe("renderStatusWidget", () => {
         }),
       ],
       theme,
+      200,
+      new Set(["proc_1"]),
     );
     expect(lines[0]).toContain("{error:dev}");
   });
@@ -148,6 +254,8 @@ describe("renderStatusWidget", () => {
         }),
       ],
       theme,
+      200,
+      new Set(["proc_2"]),
     );
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain("{dim:  }");

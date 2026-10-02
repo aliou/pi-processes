@@ -30,32 +30,73 @@ function formatProcessLabel(process: ProcessInfo, theme: Theme): string {
   return `${dot} ${name}`;
 }
 
+type SummaryKind = "done" | "failed" | "killed";
+
 /**
- * Build the summary token for exited-success processes: `✓ N done`.
- * Uses a synthetic exited-success ProcessInfo so statusDot agrees with the
- * rest of the UI.
+ * The synthetic ProcessInfo makes statusDot draw the same glyph
+ * (`✓` / `!` / `■`) the individual rows use.
  */
-function formatDoneSummary(count: number, theme: Theme): string {
-  const summary: ProcessInfo = {
-    id: "_summary",
-    name: "",
-    status: "exited",
-    success: true,
-    exitCode: 0,
-  } as ProcessInfo;
-  return `${statusDot(summary, false, theme)} ${theme.fg("dim", `${count} done`)}`;
+const SUMMARY_TOKENS: Record<
+  SummaryKind,
+  { process: ProcessInfo; label: string }
+> = {
+  done: {
+    process: {
+      id: "_summary",
+      name: "",
+      status: "exited",
+      success: true,
+      exitCode: 0,
+    } as ProcessInfo,
+    label: "done",
+  },
+  failed: {
+    process: {
+      id: "_summary",
+      name: "",
+      status: "exited",
+      success: false,
+      exitCode: 1,
+    } as ProcessInfo,
+    label: "failed",
+  },
+  killed: {
+    process: {
+      id: "_summary",
+      name: "",
+      status: "killed",
+      success: false,
+      exitCode: null,
+    } as ProcessInfo,
+    label: "killed",
+  },
+};
+
+function formatSummary(kind: SummaryKind, count: number, theme: Theme): string {
+  const { process, label } = SUMMARY_TOKENS[kind];
+  return `${statusDot(process, false, theme)} ${theme.fg("dim", `${count} ${label}`)}`;
 }
 
 /**
  * Partition processes into:
- * - individual: live, failed, killed (shown one-by-one)
+ * - individual: live processes, plus failed/killed ids in `pendingTerminalIds`
+ *   (a fresh failure stays visible by name until the next process starts)
+ * - failed: folded failures (collapsed into one `! N failed` token)
+ * - killed: folded kills (collapsed into one `■ N killed` token)
  * - exitedSuccess: clean exits (collapsed into one `✓ N done` token)
  */
-function partitionForStatusLine(processes: ProcessInfo[]): {
+function partitionForStatusLine(
+  processes: ProcessInfo[],
+  pendingTerminalIds: ReadonlySet<string>,
+): {
   individual: ProcessInfo[];
+  failed: ProcessInfo[];
+  killed: ProcessInfo[];
   exitedSuccess: ProcessInfo[];
 } {
   const individual: ProcessInfo[] = [];
+  const failed: ProcessInfo[] = [];
+  const killed: ProcessInfo[] = [];
   const exitedSuccess: ProcessInfo[] = [];
 
   // Live first, then failed/killed, ordered naturally.
@@ -64,21 +105,31 @@ function partitionForStatusLine(processes: ProcessInfo[]): {
   finished.sort((a, b) => (b.endTime ?? 0) - (a.endTime ?? 0));
 
   for (const p of [...live, ...finished]) {
+    if (LIVE_STATUSES.has(p.status) || pendingTerminalIds.has(p.id)) {
+      individual.push(p);
+      continue;
+    }
+    if (p.status === "killed") {
+      killed.push(p);
+      continue;
+    }
     if (p.status === "exited" && p.success) {
       exitedSuccess.push(p);
-    } else {
-      individual.push(p);
+      continue;
     }
+    failed.push(p);
   }
 
-  return { individual, exitedSuccess };
+  return { individual, failed, killed, exitedSuccess };
 }
 
 /**
  * Render the single-line status widget shown below the editor.
  *
- * Lists managed processes (dot + name). Live and failed processes are shown
- * individually; successfully-exited processes collapse into a single
+ * Lists managed processes (dot + name). Live processes are shown
+ * individually; failed and killed processes stay individual while their id
+ * is in `pendingTerminalIds` and fold into `! N failed` / `■ N killed`
+ * summaries afterwards; successfully-exited processes collapse into a single
  * `✓ N done` summary. The dot glyph encodes status; the name is colored by
  * status tone. Returns an empty array when there are no processes so the
  * caller can clear the widget.
@@ -87,10 +138,14 @@ export function renderStatusWidget(
   processes: ProcessInfo[],
   theme: Theme,
   maxWidth: number = DEFAULT_MAX_WIDTH,
+  pendingTerminalIds: ReadonlySet<string> = new Set(),
 ): string[] {
   if (processes.length === 0) return [];
 
-  const { individual, exitedSuccess } = partitionForStatusLine(processes);
+  const { individual, failed, killed, exitedSuccess } = partitionForStatusLine(
+    processes,
+    pendingTerminalIds,
+  );
 
   const prefix = theme.fg("dim", "ps: ");
   const prefixLen = visibleWidth(prefix);
@@ -98,13 +153,19 @@ export function renderStatusWidget(
   const separatorLen = visibleWidth(separator);
 
   // Build the full ordered list of display tokens: individual processes
-  // followed by the done-summary (if any).
+  // followed by the failed / killed / done summaries (if any).
   const tokens: string[] = [];
   for (const process of individual) {
     tokens.push(formatProcessLabel(process, theme));
   }
+  if (failed.length > 0) {
+    tokens.push(formatSummary("failed", failed.length, theme));
+  }
+  if (killed.length > 0) {
+    tokens.push(formatSummary("killed", killed.length, theme));
+  }
   if (exitedSuccess.length > 0) {
-    tokens.push(formatDoneSummary(exitedSuccess.length, theme));
+    tokens.push(formatSummary("done", exitedSuccess.length, theme));
   }
 
   // Fit tokens to width, with "+N more" overflow.

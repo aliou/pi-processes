@@ -50,7 +50,7 @@ function defaultConfig(): ProcessProtocolConfig {
     },
     follow: { enabledByDefault: true, autoHideOnFinish: true },
     widget: {
-      showStatusWidget: false,
+      showStatusWidget: true,
       dockDefaultState: "collapsed",
       dockHeight: 10,
     },
@@ -59,6 +59,7 @@ function defaultConfig(): ProcessProtocolConfig {
 
 interface Harness {
   widgetState: Map<string, "visible" | "hidden">;
+  widgetContent: Map<string, unknown>;
   emitStarted: (info: ProcessInfo) => void;
   emitEnded: (info: ProcessInfo) => void;
   emitPin: (id: string | null) => CommandPinResult;
@@ -68,6 +69,7 @@ interface Harness {
 function createHarness(): Harness {
   const events: EventBus = createEventBus();
   const widgetState = new Map<string, "visible" | "hidden">();
+  const widgetContent = new Map<string, unknown>();
 
   let processList: ProcessInfo[] = [];
   const config = defaultConfig();
@@ -75,6 +77,7 @@ function createHarness(): Harness {
   const ui: ExtensionUIContext = {
     setWidget: ((key: string, content: unknown, _options?: unknown) => {
       widgetState.set(key, content === undefined ? "hidden" : "visible");
+      widgetContent.set(key, content);
     }) as never,
   } as unknown as ExtensionUIContext;
 
@@ -115,6 +118,7 @@ function createHarness(): Harness {
 
   return {
     widgetState,
+    widgetContent,
     emitStarted: (info: ProcessInfo) => {
       upsertProcess(info);
       events.emit(CHANNELS.STARTED, info);
@@ -141,9 +145,25 @@ function createHarness(): Harness {
 }
 
 const DOCK_KEY = "processes-dock";
+const STATUS_KEY = "processes-status";
 
 function dockIsVisible(h: Harness): boolean {
   return h.widgetState.get(DOCK_KEY) === "visible";
+}
+
+function statusLine(h: Harness): string | null {
+  const factory = h.widgetContent.get(STATUS_KEY) as
+    | ((
+        tui: unknown,
+        theme: unknown,
+      ) => { render: (width: number) => string[] })
+    | undefined;
+  if (!factory) return null;
+  const theme = {
+    fg: (color: string, text: string) => `{${color}:${text}}`,
+    bg: (_color: string, text: string) => text,
+  };
+  return factory(null, theme).render(200)[0] ?? null;
 }
 
 describe("dock auto-close", () => {
@@ -252,6 +272,94 @@ describe("dock auto-close", () => {
       expect(h.emitPin(null)).toEqual({ ok: true });
 
       expect(dockIsVisible(h)).toBe(true);
+    } finally {
+      h.dispose();
+    }
+  });
+});
+
+describe("status widget pending terminal processes", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("keeps a failed process visible until the next process starts, then folds it", () => {
+    const h = createHarness();
+    try {
+      h.emitStarted(makeProcess({ id: "proc_1", name: "lint" }));
+      h.emitEnded(
+        makeProcess({
+          id: "proc_1",
+          name: "lint",
+          status: "exited",
+          endTime: 2000,
+          exitCode: 7,
+          success: false,
+        }),
+      );
+      vi.advanceTimersByTime(130);
+      expect(statusLine(h)).toContain("{error:lint}");
+
+      h.emitStarted(
+        makeProcess({ id: "proc_2", name: "dev", startTime: 3000 }),
+      );
+      vi.advanceTimersByTime(130);
+      expect(statusLine(h)).toContain("{error:!}");
+      expect(statusLine(h)).toContain("1 failed");
+      expect(statusLine(h)).not.toContain("lint");
+    } finally {
+      h.dispose();
+    }
+  });
+
+  it("keeps a killed process visible until the next process starts, then folds it", () => {
+    const h = createHarness();
+    try {
+      h.emitStarted(makeProcess({ id: "proc_1", name: "server" }));
+      h.emitEnded(
+        makeProcess({
+          id: "proc_1",
+          name: "server",
+          status: "killed",
+          endTime: 2000,
+          success: false,
+        }),
+      );
+      vi.advanceTimersByTime(130);
+      expect(statusLine(h)).toContain("server");
+
+      h.emitStarted(
+        makeProcess({ id: "proc_2", name: "dev", startTime: 3000 }),
+      );
+      vi.advanceTimersByTime(130);
+      expect(statusLine(h)).toContain("{dim:■}");
+      expect(statusLine(h)).toContain("1 killed");
+      expect(statusLine(h)).not.toContain("server");
+    } finally {
+      h.dispose();
+    }
+  });
+
+  it("folds a successful exit into the done summary immediately", () => {
+    const h = createHarness();
+    try {
+      h.emitStarted(makeProcess({ id: "proc_1", name: "build" }));
+      h.emitEnded(
+        makeProcess({
+          id: "proc_1",
+          name: "build",
+          status: "exited",
+          endTime: 2000,
+          exitCode: 0,
+          success: true,
+        }),
+      );
+      vi.advanceTimersByTime(130);
+      expect(statusLine(h)).toContain("1 done");
+      expect(statusLine(h)).not.toContain("build");
     } finally {
       h.dispose();
     }

@@ -50,8 +50,18 @@ export class ProcessRuntimeController {
     this.getConfiguredShellPath = deps.getConfiguredShellPath;
   }
 
-  start(name: string, command: string, cwd: string): ManagedProcessRecord {
-    const child = spawnCommand(command, cwd, this.getConfiguredShellPath());
+  start(
+    name: string,
+    command: string,
+    cwd: string,
+    env?: NodeJS.ProcessEnv,
+  ): ManagedProcessRecord {
+    const child = spawnCommand(
+      command,
+      cwd,
+      this.getConfiguredShellPath(),
+      env,
+    );
     return this.register(name, command, cwd, child, {});
   }
 

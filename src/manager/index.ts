@@ -54,8 +54,13 @@ export class ProcessManager {
     return () => this.events.off("event", listener);
   }
 
-  start(name: string, command: string, cwd: string): ProcessInfo {
-    const managed = this.runtime.start(name, command, cwd);
+  start(
+    name: string,
+    command: string,
+    cwd: string,
+    env?: NodeJS.ProcessEnv,
+  ): ProcessInfo {
+    const managed = this.runtime.start(name, command, cwd, env);
     return formatProcess(managed);
   }
 

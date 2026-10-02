@@ -25,7 +25,13 @@ const processInfo: ProcessInfo = {
   errorMessage: null,
 };
 
-const ctx = { cwd: "/repo" } as ExtensionContext;
+const ctx = {
+  cwd: "/repo",
+  sessionManager: {
+    getSessionId: () => "session-123",
+    getSessionFile: () => "/tmp/session-123.jsonl",
+  },
+} as ExtensionContext;
 
 function createFakeRegistry(): NotificationRegistry {
   return createNotificationRegistry();
@@ -71,7 +77,12 @@ describe("executeStart", () => {
       registry,
     );
 
-    expect(start).toHaveBeenCalledWith("dev", "pnpm dev", "/repo");
+    expect(start).toHaveBeenCalledWith(
+      "dev",
+      "pnpm dev",
+      "/repo",
+      expect.anything(),
+    );
     expect(details.notify).toEqual({
       onSuccess: "turn",
       onFailure: "turn",
@@ -154,7 +165,12 @@ describe("executeStart", () => {
       registry,
     );
 
-    expect(start).toHaveBeenCalledWith("dev", "pnpm dev", "/explicit");
+    expect(start).toHaveBeenCalledWith(
+      "dev",
+      "pnpm dev",
+      "/explicit",
+      expect.anything(),
+    );
     expect(details.process.cwd).toBe("/explicit");
   });
 
@@ -174,7 +190,33 @@ describe("executeStart", () => {
       registry,
     );
 
-    expect(start).toHaveBeenCalledWith("dev", "pnpm dev", "/repo");
+    expect(start).toHaveBeenCalledWith(
+      "dev",
+      "pnpm dev",
+      "/repo",
+      expect.anything(),
+    );
+  });
+
+  it("starts with PI_* session variables injected into the child env", () => {
+    const start = vi.fn((..._args: unknown[]) => processInfo);
+    const manager = { start } as unknown as ProcessManager;
+    const registry = createFakeRegistry();
+
+    executeStart(
+      {
+        action: "start",
+        name: "dev",
+        command: "pnpm dev",
+      },
+      manager,
+      ctx,
+      registry,
+    );
+
+    const env = start.mock.calls[0]?.[3] as NodeJS.ProcessEnv;
+    expect(env.PI_SESSION_ID).toBe("session-123");
+    expect(env.PI_SESSION_FILE).toBe("/tmp/session-123.jsonl");
   });
 });
 

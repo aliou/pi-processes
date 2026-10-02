@@ -1,9 +1,8 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
 import { ProcessActionTitle } from "../components";
-import type { ProcessesParamsType } from "../schema";
+import type { ClearDetails, ProcessesParamsType } from "../schema";
 import { formatCount } from "../utils";
-import type { ClearDetails } from ".";
 
 export function buildHeader(
   _args: ProcessesParamsType,

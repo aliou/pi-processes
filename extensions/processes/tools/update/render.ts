@@ -3,9 +3,8 @@ import { Container, Text } from "@earendil-works/pi-tui";
 import { sanitizeForDisplay } from "../../../shared/display-text";
 import type { LogMatcherConfig } from "../../notifications/registry";
 import { buildMatcherLine, ProcessActionHeader } from "../components";
-import type { ProcessesParamsType } from "../schema";
+import type { ProcessesParamsType, UpdateDetails } from "../schema";
 import { buildField } from "../utils";
-import type { UpdateDetails } from ".";
 
 export function buildHeader(
   args: ProcessesParamsType,

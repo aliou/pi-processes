@@ -3,7 +3,9 @@
  * and the output tool action. Pi-agnostic — no Pi imports.
  */
 
-export type LineMatchMode = "literal" | "regex";
+export const LINE_MATCH_MODES = ["literal", "regex"] as const;
+
+export type LineMatchMode = (typeof LINE_MATCH_MODES)[number];
 
 /**
  * Compile a pattern + mode into a line-matching predicate.

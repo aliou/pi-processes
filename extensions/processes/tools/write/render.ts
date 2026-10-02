@@ -1,9 +1,8 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
 import { ProcessActionHeader } from "../components";
-import type { ProcessesParamsType } from "../schema";
+import type { ProcessesParamsType, WriteDetails } from "../schema";
 import { buildField } from "../utils";
-import type { WriteDetails } from ".";
 
 export function buildHeader(
   args: ProcessesParamsType,

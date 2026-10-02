@@ -1,13 +1,12 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
 import { buildMatcherLine, ProcessActionHeader } from "../components";
-import type { ProcessesParamsType } from "../schema";
+import type { ProcessesParamsType, StartDetails } from "../schema";
 import {
   buildCompactProcessLine,
   buildField,
   buildProcessDetails,
 } from "../utils";
-import type { StartDetails } from ".";
 
 export function buildHeader(
   args: ProcessesParamsType,

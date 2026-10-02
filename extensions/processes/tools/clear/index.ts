@@ -1,9 +1,5 @@
 import type { ProcessManager } from "../../../../src/manager";
-
-export interface ClearDetails {
-  action: "clear";
-  cleared: number;
-}
+import type { ClearDetails } from "../schema";
 
 export function executeClear(manager: ProcessManager): ClearDetails {
   return {

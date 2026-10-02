@@ -3,7 +3,7 @@ import {
   MAX_LOG_MATCHERS_PER_PROCESS,
 } from "../notifications/log-matchers";
 import type { LogMatcherConfig, NotifyConfig } from "../notifications/registry";
-import type { NotifyLogMatchParamsType, NotifyParamsType } from "./schema";
+import type { NotifyParamsType } from "./schema";
 
 const DEFAULT_NOTIFY_CONFIG = {
   // Builds, tests, and other one-shot commands are started because the agent
@@ -46,7 +46,7 @@ export function normalizeNotifyConfig(
 }
 
 export function normalizeLogMatchItems(
-  input: NotifyLogMatchParamsType[],
+  input: LogMatcherConfig[],
   options: {
     actionLabel: string;
     pathPrefix: string;
@@ -56,14 +56,14 @@ export function normalizeLogMatchItems(
 }
 
 function normalizeLogMatches(
-  input: NotifyLogMatchParamsType[],
+  input: LogMatcherConfig[],
   options: { actionLabel: string; pathPrefix: string },
 ): LogMatcherConfig[] {
   return input.map((entry, index) => normalizeLogMatch(entry, index, options));
 }
 
 function normalizeLogMatch(
-  input: NotifyLogMatchParamsType,
+  input: LogMatcherConfig,
   index: number,
   options: { actionLabel: string; pathPrefix: string },
 ): LogMatcherConfig {

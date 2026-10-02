@@ -1,17 +1,5 @@
 import type { ProcessManager } from "../../../../src/manager";
-import type { ProcessInfo } from "../../../../src/types";
-import type { ProcessesParamsType } from "../schema";
-
-export interface WriteDetails {
-  action: "write";
-  id: string;
-  processName: string;
-  process: ProcessInfo | null;
-  bytes: number;
-  end: boolean;
-  ok: boolean;
-  reason: string | null;
-}
+import type { ProcessesParamsType, WriteDetails } from "../schema";
 
 /**
  * Write text to a running process's stdin.

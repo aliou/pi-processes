@@ -26,6 +26,7 @@ export type {
   ProcessProtocolNotificationLogMatch,
   ProcessProtocolNotificationPayload,
 } from "./notifications";
+export { PROCESS_PROTOCOL_ATTENTIONS } from "./notifications";
 export type {
   ProcessProtocolConfig,
   RequestCombinedOutputPayload,

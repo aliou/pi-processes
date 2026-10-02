@@ -1,9 +1,23 @@
-export type ProcessStatus =
-  | "running"
-  | "terminating"
-  | "terminate_timeout"
-  | "exited"
-  | "killed";
+import { type Static, type TSchema, type TUnsafe, Type } from "typebox";
+
+function StringEnum<const T extends readonly string[]>(
+  values: T,
+): TUnsafe<T[number]> {
+  return Type.Unsafe<T[number]>({
+    type: "string",
+    enum: [...values],
+  } as TSchema);
+}
+
+export const PROCESS_STATUSES = [
+  "running",
+  "terminating",
+  "terminate_timeout",
+  "exited",
+  "killed",
+] as const;
+
+export type ProcessStatus = (typeof PROCESS_STATUSES)[number];
 
 export const LIVE_STATUSES: ReadonlySet<ProcessStatus> = new Set([
   "running",
@@ -11,37 +25,44 @@ export const LIVE_STATUSES: ReadonlySet<ProcessStatus> = new Set([
   "terminate_timeout",
 ]);
 
-export type ProcessEndReason =
-  | "exit"
-  | "signal"
-  | "spawn_error"
-  | "missing_pid"
-  | "kill_timeout"
-  | "lost";
+export const PROCESS_END_REASONS = [
+  "exit",
+  "signal",
+  "spawn_error",
+  "missing_pid",
+  "kill_timeout",
+  "lost",
+] as const;
 
-export interface ProcessSignalInfo {
-  name: NodeJS.Signals;
-  number: number | null;
-  description: string;
-}
+export type ProcessEndReason = (typeof PROCESS_END_REASONS)[number];
 
-export interface ProcessInfo {
-  id: string;
-  name: string;
-  pid: number; // On Unix, this is also the PGID (process group leader)
-  command: string;
-  cwd: string;
-  startTime: number;
-  endTime: number | null;
-  status: ProcessStatus;
-  exitCode: number | null;
-  success: boolean | null; // null if running, true if exit code 0, false otherwise
-  stdoutFile: string;
-  stderrFile: string;
-  endReason: ProcessEndReason | null;
-  signal: ProcessSignalInfo | null;
-  errorMessage: string | null;
-}
+export const ProcessSignalInfoSchema = Type.Object({
+  name: Type.String(),
+  number: Type.Union([Type.Integer(), Type.Null()]),
+  description: Type.String(),
+});
+
+export type ProcessSignalInfo = Static<typeof ProcessSignalInfoSchema>;
+
+export const ProcessInfoSchema = Type.Object({
+  id: Type.String(),
+  name: Type.String(),
+  pid: Type.Integer(), // On Unix, this is also the PGID (process group leader)
+  command: Type.String(),
+  cwd: Type.String(),
+  startTime: Type.Number(),
+  endTime: Type.Union([Type.Number(), Type.Null()]),
+  status: StringEnum(PROCESS_STATUSES),
+  exitCode: Type.Union([Type.Integer(), Type.Null()]),
+  success: Type.Union([Type.Boolean(), Type.Null()]), // null if running, true if exit code 0, false otherwise
+  stdoutFile: Type.String(),
+  stderrFile: Type.String(),
+  endReason: Type.Union([StringEnum(PROCESS_END_REASONS), Type.Null()]),
+  signal: Type.Union([ProcessSignalInfoSchema, Type.Null()]),
+  errorMessage: Type.Union([Type.String(), Type.Null()]),
+});
+
+export type ProcessInfo = Static<typeof ProcessInfoSchema>;
 
 export type ManagerEvent =
   | { type: "process_started"; info: ProcessInfo }
@@ -64,9 +85,13 @@ export interface AdoptProcessOptions {
   startTime?: number;
 }
 
+export const KILL_FAILURE_REASONS = ["not_found", "timeout", "error"] as const;
+
+export type KillFailureReason = (typeof KILL_FAILURE_REASONS)[number];
+
 export type KillResult =
   | { ok: true; info: ProcessInfo }
-  | { ok: false; info: ProcessInfo; reason: "not_found" | "timeout" | "error" };
+  | { ok: false; info: ProcessInfo; reason: KillFailureReason };
 
 export type WriteResult =
   | { ok: true }

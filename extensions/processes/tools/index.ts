@@ -10,25 +10,32 @@ import { type Component, Container, Text } from "@earendil-works/pi-tui";
 
 import type { ProcessManager } from "../../../src/manager";
 import type { NotificationRegistry } from "../notifications/registry";
-import { type ClearDetails, executeClear, formatClearDetails } from "./clear";
+import { executeClear, formatClearDetails } from "./clear";
 import * as clearRender from "./clear/render";
 import { ToolLayout } from "./components";
-import { executeList, formatListDetails, type ListDetails } from "./list";
+import { executeList, formatListDetails } from "./list";
 import * as listRender from "./list/render";
-import { executeOutput, type OutputDetails } from "./output";
+import { buildOutputStructuredContent, executeOutput } from "./output";
 import * as outputRender from "./output/render";
-import { ProcessesParams, type ProcessesParamsType } from "./schema";
-import { executeStart, formatStartDetails, type StartDetails } from "./start";
-import * as startRender from "./start/render";
-import { executeStop, formatStopDetails, type StopDetails } from "./stop";
-import * as stopRender from "./stop/render";
 import {
-  executeUpdate,
-  formatUpdateDetails,
+  type ClearDetails,
+  type ListDetails,
+  type OutputDetails,
+  ProcessesParams,
+  type ProcessesParamsType,
+  ProcessToolOutputSchema,
+  type StartDetails,
+  type StopDetails,
   type UpdateDetails,
-} from "./update";
+  type WriteDetails,
+} from "./schema";
+import { executeStart, formatStartDetails } from "./start";
+import * as startRender from "./start/render";
+import { executeStop, formatStopDetails } from "./stop";
+import * as stopRender from "./stop/render";
+import { executeUpdate, formatUpdateDetails } from "./update";
 import * as updateRender from "./update/render";
-import { executeWrite, formatWriteDetails, type WriteDetails } from "./write";
+import { executeWrite, formatWriteDetails } from "./write";
 import * as writeRender from "./write/render";
 
 type ProcessDetails =
@@ -61,12 +68,17 @@ export function registerProcessTool(
         "process tool: for the full lifecycle (start, list, output, update, write, stop, clear), notify options, use cases, and noisy-watch handling, read the pi-processes skill.",
       ],
       parameters: ProcessesParams,
+      outputSchema: ProcessToolOutputSchema,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
         if (params.action === "output") {
           const result = executeOutput(params, manager);
           return {
             content: [{ type: "text", text: result.content }],
             details: result.details,
+            structuredContent: buildOutputStructuredContent(
+              result.details,
+              result.selection,
+            ),
           };
         }
 
@@ -74,6 +86,7 @@ export function registerProcessTool(
         return {
           content: [{ type: "text", text: formatDetails(details) }],
           details,
+          structuredContent: details,
         };
       },
       renderCall: renderProcessCall,
@@ -87,7 +100,7 @@ async function execute(
   manager: ProcessManager,
   ctx: ExtensionContext,
   notifications: NotificationRegistry,
-): Promise<ProcessDetails> {
+): Promise<Exclude<ProcessDetails, OutputDetails>> {
   switch (params.action) {
     case "start":
       return executeStart(params, manager, ctx, notifications);

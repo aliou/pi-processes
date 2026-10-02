@@ -25,7 +25,33 @@ function makePayload(
 }
 
 function piWithSendMessage(sendMessage: ReturnType<typeof vi.fn>) {
-  return { sendMessage } as never;
+  return { sendMessage, on: () => () => {} } as never;
+}
+
+function piWithNotificationApi() {
+  const handlers = new Map<string, (event: never, ctx: never) => unknown>();
+  const sendMessage = vi.fn();
+  const sendUserMessage = vi.fn();
+  const pi = {
+    sendMessage,
+    sendUserMessage,
+    on: (event: string, handler: (event: never, ctx: never) => unknown) => {
+      handlers.set(event, handler);
+      return () => {};
+    },
+  } as never;
+  return { pi, handlers, sendMessage, sendUserMessage };
+}
+
+function fireLifecycle(
+  handlers: Map<string, (event: never, ctx: never) => unknown>,
+  events: string[],
+  idle: boolean,
+) {
+  const ctx = { isIdle: () => idle };
+  for (const event of events) {
+    handlers.get(event)?.({} as never, ctx as never);
+  }
 }
 
 describe("registerNotificationDelivery", () => {
@@ -107,5 +133,99 @@ describe("registerNotificationDelivery", () => {
 
     dispose();
     vi.useRealTimers();
+  });
+});
+
+// Regression: idle turn notifications skip before_agent_start (#121).
+describe("idle turn notifications", () => {
+  it("keeps the steer wake while a run is active", () => {
+    const events = createEventBus();
+    const { pi, handlers, sendMessage, sendUserMessage } =
+      piWithNotificationApi();
+    registerNotificationDelivery(events, pi);
+    fireLifecycle(handlers, ["session_start", "agent_start"], false);
+
+    events.emit(CHANNELS.NOTIFICATION, makePayload({ attention: "turn" }));
+
+    expect(sendUserMessage).not.toHaveBeenCalled();
+    const [, options] = sendMessage.mock.calls[0];
+    expect(options).toEqual({ triggerTurn: true, deliverAs: "steer" });
+  });
+
+  it("keeps the steer wake when no host context has been seen yet", () => {
+    const events = createEventBus();
+    const { pi, sendMessage, sendUserMessage } = piWithNotificationApi();
+    registerNotificationDelivery(events, pi);
+
+    events.emit(CHANNELS.NOTIFICATION, makePayload({ attention: "turn" }));
+
+    expect(sendUserMessage).not.toHaveBeenCalled();
+    const [, options] = sendMessage.mock.calls[0];
+    expect(options).toEqual({ triggerTurn: true, deliverAs: "steer" });
+  });
+
+  it("delivers an idle turn notification without triggering the run itself, and wakes the host with a user message", () => {
+    const events = createEventBus();
+    const { pi, handlers, sendMessage, sendUserMessage } =
+      piWithNotificationApi();
+    registerNotificationDelivery(events, pi);
+    fireLifecycle(
+      handlers,
+      ["session_start", "turn_end", "agent_end", "agent_settled"],
+      true,
+    );
+
+    events.emit(CHANNELS.NOTIFICATION, makePayload({ attention: "turn" }));
+
+    const [message, options] = sendMessage.mock.calls[0] ?? [];
+    expect(message?.customType).toBe(MESSAGE_TYPE_PROCESS_NOTIFICATION);
+    expect(options?.triggerTurn).toBe(false);
+    expect(sendUserMessage).toHaveBeenCalledTimes(1);
+    expect(sendUserMessage).toHaveBeenCalledWith("");
+  });
+
+  it("wakes an idle host only once until the woken run starts", () => {
+    const events = createEventBus();
+    const { pi, handlers, sendMessage, sendUserMessage } =
+      piWithNotificationApi();
+    registerNotificationDelivery(events, pi);
+    fireLifecycle(
+      handlers,
+      ["session_start", "turn_end", "agent_end", "agent_settled"],
+      true,
+    );
+
+    events.emit(CHANNELS.NOTIFICATION, makePayload({ attention: "turn" }));
+    events.emit(CHANNELS.NOTIFICATION, makePayload({ attention: "turn" }));
+
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+    for (const [, options] of sendMessage.mock.calls) {
+      expect(options.triggerTurn).toBe(false);
+    }
+    expect(sendUserMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-arms the wake after the woken run completes", () => {
+    const events = createEventBus();
+    const { pi, handlers, sendUserMessage } = piWithNotificationApi();
+    registerNotificationDelivery(events, pi);
+    fireLifecycle(
+      handlers,
+      ["session_start", "turn_end", "agent_end", "agent_settled"],
+      true,
+    );
+
+    events.emit(CHANNELS.NOTIFICATION, makePayload({ attention: "turn" }));
+    expect(sendUserMessage).toHaveBeenCalledTimes(1);
+
+    // The woken run starts and settles; the host is idle again.
+    fireLifecycle(
+      handlers,
+      ["agent_start", "turn_start", "turn_end", "agent_end", "agent_settled"],
+      true,
+    );
+
+    events.emit(CHANNELS.NOTIFICATION, makePayload({ attention: "turn" }));
+    expect(sendUserMessage).toHaveBeenCalledTimes(2);
   });
 });

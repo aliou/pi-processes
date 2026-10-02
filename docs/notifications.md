@@ -22,9 +22,16 @@ do not affect delivery.
 
 ### Delivery timing
 
-`turn` notifications use Pi's `steer` path. They wake an idle agent or reach an
-active run after its current tool calls finish. `context` and emitted `ignore`
-notifications are sent with `triggerTurn: false` and no `deliverAs`: they never
+`turn` notifications use Pi's `steer` path while a run is active (or before
+any host lifecycle event has been observed), reaching the run after its current
+tool calls finish. On an idle host the notification is instead persisted with
+`triggerTurn: false` and the host is woken with a bare `pi.sendUserMessage`,
+because a steer wake on an idle host skips `before_agent_start`
+([#121](https://github.com/aliou/pi-processes/issues/121)). Only one wake is
+sent until the woken run starts; the wake re-arms once the host is idle again.
+
+`context` and emitted `ignore` notifications are sent with `triggerTurn: false`
+and no `deliverAs`: they never
 wake or steer the agent, and they persist as displayed custom messages
 immediately. While a turn is running, Pi holds them and appends once every tool
 result of the turn is in (pi 0.84.4+, [#8537](https://github.com/earendil-works/pi/issues/8537)),
@@ -68,7 +75,7 @@ An attention level is resolved per event and mapped to Pi send options by
 
 | Attention | `triggerTurn` | `deliverAs` | Agent effect |
 | --------- | ------------- | ----------- | ------------ |
-| `turn` | `true` | `steer` | Wakes an idle agent or steers an active run after its current tool calls. |
+| `turn` | `true` | `steer` | Steers an active run after its current tool calls. On an idle host: persisted with `triggerTurn: false`, host woken with a bare user message. |
 | `context` | `false` | — | Persists and displays immediately; never wakes or steers the agent. Mid-run, Pi appends it after the turn's tool results. |
 | `ignore` | `false` | — | Suppressed for successful exits and external kills; emitted log matches persist without waking the agent. Failures are promoted to `context`. |
 
@@ -333,8 +340,8 @@ The summary is always `context`.
 - `extensions/processes/notifications/registry.ts` — per-process config and
   intentional-stop markers.
 - `extensions/processes/handlers/kill-process.ts` — intentional stop marking.
-- `extensions/processes/handlers/notifications.ts` — delivery listener and
-  rate limiting.
+- `extensions/processes/handlers/notifications.ts` — delivery listener,
+  log-match rate limiting, and the idle-host wake.
 - `extensions/processes/notification-sender.ts` — attention → Pi send options.
 - `extensions/processes/tools/notify.ts` — config normalization and defaults.
 - `src/manager/process-runtime-controller.ts` — `process_ended` emission,

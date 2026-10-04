@@ -365,3 +365,87 @@ describe("status widget pending terminal processes", () => {
     }
   });
 });
+
+interface DockWidgetComponent {
+  render: (width: number) => string[];
+  handleMouse?: (event: unknown) => unknown;
+}
+
+describe("dock click toggle", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function dockComponent(h: Harness): DockWidgetComponent {
+    const factory = h.widgetContent.get(DOCK_KEY) as (
+      tui: unknown,
+      theme: unknown,
+    ) => DockWidgetComponent;
+    const theme = {
+      fg: (_color: string, text: string) => text,
+      bg: (_color: string, text: string) => text,
+      bold: (text: string) => text,
+      italic: (text: string) => text,
+      underline: (text: string) => text,
+      inverse: (text: string) => text,
+      strikethrough: (text: string) => text,
+    };
+    return factory(null, theme);
+  }
+
+  const clickEvent = () => ({
+    type: "click",
+    button: "left",
+    x: 0,
+    y: 0,
+    screenX: 0,
+    screenY: 0,
+    width: 120,
+    height: 1,
+    shift: false,
+    alt: false,
+    ctrl: false,
+  });
+
+  it("clicking the dock toggles collapsed <-> expanded", () => {
+    const h = createHarness();
+    try {
+      h.emitStarted(makeProcess({ status: "running" }));
+      vi.advanceTimersByTime(130);
+      expect(dockIsVisible(h)).toBe(true);
+
+      let component = dockComponent(h);
+      const collapsedHeight = component.render(120).length;
+
+      expect(component.handleMouse?.(clickEvent())).toEqual({ handled: true });
+      component = dockComponent(h);
+      expect(component.render(120).length).toBeGreaterThan(collapsedHeight);
+
+      expect(component.handleMouse?.(clickEvent())).toEqual({ handled: true });
+      component = dockComponent(h);
+      expect(component.render(120).length).toBe(collapsedHeight);
+    } finally {
+      h.dispose();
+    }
+  });
+
+  it("ignores non-click mouse events", () => {
+    const h = createHarness();
+    try {
+      h.emitStarted(makeProcess({ status: "running" }));
+      vi.advanceTimersByTime(130);
+
+      const collapsedHeight = dockComponent(h).render(120).length;
+      const component = dockComponent(h);
+      expect(
+        component.handleMouse?.({ ...clickEvent(), type: "press" }),
+      ).toBeUndefined();
+      expect(dockComponent(h).render(120).length).toBe(collapsedHeight);
+    } finally {
+      h.dispose();
+    }
+  });
+});

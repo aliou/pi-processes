@@ -3,6 +3,10 @@ import type {
   ExtensionContext,
   Theme,
 } from "@earendil-works/pi-coding-agent";
+import type {
+  TuiMouseEvent,
+  TuiMouseEventResult,
+} from "@earendil-works/pi-tui";
 import { LIVE_STATUSES, type ProcessInfo } from "../../../src/types";
 import { buildDroppedOutputLine, trimToBudget } from "../../shared/line-buffer";
 import {
@@ -123,6 +127,14 @@ export function setupDockWidgets(
             liveConfig.widget.dockHeight,
           ),
         invalidate: () => undefined,
+        handleMouse: (
+          event: TuiMouseEvent,
+        ): TuiMouseEventResult | undefined => {
+          if (event.type !== "click") return undefined;
+          if (state.getState().visibility === "collapsed") actions.expand();
+          else actions.collapse();
+          return { handled: true };
+        },
       }),
       { placement: "aboveEditor" },
     );

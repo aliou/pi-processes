@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.13.2
+
+### Patch Changes
+
+- b17b6bb: Click a log-match notification in the transcript to toggle its detail line, and click the dock to toggle it between collapsed and expanded. Both are fullscreen-only (regular mode leaves the mouse to the terminal); the keyboard paths (expand toggle, `/ps:dock`) are unchanged.
+
 ## 0.13.1
 
 ### Patch Changes

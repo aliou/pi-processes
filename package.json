@@ -32,12 +32,26 @@
   "engines": {
     "node": ">=22.19.0"
   },
+  "exports": {
+    "./durable": {
+      "types": "./dist/durable.d.ts",
+      "import": "./dist/durable.js"
+    },
+    "./package.json": "./package.json",
+    "./extensions/*": "./extensions/*",
+    "./src/*": "./src/*",
+    "./skills/*": "./skills/*",
+    "./schema.json": "./schema.json"
+  },
   "files": [
+    "dist",
     "src",
     "!src/**/*.test.ts",
     "extensions",
     "!extensions/**/*.test.ts",
     "skills",
+    "docs",
+    "examples/durable.ts",
     "schema.json",
     "README.md",
     "CONTRIBUTING.md"
@@ -50,6 +64,7 @@
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-durable": "*",
     "@earendil-works/pi-tui": "*",
     "typebox": "*"
   },
@@ -57,20 +72,25 @@
     "@aliou/biome-plugins": "^0.12.0",
     "@biomejs/biome": "^2.5.8",
     "@changesets/cli": "^2.27.11",
-    "@earendil-works/pi-ai": "1.0.0",
-    "@earendil-works/pi-coding-agent": "1.0.0",
-    "@earendil-works/pi-tui": "1.0.0",
+    "@earendil-works/chord": "1.0.1",
+    "@earendil-works/pi-ai": "1.0.1",
+    "@earendil-works/pi-coding-agent": "1.0.1",
+    "@earendil-works/pi-durable": "1.0.1",
+    "@earendil-works/pi-tui": "1.0.1",
     "@golevelup/ts-vitest": "^4.0.0",
     "@types/node": "^25.0.10",
     "husky": "^9.1.7",
     "memfs": "^4.57.2",
     "ts-json-schema-generator": "^2.9.0",
+    "tsup": "8.5.1",
     "typebox": "1.3.27",
     "typescript": "^5.9.3",
     "vitest": "^4.1.5",
     "vitest-evals": "0.15.0"
   },
   "scripts": {
+    "build": "tsup",
+    "prepack": "pnpm build",
     "typecheck": "tsc --noEmit",
     "typecheck:evals": "tsc --noEmit -p tests/evals/tsconfig.json",
     "lint": "biome check",
@@ -79,11 +99,13 @@
     "check:schema": "pi-settings-schema -p extensions/processes/config/types.ts -t ProcessConfig -o schema.json --version 0.10.6 --check",
     "check:changesets": "node scripts/check-changesets.ts",
     "check:lockfile": "pnpm install --frozen-lockfile --ignore-scripts",
+    "check:package": "node --experimental-strip-types scripts/check-package.ts",
     "prepare": "[ -d .git ] && husky || true",
     "changeset": "changeset",
     "version": "changeset version",
     "test": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:durable": "vitest run --config vitest.durable.config.ts",
     "test:evals": "vitest run --config tests/evals/vitest.config.ts",
     "release": "pnpm changeset publish"
   },
@@ -93,6 +115,9 @@
       "optional": true
     },
     "@earendil-works/pi-coding-agent": {
+      "optional": true
+    },
+    "@earendil-works/pi-durable": {
       "optional": true
     },
     "@earendil-works/pi-tui": {

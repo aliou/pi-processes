@@ -26,11 +26,15 @@ pnpm typecheck
 pnpm lint
 pnpm test
 pnpm test:e2e
+pnpm test:durable
+pnpm build
+pnpm check:package
 ```
 
 ## Repository layout
 
 - `src/` - Pi-agnostic process management, types, protocol, and utilities
+- `durable/` - native durable tool, lifecycle task, schemas, watch state, and addressed host notifications; uses the manager directly and does not import Pi extension code
 - `extensions/processes/` - core extension, process tool (start, list, output, update, write, stop, clear), settings, lifecycle hooks, notifications, protocol handlers, `/ps`, `/ps:kill`, `/ps:clear`, and `/ps:settings`
 - `extensions/processes-logs/` - `/ps:logs` command and log overlay
 - `extensions/processes-dock/` - `/ps:dock`, `/ps:pin`, the dock widget, and the status widget
@@ -40,16 +44,22 @@ pnpm test:e2e
 
 ## Package metadata
 
-The package targets Pi `0.87.0`.
+The package targets Pi `1.0.1`.
 
 Pi bundles core packages for extensions. Keep direct imports of these packages in `peerDependencies` with `"*"` ranges and exact local versions in `devDependencies`:
 
 - `@earendil-works/pi-ai`
 - `@earendil-works/pi-coding-agent`
+- `@earendil-works/pi-durable`
 - `@earendil-works/pi-tui`
 - `typebox`
 
 Keep normal third-party runtime dependencies in `dependencies`.
+
+Pi hosts, durable, and TypeBox are optional peers. `pnpm build` produces the
+native `/durable` JavaScript and declarations in `dist/`; `prepack` runs the
+build. Pi loads the source extensions declared by the manifest. See
+`docs/durable.md` for the native contract, ownership, recovery, and package checks.
 
 ## Internal behavior
 

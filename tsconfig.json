@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
+    "lib": ["ES2024"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
@@ -12,6 +13,7 @@
   },
   "include": [
     "src/**/*",
+    "durable/**/*",
     "extensions/**/*",
     "examples/**/*",
     "scripts/**/*",

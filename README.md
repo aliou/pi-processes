@@ -35,6 +35,16 @@ From git:
 pi install git:github.com/aliou/pi-processes
 ```
 
+## Durable apps
+
+Use `@aliou/pi-processes/durable` to install a native extension in a pi-durable
+registry. Start creates a background lifecycle task; the host delivers
+notifications to the initiating conversation. Durable is an optional peer.
+Processes and watches stay in memory and are not restored after an app restart.
+
+See `docs/durable.md` for setup and recovery, and `examples/durable.ts` for a
+runnable example.
+
 ## How Pi stays in the loop
 
 Pi does not wait around for a background process. After it starts one, it keeps helping with the rest of the work and gets brought back automatically when something happens:

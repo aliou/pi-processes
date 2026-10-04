@@ -17,10 +17,13 @@ During UI tests that require processes to be running, either give the user a pro
 ## Stack
 
 - TypeScript (strict mode), Node.js >=22.19.0, pnpm 11.5.1, Biome, Changesets
-- The package targets Pi 0.87.0. Keep imported Pi-bundled packages in `peerDependencies` with `"*"` ranges and exact local versions in `devDependencies`: `@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`, and `typebox`.
+- The package targets Pi 1.0.1. Keep imported Pi-bundled packages in optional `peerDependencies` with `"*"` ranges and exact local versions in `devDependencies`: `@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`, `@earendil-works/pi-durable`, `@earendil-works/pi-tui`, and `typebox`.
 
 ## Scripts
 
+- `pnpm build` — build native `/durable` JavaScript and declarations; `prepack` builds before packing
+- `pnpm test:durable` — native Harness tests with faux models and repository process fixtures
+- `pnpm check:package` — test the packed package in isolated Pi and durable installs
 - `pnpm typecheck` — TypeScript check
 - `pnpm lint` — Biome check
 - `pnpm format` — Biome check with write
@@ -54,6 +57,7 @@ Avoid fixed sleeps in both unit and e2e tests. Prefer event-driven helpers that 
 ## Structure
 
 - `src/` - pi-agnostic process management (manager, types, protocol, utils). Zero pi imports.
+- `durable/` - native durable extension, schemas, tool, lifecycle task, observation, notifications, and watches; uses `ProcessManager` directly
 - `extensions/processes/` - core extension: tool registration, settings, hooks, event bridge, request/command handlers, `/ps` overview panel, `/ps:kill`, `/ps:clear`, `/ps:settings`
 - `extensions/processes/config/migrations/` - ordered settings migrations. Each migration lives in its own file prefixed with its index, such as `001-v0-9-4-to-v0-10-0-config.ts`. Migrations declare a semver `version` (the loader stamps it after a successful run); the terminal migration in `002-stamp-config-version.ts` exports `PROCESS_CONFIG_VERSION`, which must match the `--version` flag in the `gen:schema` and `check:schema` scripts.
 - `extensions/processes-logs/` - `/ps:logs` command and log overlay
@@ -69,6 +73,8 @@ Avoid fixed sleeps in both unit and e2e tests. Prefer event-driven helpers that 
 `docs/` holds both living docs (current behavior) and future-design notes (proposed work, prefixed `future-`). When a change to lifecycle, notifications, config, or public behavior lands, update the relevant `docs/` entry (start with `docs/notifications.md` for notification/event flow) and retire the matching future-design note by folding its landed behavior into a living doc.
 
 When adding a doc, name it for its subject (`docs/notifications.md`, not `docs/new-foo.md`) and add it to `docs/README.md`. Anchor call-stack nodes to real symbols and plain repo paths, never line numbers.
+
+When changing durable tools, task recovery, host delivery, ownership, or packaging, read and update `docs/durable.md`. Keep Pi and durable implementations independent. Do not extract shared action dispatch, schemas, notification policy, routing, or a service façade into `src/`. Share process-management operations only. Preserve Pi extension and skill discovery alongside the `/durable` export.
 
 ## Rendering conventions
 

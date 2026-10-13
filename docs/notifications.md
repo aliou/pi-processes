@@ -22,13 +22,14 @@ do not affect delivery.
 
 ### Delivery timing
 
-`turn` notifications use Pi's `steer` path while a run is active (or before
-any host lifecycle event has been observed), reaching the run after its current
-tool calls finish. On an idle host the notification is instead persisted with
-`triggerTurn: false` and the host is woken with a bare `pi.sendUserMessage`,
-because a steer wake on an idle host skips `before_agent_start`
-([#121](https://github.com/aliou/pi-processes/issues/121)). Only one wake is
-sent until the woken run starts; the wake re-arms once the host is idle again.
+`turn` notifications always use Pi's `steer` path, reaching an active run
+after its current tool calls finish. On an idle host the same options start a
+new run from the notification; pi ≥1.2.0 emits `before_agent_start` for these
+runs ([earendil-works/pi#10739](https://github.com/earendil-works/pi/pull/10739)),
+which is why this package targets pi 1.2.0. On pi ≤1.1.x an idle steer wake
+skips `before_agent_start` and patches away handler-added system prompt
+sections after the first tool call
+([#121](https://github.com/aliou/pi-processes/issues/121)).
 
 `context` and emitted `ignore` notifications are sent with `triggerTurn: false`
 and no `deliverAs`: they never
@@ -38,7 +39,7 @@ result of the turn is in (pi 0.84.4+, [#8537](https://github.com/earendil-works/
 so they never split a tool call from its result — the failure mode that made
 Anthropic requests 400 (pi 0.84.2–0.84.3). On older pi this option shape is
 unsafe: ≤0.84.1 steers the active run, and 0.84.2–0.84.3 appends mid-run.
-This package targets pi 0.87.0; if you must support older pi, send
+This package targets pi 1.2.0; if you must support older pi, send
 `deliverAs: "nextTurn"` instead — it defers the message until the next user
 prompt on every version.
 
@@ -75,7 +76,7 @@ An attention level is resolved per event and mapped to Pi send options by
 
 | Attention | `triggerTurn` | `deliverAs` | Agent effect |
 | --------- | ------------- | ----------- | ------------ |
-| `turn` | `true` | `steer` | Steers an active run after its current tool calls. On an idle host: persisted with `triggerTurn: false`, host woken with a bare user message. |
+| `turn` | `true` | `steer` | Steers an active run after its current tool calls; on an idle host, starts a new run from the notification (pi ≥1.2.0 emits `before_agent_start` for it). |
 | `context` | `false` | — | Persists and displays immediately; never wakes or steers the agent. Mid-run, Pi appends it after the turn's tool results. |
 | `ignore` | `false` | — | Suppressed for successful exits and external kills; emitted log matches persist without waking the agent. Failures are promoted to `context`. |
 

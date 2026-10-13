@@ -21,8 +21,7 @@ export interface ProcessNotificationSendOptions {
  * turn is in (pi 0.84.4+ #8537), so they never split a tool call from its
  * result. On older pi this option shape is unsafe: ≤0.84.1 steers the active
  * run, and 0.84.2–0.84.3 appends mid-run and breaks provider ordering. This
- * package targets pi 0.87.0; on older pi, widen the `deliverAs` type and send
- * `"nextTurn"` instead (deferred to the next user prompt on every version).
+ * package targets pi 1.2.0.
  */
 export function attentionToSendOptions(
   attention: Attention,

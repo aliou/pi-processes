@@ -28,30 +28,6 @@ export function registerNotificationDelivery(
   events: EventBus,
   pi: ExtensionAPI,
 ): () => void {
-  // A steer-triggered turn on an idle session skips before_agent_start, and
-  // pi emits no event when the session goes idle. Track idleness from
-  // lifecycle events so a turn notification on an idle session can instead
-  // wake it with a user message, which fires the hook.
-  let sessionIdle: boolean | null = null;
-  let wakePending = false;
-  const disposers = [
-    pi.on("session_start", (_event, ctx) => {
-      wakePending = false;
-      sessionIdle = ctx.isIdle();
-    }),
-    pi.on("agent_start", () => {
-      sessionIdle = false;
-      wakePending = false;
-    }),
-    pi.on("turn_start", () => {
-      sessionIdle = false;
-      wakePending = false;
-    }),
-    pi.on("agent_settled", () => {
-      sessionIdle = true;
-    }),
-  ];
-
   let windowStart: number | null = null;
   let sentInWindow = 0;
   let suppressed = 0;
@@ -126,27 +102,18 @@ export function registerNotificationDelivery(
         sentInWindow++;
       }
 
-      if (payload.attention === "turn" && sessionIdle === true) {
-        sendProcessNotificationMessage(pi, payload, { triggerTurn: false });
-        if (!wakePending) {
-          wakePending = true;
-          try {
-            pi.sendUserMessage("");
-          } catch {
-            wakePending = false;
-          }
-        }
-        return;
-      }
-
-      const options = attentionToSendOptions(payload.attention);
-      sendProcessNotificationMessage(pi, payload, options);
+      // An idle steer wake starts a new run from the notification; pi ≥1.2.0
+      // emits before_agent_start for these runs (earendil-works/pi#10739).
+      sendProcessNotificationMessage(
+        pi,
+        payload,
+        attentionToSendOptions(payload.attention),
+      );
     },
   );
 
   return () => {
     disposeListener();
-    for (const dispose of disposers) dispose();
     resetWindow();
   };
 }

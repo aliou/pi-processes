@@ -110,6 +110,7 @@ Available settings include:
 - follow mode behavior
 - status widget toggle
 - optional background command interception
+- tool exposure (`direct`, `model-only`, `codemode`, `deferred`, or `hidden`; applied on the next session start)
 
 ## Platform support
 

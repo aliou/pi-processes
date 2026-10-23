@@ -6,11 +6,15 @@
 
 import { setNestedValue } from "@aliou/pi-utils-settings";
 
-import type { ProcessConfig } from "../config";
+import { type ProcessConfig, TOOL_EXPOSURES } from "../config";
 
 const BOOLEAN_FIELDS = new Set([
   "interception.blockBackgroundCommands",
   "widget.showStatusWidget",
+]);
+
+const ENUM_FIELDS = new Map<string, readonly string[]>([
+  ["toolExposure", TOOL_EXPOSURES],
 ]);
 
 export function applySettingChange(
@@ -22,6 +26,13 @@ export function applySettingChange(
 
   if (BOOLEAN_FIELDS.has(id)) {
     setNestedValue(updated, id, newValue === "on");
+    return updated;
+  }
+
+  const enumValues = ENUM_FIELDS.get(id);
+  if (enumValues) {
+    if (!enumValues.includes(newValue)) return null;
+    setNestedValue(updated, id, newValue);
     return updated;
   }
 

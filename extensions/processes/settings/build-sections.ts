@@ -14,6 +14,7 @@ import {
 import type { SettingItem } from "@earendil-works/pi-tui";
 
 import type { ProcessConfig, ProcessProtocolConfig } from "../config";
+import { TOOL_EXPOSURES } from "../config";
 
 interface BuildSectionsContext {
   setDraft: (config: ProcessConfig) => void;
@@ -33,6 +34,7 @@ export function buildSections(
     label: "Core",
     items: [
       buildShellPathItem(scopedConfig, resolved, ctx),
+      buildToolExposureDetailItem(scopedConfig, resolved, ctx),
       boolItem(
         "interception.blockBackgroundCommands",
         "Block background commands",
@@ -380,6 +382,55 @@ function buildDockDetailItem(
         ],
         getDoneSummary: () =>
           `${nextDockDefaultState} · ${parsePositiveInt(nextDockHeight)} log lines`,
+        onDone: (summary) => done(summary),
+      });
+    },
+  };
+}
+
+function buildToolExposureDetailItem(
+  scopedConfig: ProcessConfig,
+  resolved: ProcessProtocolConfig,
+  ctx: BuildSectionsContext,
+): SettingItem {
+  const exposure = scopedConfig.toolExposure ?? resolved.tool.exposure;
+
+  return {
+    id: "toolExposure.details",
+    label: "Tool exposure",
+    currentValue: exposure,
+    description:
+      "Open focused settings for how the model reaches the process tool. Applies on the next session start.",
+    submenu: (_current, done) => {
+      const current = scopedConfig;
+      let nextExposure = exposure;
+
+      const syncDraft = () => {
+        ctx.setDraft({
+          ...current,
+          toolExposure: nextExposure,
+        });
+      };
+
+      return new SettingsDetailEditor({
+        title: "Tool exposure",
+        theme: ctx.theme,
+        fields: [
+          {
+            id: "toolExposure.value",
+            type: "enum",
+            label: "Exposure",
+            description:
+              "How the model reaches the process tool. Deferred keeps it callable and discoverable via tool search while leaving the declared tool list. Applies on the next session start.",
+            options: [...TOOL_EXPOSURES],
+            getValue: () => nextExposure,
+            setValue: (value) => {
+              nextExposure = value as ProcessProtocolConfig["tool"]["exposure"];
+              syncDraft();
+            },
+          },
+        ],
+        getDoneSummary: () => nextExposure,
         onDone: (summary) => done(summary),
       });
     },

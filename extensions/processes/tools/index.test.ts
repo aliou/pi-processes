@@ -16,10 +16,12 @@ import type {
   Theme,
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 
 import type { ProcessManager } from "../../../src/manager";
+import { DEFAULT_CONFIG, TOOL_EXPOSURES } from "../config";
 import type { NotificationRegistry } from "../notifications/registry";
+import type { ProcessToolConfig } from "./index";
 import { registerProcessTool } from "./index";
 
 type RenderCallFn = NonNullable<ToolDefinition["renderCall"]>;
@@ -38,13 +40,41 @@ const theme = {
   bold: (text: string) => text,
 } as Theme;
 
-function captureRenderCall(): HostRenderCall {
+function captureRegisteredTool(
+  tool: ProcessToolConfig = DEFAULT_CONFIG.tool,
+): ToolDefinition {
   const pi = { registerTool: vi.fn() } as unknown as ExtensionAPI;
-  registerProcessTool(pi, {} as ProcessManager, {} as NotificationRegistry);
-  const tool = vi.mocked(pi.registerTool).mock.calls[0]?.[0] as ToolDefinition;
-  if (!tool.renderCall) throw new Error("process tool was not registered");
-  return tool.renderCall as unknown as HostRenderCall;
+  registerProcessTool(
+    pi,
+    {} as ProcessManager,
+    {} as NotificationRegistry,
+    tool,
+  );
+  const registered = vi.mocked(pi.registerTool).mock.calls[0]?.[0] as
+    | ToolDefinition
+    | undefined;
+  assert(registered, "process tool was not registered");
+  return registered;
 }
+
+function captureRenderCall(): HostRenderCall {
+  const registered = captureRegisteredTool();
+  assert(registered.renderCall, "process tool was not registered");
+  return registered.renderCall as unknown as HostRenderCall;
+}
+
+describe("tool exposure", () => {
+  it("registers with direct exposure from the default config", () => {
+    expect(DEFAULT_CONFIG.tool.exposure).toBe("direct");
+    expect(captureRegisteredTool().exposure).toBe("direct");
+  });
+
+  it("passes every configurable exposure through to the registered tool", () => {
+    for (const exposure of TOOL_EXPOSURES) {
+      expect(captureRegisteredTool({ exposure }).exposure).toBe(exposure);
+    }
+  });
+});
 
 describe("renderCall host argument order", () => {
   it("renders with pi order: (args, theme, context)", () => {

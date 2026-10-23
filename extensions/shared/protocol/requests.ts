@@ -1,3 +1,5 @@
+import type { ToolExposure } from "@earendil-works/pi-coding-agent";
+
 import type { ProcessInfo } from "../../../src/types";
 
 // UI emits, core listens and calls reply synchronously.
@@ -68,6 +70,9 @@ export interface ProcessProtocolConfig {
     showStatusWidget: boolean;
     dockDefaultState: "closed" | "collapsed" | "expanded";
     dockHeight: number;
+  };
+  tool: {
+    exposure: ToolExposure;
   };
 }
 

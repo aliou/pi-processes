@@ -32,9 +32,10 @@ describe("002 stamp config version", () => {
     expect(migrated).toEqual(config);
   });
 
-  it("is registered after the shape migration", () => {
+  it("is registered after the shape migrations", () => {
     expect(migrations.map((migration) => migration.name)).toEqual([
       "001-v0-9-4-to-v0-10-0-config",
+      "003-v0-10-6-to-v0-14-0-config",
       "002-stamp-config-version",
     ]);
   });
@@ -42,6 +43,7 @@ describe("002 stamp config version", () => {
   it("keeps the semver version scheme the loader accepts", () => {
     expect(migrations.map((migration) => migration.version)).toEqual([
       "0.10.0",
+      undefined,
       PROCESS_CONFIG_VERSION,
     ]);
 

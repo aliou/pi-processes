@@ -16,22 +16,36 @@ describe("process config schema", () => {
     );
   });
 
-  it("documents the current config version", () => {
+  it("documents the version key without embedding the config version", () => {
     expect(
       schema.definitions.ProcessConfig.properties.version.description,
-    ).toBe(
-      `Config schema version, stamped by migrations. Current version: ${PROCESS_CONFIG_VERSION}.`,
-    );
+    ).toBe("Config schema version, stamped by migrations.");
   });
 
-  it("generates the schema with the current config version", () => {
+  it("exposes toolExposure with every configurable exposure", () => {
+    expect(schema.definitions.ProcessConfig.properties.toolExposure).toEqual({
+      $ref: "#/definitions/ToolExposure",
+    });
+    expect(schema.definitions.ToolExposure.enum).toEqual([
+      "direct",
+      "model-only",
+      "codemode",
+      "deferred",
+      "hidden",
+    ]);
+  });
+
+  it("generates the schema without a version flag", () => {
     for (const script of [
       pkg.scripts["gen:schema"],
       pkg.scripts["check:schema"],
     ]) {
-      expect(script.match(/--version\s+(\S+)/)?.[1]).toBe(
-        PROCESS_CONFIG_VERSION,
-      );
+      expect(script).not.toMatch(/--version/);
     }
+  });
+
+  it("stamps the next package minor as the config version", () => {
+    const [major, minor] = pkg.version.split(".").map(Number);
+    expect(PROCESS_CONFIG_VERSION).toBe(`${major}.${minor + 1}.0`);
   });
 });

@@ -2,7 +2,11 @@ import { ConfigLoader } from "@aliou/pi-utils-settings";
 import { DEFAULT_CONFIG } from "./defaults";
 import { importLegacyProcessConfig, migrations } from "./migrations";
 import { PROCESS_CONFIG_SCHEMA_URL } from "./schema";
-import type { ProcessConfig, ProcessProtocolConfig } from "./types";
+import {
+  isToolExposure,
+  type ProcessConfig,
+  type ProcessProtocolConfig,
+} from "./types";
 
 /**
  * Pending messages from the one-time legacy config import. Drained alongside
@@ -36,4 +40,15 @@ export const configLoader = new ConfigLoader<
   scopes: ["global", "local", "memory"],
   migrations,
   schemaUrl: PROCESS_CONFIG_SCHEMA_URL,
+  afterMerge: resolveToolConfig,
 });
+
+export function resolveToolConfig(
+  resolved: ProcessProtocolConfig,
+): ProcessProtocolConfig {
+  const { toolExposure, ...rest } = resolved as ProcessProtocolConfig & {
+    toolExposure?: unknown;
+  };
+  if (!isToolExposure(toolExposure)) return rest;
+  return { ...rest, tool: { ...rest.tool, exposure: toolExposure } };
+}

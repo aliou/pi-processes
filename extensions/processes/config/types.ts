@@ -5,6 +5,8 @@
  * Runtime config uses the shared protocol shape returned by REQUEST_CONFIG.
  */
 
+import type { ToolExposure } from "@earendil-works/pi-coding-agent";
+
 import type { ProcessProtocolConfig } from "../../shared/protocol";
 
 export interface ExecutionConfig {
@@ -49,6 +51,21 @@ export interface WidgetConfig {
   dockHeight?: number;
 }
 
+export const TOOL_EXPOSURES = [
+  "direct",
+  "model-only",
+  "codemode",
+  "deferred",
+  "hidden",
+] as const satisfies readonly ToolExposure[];
+
+export function isToolExposure(value: unknown): value is ToolExposure {
+  return (
+    typeof value === "string" &&
+    (TOOL_EXPOSURES as readonly string[]).includes(value)
+  );
+}
+
 /**
  * User-facing pi-processes settings stored on disk.
  *
@@ -68,6 +85,7 @@ export interface ProcessConfig {
   follow?: FollowConfig;
   /** Dock and status widget settings. */
   widget?: WidgetConfig;
+  toolExposure?: ToolExposure;
 }
 
 export type { ProcessProtocolConfig };

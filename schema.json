@@ -29,6 +29,9 @@
           "$ref": "#/definitions/WidgetConfig",
           "description": "Dock and status widget settings."
         },
+        "toolExposure": {
+          "$ref": "#/definitions/ToolExposure"
+        },
         "$schema": {
           "type": "string"
         },
@@ -43,7 +46,7 @@
               "pattern": "^\\d{1,15}(\\.\\d{1,15})?(\\.\\d{1,15})?$"
             }
           ],
-          "description": "Config schema version, stamped by migrations. Current version: 0.10.6."
+          "description": "Config schema version, stamped by migrations."
         }
       },
       "additionalProperties": false,
@@ -137,6 +140,17 @@
         }
       },
       "additionalProperties": false
+    },
+    "ToolExposure": {
+      "type": "string",
+      "enum": [
+        "direct",
+        "model-only",
+        "codemode",
+        "deferred",
+        "hidden"
+      ],
+      "description": "How the model reaches a tool. \"Callable\" means callable from other tools through `ctx.executeTool()`, as the `codemode` tool does.\n\n- `direct`: declared to the model while active, and callable while active.\n- `model-only`: declared to the model while active, never callable. Use it for orchestrating or   interactive tools.\n- `codemode`: callable whenever registered. Not declared to the model unless explicitly   activated. Codemode tools list it in their description.\n- `deferred`: like `codemode`, but codemode tools do not list it; tool search can find it.\n- `hidden`: registered but unreachable. Activating it has no effect.\n\n`direct` and `model-only` tools are activated when they are registered; the others are not. The active tool set (`getActiveTools`/`setActiveTools`) is the set declared to the model."
     }
   }
 }

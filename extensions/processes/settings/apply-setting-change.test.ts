@@ -28,6 +28,18 @@ describe("applySettingChange", () => {
     expect(applySettingChange("output.maxOutputLines", "250", base)).toBeNull();
   });
 
+  it("stores toolExposure enum values", () => {
+    const deferred = applySettingChange("toolExposure", "deferred", base);
+    expect(deferred?.toolExposure).toBe("deferred");
+
+    const direct = applySettingChange("toolExposure", "direct", base);
+    expect(direct?.toolExposure).toBe("direct");
+  });
+
+  it("returns null for toolExposure values outside the enum", () => {
+    expect(applySettingChange("toolExposure", "always", base)).toBeNull();
+  });
+
   it("returns null for unknown setting IDs", () => {
     expect(applySettingChange("unknown.field", "value", base)).toBeNull();
   });

@@ -40,6 +40,25 @@ describe("buildSections", () => {
     expect(getBlockerValue(inherited)).toBe("inherited: off");
   });
 
+  it("summarizes tool exposure in a submenu item", () => {
+    const scoped: ProcessConfig = {
+      toolExposure: "deferred",
+    };
+    const sections = buildSections(scoped, resolved, ctx);
+    const exposureItem = sections
+      .find((s) => s.label === "Core")
+      ?.items.find((item) => item.id === "toolExposure.details");
+
+    expect(exposureItem?.currentValue).toBe("deferred");
+    expect(exposureItem?.submenu).toBeTypeOf("function");
+
+    const inherited = buildSections(null, resolved, ctx);
+    const inheritedItem = inherited
+      .find((s) => s.label === "Core")
+      ?.items.find((item) => item.id === "toolExposure.details");
+    expect(inheritedItem?.currentValue).toBe("direct");
+  });
+
   it("summarizes logs settings in a submenu item", () => {
     const scoped: ProcessConfig = {
       output: { maxOutputLines: 500 },

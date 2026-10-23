@@ -5,10 +5,11 @@ import type { ProcessConfig } from "../types";
 /**
  * Current config version stamped on every settings file.
  *
- * Keep this in sync with the `--version` flag of the `gen:schema` and
- * `check:schema` scripts in package.json.
+ * Keep this in sync with the next package minor after the current package
+ * version (pinned by the schema test) — the release carrying the config
+ * change ships as that minor.
  */
-export const PROCESS_CONFIG_VERSION = "0.10.6";
+export const PROCESS_CONFIG_VERSION = "0.14.0";
 
 /**
  * Terminal migration: converge every config on the current version.

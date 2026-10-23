@@ -9,6 +9,7 @@ import {
 import { type Component, Container, Text } from "@earendil-works/pi-tui";
 
 import type { ProcessManager } from "../../../src/manager";
+import type { ProcessProtocolConfig } from "../../shared/protocol";
 import type { NotificationRegistry } from "../notifications/registry";
 import { executeClear, formatClearDetails } from "./clear";
 import * as clearRender from "./clear/render";
@@ -47,15 +48,19 @@ type ProcessDetails =
   | UpdateDetails
   | ClearDetails;
 
+export type ProcessToolConfig = ProcessProtocolConfig["tool"];
+
 export function registerProcessTool(
   pi: ExtensionAPI,
   manager: ProcessManager,
   notifications: NotificationRegistry,
+  tool: ProcessToolConfig,
 ): void {
   pi.registerTool(
     defineTool({
       name: "process",
       label: "Process",
+      exposure: tool.exposure,
       description:
         "Start, list, stop, write to stdin, update, clear, and inspect output of long-running background processes.",
       promptSnippet:

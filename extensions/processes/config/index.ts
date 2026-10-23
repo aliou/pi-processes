@@ -3,6 +3,7 @@ export {
   configLoader,
   drainImportMessages,
   loadProcessConfig,
+  resolveToolConfig,
 } from "./loader";
 export { migrations } from "./migrations";
 export {
@@ -10,3 +11,7 @@ export {
   PROCESS_CONFIG_SCHEMA_VERSION,
 } from "./schema";
 export type { ProcessConfig, ProcessProtocolConfig } from "./types";
+export {
+  isToolExposure,
+  TOOL_EXPOSURES,
+} from "./types";

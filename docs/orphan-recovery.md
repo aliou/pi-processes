@@ -59,14 +59,27 @@ On `session_start` (all reasons), the core extension calls
 | host dead, child pid reused (starttime differs) | never signal — discard record |
 | host dead, group leader gone (`/proc` entry missing) | never signal — discard record |
 | host dead, group already dead | discard record |
+| group kill raises ESRCH mid-reap | discard record as already dead |
+| group kill refused (EPERM or other) | discard record as kill_failed, continue |
 
 Leftover log directories of dead hosts are removed along with their records
-(only `pi-processes-*` mkdtemp directories; explicitly configured log dirs
-are left alone). Recovered groups are reported to the user with a
-`ctx.ui.notify` warning on the session-start path.
+(only `pi-processes-*` mkdtemp directories directly under the temp dir;
+anything else is left alone). Recovered groups are reported to the user
+with a `ctx.ui.notify` warning on the session-start path.
 
 When in doubt the reap never kills: an unverifiable host identity keeps the
 record, and an unverifiable child identity discards it without signaling.
+
+### Failure behavior around the matrix
+
+All record I/O is best-effort. A write that fails (read-only cache dir,
+ENOSPC, EROFS) degrades to "no record" — recovery must never break the
+core `start`/end/shutdown paths — and failing removes are ignored. A group
+kill that raises `ESRCH` (the group died between the liveness check and the
+signal — also the normal outcome when two sessions race on the same
+record) is reported as `already_dead`; any other kill failure (e.g. `EPERM`
+from a group that changed uid) is reported as `kill_failed`. Neither aborts
+the reap loop; each record is processed independently.
 
 ## Limitations
 
@@ -84,15 +97,19 @@ record, and an unverifiable child identity discards it without signaling.
   available. On macOS (and Windows, which is unsupported overall) recovery
   stays disabled rather than risk killing a reused PID.
 - **Corrupt or foreign records are dropped.** Unparseable files or records
-  with an unknown version are removed on sight; a record nobody can verify
-  must never authorize a kill.
+  with the current version but an invalid shape are removed on sight; a
+  record nobody can verify must never authorize a kill. Records written in a
+  *newer* format version are skipped and kept for the newer session that
+  wrote them. Temp files left by an interrupted write are pruned once older
+  than an hour, so an in-flight write from a concurrent session is never
+  touched.
 
 ## Tests
 
 - `src/manager/orphan-recovery.test.ts` — record persistence, store
   round-trip and pruning, and the full reap decision matrix (host
-  alive/dead, PID reuse, reboot, leader-gone, already-dead) with injected
-  identity and signal fakes.
+  alive/dead, PID reuse, reboot, leader-gone, already-dead, kill ESRCH/EPERM,
+  unwritable record dir) with injected identity and signal fakes.
 - `src/utils/proc-identity.test.ts` — `/proc` parsing (comm with spaces and
   parentheses) and boot-id/starttime readers.
 - `extensions/processes/hooks/orphan-recovery.test.ts` — session-start

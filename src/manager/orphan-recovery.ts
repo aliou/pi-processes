@@ -24,19 +24,25 @@
  * other POSIX platforms recovery stays disabled rather than risking a kill
  * of a PID-reused group.
  */
+import { randomBytes } from "node:crypto";
 import {
   mkdirSync,
   readdirSync,
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
-import { basename, join } from "node:path";
+import { tmpdir } from "node:os";
+import { basename, dirname, join } from "node:path";
 
 import type { ProcessIdentityReader } from "../utils/proc-identity";
 
 export const ORPHAN_RECORD_VERSION = 1;
+
+/** Temp record files older than this are pruned during a reap. */
+export const STRAY_TEMP_FILE_MAX_AGE_MS = 60 * 60 * 1000;
 
 /**
  * Persisted identity of one managed process group.
@@ -81,7 +87,8 @@ export type DiscardedOrphanReason =
   | "rebooted" // record predates the current boot; nothing can be alive
   | "pid_reused" // PID now belongs to a different process; never signal it
   | "leader_gone" // group leader exited; no identity anchor for a kill
-  | "already_dead"; // the group died on its own before the reap
+  | "already_dead" // the group died on its own before or during the reap
+  | "kill_failed"; // signaling failed (e.g. EPERM); reported, loop continues
 
 export interface OrphanReapReport {
   /** Orphaned groups that were verified and killed. */
@@ -136,6 +143,10 @@ function isValidRecord(value: unknown): value is OrphanProcessRecord {
  * The store tracks the files this instance wrote so `removeWritten()` can
  * clear exactly this manager's records at graceful shutdown without touching
  * records belonging to concurrent pi sessions sharing the directory.
+ *
+ * All record I/O is best-effort: recovery must never break the core start,
+ * end, or shutdown paths, so a failing write degrades to "no record" and a
+ * failing remove is ignored rather than thrown.
  */
 export class OrphanRecordStore {
   private readonly dir: string;
@@ -146,32 +157,57 @@ export class OrphanRecordStore {
   }
 
   write(record: OrphanProcessRecord): void {
-    mkdirSync(this.dir, { recursive: true });
     const file = join(this.dir, recordFileName(record));
-    const tmp = `${file}.tmp`;
-    writeFileSync(tmp, `${JSON.stringify(record, null, 2)}\n`);
-    renameSync(tmp, file);
-    this.written.add(file);
+    // A unique temp name per write so a crash between write and rename never
+    // clobbers another in-flight write; strays are pruned by list().
+    const tmp = `${file}.${randomBytes(6).toString("hex")}.tmp`;
+    try {
+      mkdirSync(this.dir, { recursive: true });
+      writeFileSync(tmp, `${JSON.stringify(record, null, 2)}\n`);
+      renameSync(tmp, file);
+      this.written.add(file);
+    } catch (_error) {
+      try {
+        rmSync(tmp, { force: true });
+      } catch (_cleanupError) {
+        void _cleanupError; // Best-effort temp cleanup; strays are pruned later
+      }
+    }
   }
 
   remove(record: { hostPid: number; id: string }): void {
     const file = join(this.dir, recordFileName(record));
     this.written.delete(file);
-    rmSync(file, { force: true });
+    try {
+      rmSync(file, { force: true });
+    } catch (_error) {
+      void _error; // Intentionally ignored - best-effort record removal
+    }
   }
 
   /** Remove every record this store instance wrote (graceful shutdown). */
   removeWritten(): void {
-    for (const file of this.written) {
-      rmSync(file, { force: true });
-    }
+    const files = [...this.written];
     this.written.clear();
+    for (const file of files) {
+      try {
+        rmSync(file, { force: true });
+      } catch (_error) {
+        void _error; // Intentionally ignored - best-effort record removal
+      }
+    }
   }
 
   /**
-   * List persisted records. Unreadable, corrupt, or wrong-version files are
-   * removed: they can only come from a crash mid-write or an older release,
-   * and a record nobody can verify must never authorize a kill.
+   * List persisted records.
+   *
+   * Unreadable or corrupt files (a crash mid-write) are removed: a record
+   * nobody can verify must never authorize a kill. Records with a *newer*
+   * format version are skipped but kept — they belong to a newer
+   * pi-processes session that may still be running. Temp files left by an
+   * interrupted write are pruned once they are older than
+   * STRAY_TEMP_FILE_MAX_AGE_MS, so an in-flight write from a concurrent
+   * session is never touched.
    */
   list(): OrphanProcessRecord[] {
     let entries: string[];
@@ -183,22 +219,49 @@ export class OrphanRecordStore {
 
     const records: OrphanProcessRecord[] = [];
     for (const entry of entries) {
+      if (entry.endsWith(".tmp")) {
+        this.pruneTempFile(join(this.dir, entry));
+        continue;
+      }
       if (!entry.endsWith(".json")) continue;
       const file = join(this.dir, entry);
       let parsed: unknown;
       try {
         parsed = JSON.parse(readFileSync(file, "utf-8"));
       } catch (_error) {
-        rmSync(file, { force: true });
+        this.removeFile(file);
         continue;
       }
       if (isValidRecord(parsed)) {
         records.push(parsed);
-      } else {
-        rmSync(file, { force: true });
+        continue;
       }
+      const version = (parsed as Record<string, unknown>).version;
+      if (typeof version === "number" && version > ORPHAN_RECORD_VERSION) {
+        // Newer format: keep it for the newer session that wrote it.
+        continue;
+      }
+      this.removeFile(file);
     }
     return records;
+  }
+
+  private removeFile(file: string): void {
+    try {
+      rmSync(file, { force: true });
+    } catch (_error) {
+      void _error; // Intentionally ignored - best-effort record removal
+    }
+  }
+
+  private pruneTempFile(file: string): void {
+    try {
+      const mtimeMs = statSync(file).mtimeMs;
+      if (Date.now() - mtimeMs < STRAY_TEMP_FILE_MAX_AGE_MS) return;
+    } catch (_error) {
+      return; // Unstatatable: leave it alone
+    }
+    this.removeFile(file);
   }
 }
 
@@ -232,6 +295,11 @@ function isHostAlive(
  * - Host dead: verify the child's identity via starttime. Only a matching,
  *   still-alive group is killed (SIGKILL to `-pgid`). A reused PID or an
  *   unverifiable identity is never signaled; the record is discarded.
+ *
+ * A kill that raises ESRCH (the group died mid-reap, or another session won
+ * a race on the same record) is reported as `already_dead`; any other kill
+ * failure (e.g. EPERM) is reported as `kill_failed`. Neither aborts the
+ * loop.
  *
  * Leftover log directories of dead hosts are removed along with their
  * records.
@@ -290,13 +358,26 @@ export function reapOrphanedRecords(
 
     store.remove(record);
     if (deps.isGroupAlive(record.pid)) {
-      deps.killGroup(record.pid);
-      report.killed.push({
-        id: record.id,
-        name: record.name,
-        command: record.command,
-        pid: record.pid,
-      });
+      try {
+        deps.killGroup(record.pid);
+        report.killed.push({
+          id: record.id,
+          name: record.name,
+          command: record.command,
+          pid: record.pid,
+        });
+      } catch (error) {
+        // The group died between the liveness check and the signal (also
+        // the normal outcome when two sessions race on the same record), or
+        // the signal was refused. Either way the record is gone and the
+        // reap continues with the remaining records.
+        const err = error as NodeJS.ErrnoException;
+        report.discarded.push({
+          id: record.id,
+          name: record.name,
+          reason: err.code === "ESRCH" ? "already_dead" : "kill_failed",
+        });
+      }
     } else {
       report.discarded.push({
         id: record.id,
@@ -314,12 +395,18 @@ export function reapOrphanedRecords(
  * Remove a dead host's leftover log directory.
  *
  * Only directories our own `ProcessLogStore` created via `mkdtemp`
- * (`pi-processes-*` under the temp dir) are removed; an explicitly
- * configured log directory is left in place.
+ * (`pi-processes-*` directly under the temp dir) are removed; anything else
+ * — including an explicitly configured log directory that happens to carry
+ * the prefix — is left in place.
  */
 export function removeOrphanLogDir(dir: string): void {
+  if (dirname(dir) !== tmpdir()) return;
   if (!basename(dir).startsWith("pi-processes-")) return;
-  rmSync(dir, { recursive: true, force: true });
+  try {
+    rmSync(dir, { recursive: true, force: true });
+  } catch (_error) {
+    void _error; // Intentionally ignored - best-effort leftover cleanup
+  }
 }
 
 /**

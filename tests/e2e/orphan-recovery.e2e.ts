@@ -62,6 +62,23 @@ async function repointRecordAtDeadHost(
 
 const cwdTest = test.skipIf(readBootId() === null);
 
+/**
+ * Bounded wait for a group to die. `kill(-pgid, 0)` keeps succeeding while
+ * zombies await reaping by init, so asserting synchronously right after the
+ * leader's close event is flaky; poll instead (AGENTS.md: no fixed sleeps).
+ */
+async function waitForGroupDeath(
+  pgid: number,
+  timeoutMs = 5000,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!isProcessGroupAlive(pgid)) return true;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  return !isProcessGroupAlive(pgid);
+}
+
 cwdTest(
   "reap kills a verified orphan group left by a dead host",
   { timeout: 15_000 },
@@ -97,7 +114,8 @@ cwdTest(
 
     const endedInfo = await ended;
     expect(endedInfo.status).toBe("killed");
-    expect(isProcessGroupAlive(info.pid)).toBe(false);
+    const groupDead = await waitForGroupDeath(info.pid);
+    expect(groupDead).toBe(true);
 
     manager.cleanup();
     reaper.cleanup();
@@ -131,7 +149,8 @@ cwdTest(
     other.cleanup();
     manager.cleanup();
     await waitForEnd(manager, info.id);
-    expect(isProcessGroupAlive(info.pid)).toBe(false);
+    const groupDead = await waitForGroupDeath(info.pid);
+    expect(groupDead).toBe(true);
   },
 );
 

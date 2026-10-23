@@ -1,5 +1,7 @@
 import { EventEmitter } from "node:events";
 import { existsSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { PassThrough } from "node:stream";
 
 import { vol } from "memfs";
@@ -20,6 +22,7 @@ import {
   OrphanRecordStore,
   reapOrphanedRecords,
   removeOrphanLogDir,
+  STRAY_TEMP_FILE_MAX_AGE_MS,
 } from "./orphan-recovery";
 
 // ---------------------------------------------------------------------------
@@ -54,6 +57,7 @@ interface DepOverrides {
   hostStartTime?: string | null;
   childStartTime?: string | null;
   groupAlive?: boolean;
+  killGroup?: (pgid: number) => void;
 }
 
 function makeDeps(overrides?: DepOverrides): {
@@ -81,7 +85,7 @@ function makeDeps(overrides?: DepOverrides): {
     isPidAlive: (pid) =>
       pid === 4000 ? (overrides?.hostPidAlive ?? true) : pid === 5000,
     isGroupAlive: () => overrides?.groupAlive ?? true,
-    killGroup: (pgid) => killedGroups.push(pgid),
+    killGroup: overrides?.killGroup ?? ((pgid) => killedGroups.push(pgid)),
     removeLogDir: (dir) => removedLogDirs.push(dir),
   };
   return { deps, killedGroups, removedLogDirs };
@@ -154,21 +158,54 @@ describe("OrphanRecordStore", () => {
     expect(existsSync(`${STATE_DIR}/4000-proc_broken.json`)).toBe(false);
   });
 
-  it("discards records with an unknown version or shape", () => {
+  it("discards same-version records with an invalid shape", () => {
     const store = new OrphanRecordStore(STATE_DIR);
     vol.mkdirSync(STATE_DIR, { recursive: true });
-    vol.writeFileSync(
-      `${STATE_DIR}/4000-proc_v2.json`,
-      JSON.stringify({ ...makeRecord(), version: 99 }),
-    );
     vol.writeFileSync(
       `${STATE_DIR}/4000-proc_nopid.json`,
       JSON.stringify({ ...makeRecord(), id: "proc_nopid", pid: "x" }),
     );
 
     expect(store.list()).toHaveLength(0);
-    expect(existsSync(`${STATE_DIR}/4000-proc_v2.json`)).toBe(false);
     expect(existsSync(`${STATE_DIR}/4000-proc_nopid.json`)).toBe(false);
+  });
+
+  it("keeps records with a newer format version for the newer session", () => {
+    const store = new OrphanRecordStore(STATE_DIR);
+    vol.mkdirSync(STATE_DIR, { recursive: true });
+    vol.writeFileSync(
+      `${STATE_DIR}/4000-proc_v2.json`,
+      JSON.stringify({ ...makeRecord(), id: "proc_v2", version: 99 }),
+    );
+
+    expect(store.list()).toHaveLength(0);
+    expect(existsSync(`${STATE_DIR}/4000-proc_v2.json`)).toBe(true);
+  });
+
+  it("degrades to no record when the directory is unwritable", () => {
+    vol.mkdirSync("/state", { recursive: true });
+    vol.writeFileSync("/state/blocker", "not a directory");
+    const store = new OrphanRecordStore("/state/blocker");
+
+    expect(() => store.write(makeRecord())).not.toThrow();
+    expect(() => store.remove({ hostPid: 4000, id: "proc_aa" })).not.toThrow();
+    expect(() => store.removeWritten()).not.toThrow();
+    expect(store.list()).toEqual([]);
+  });
+
+  it("prunes stale temp files but keeps fresh ones", () => {
+    const store = new OrphanRecordStore(STATE_DIR);
+    vol.mkdirSync(STATE_DIR, { recursive: true });
+    const stale = `${STATE_DIR}/4000-proc_old.json.deadbeef.tmp`;
+    const fresh = `${STATE_DIR}/4000-proc_new.json.cafebabe.tmp`;
+    vol.writeFileSync(stale, "");
+    vol.writeFileSync(fresh, "");
+    const old = new Date(Date.now() - (STRAY_TEMP_FILE_MAX_AGE_MS + 60_000));
+    vol.utimesSync(stale, old, old);
+
+    expect(store.list()).toEqual([]);
+    expect(existsSync(stale)).toBe(false);
+    expect(existsSync(fresh)).toBe(true);
   });
 
   it("ignores non-json entries and a missing directory", () => {
@@ -348,23 +385,80 @@ describe("reapOrphanedRecords", () => {
       { id: "proc_cc", name: "srv", reason: "rebooted" },
     ]);
   });
+
+  it("reports ESRCH from the group kill as already dead and keeps reaping", () => {
+    const store = writeRecords(
+      makeRecord({ id: "proc_aa", pid: 5000 }),
+      makeRecord({ id: "proc_bb", hostPid: 4100, pid: 5100 }),
+    );
+    const { deps, killedGroups } = makeDeps({
+      hostPidAlive: false,
+      killGroup: (pgid) => {
+        if (pgid === 5000) {
+          throw Object.assign(new Error("kill ESRCH"), { code: "ESRCH" });
+        }
+        killedGroups.push(pgid);
+      },
+    });
+
+    const report = reapOrphanedRecords(store, deps);
+
+    expect(report.killed.map((k) => k.id)).toEqual(["proc_bb"]);
+    expect(report.discarded).toEqual([
+      { id: "proc_aa", name: "srv", reason: "already_dead" },
+    ]);
+    expect(killedGroups).toEqual([5100]);
+  });
+
+  it("continues the loop when the group kill fails", () => {
+    const store = writeRecords(
+      makeRecord({ id: "proc_aa", pid: 5000 }),
+      makeRecord({ id: "proc_bb", hostPid: 4100, pid: 5100 }),
+    );
+    const { deps, killedGroups } = makeDeps({
+      hostPidAlive: false,
+      killGroup: (pgid) => {
+        if (pgid === 5000) {
+          throw Object.assign(new Error("kill EPERM"), { code: "EPERM" });
+        }
+        killedGroups.push(pgid);
+      },
+    });
+
+    const report = reapOrphanedRecords(store, deps);
+
+    expect(report.killed.map((k) => k.id)).toEqual(["proc_bb"]);
+    expect(report.discarded).toEqual([
+      { id: "proc_aa", name: "srv", reason: "kill_failed" },
+    ]);
+    expect(killedGroups).toEqual([5100]);
+  });
 });
 
 describe("removeOrphanLogDir", () => {
-  it("removes mkdtemp-created log directories", () => {
-    vol.mkdirSync("/tmp/pi-processes-abc", { recursive: true });
+  it("removes mkdtemp-created log directories under the temp dir", () => {
+    const dir = join(tmpdir(), "pi-processes-abc");
+    vol.mkdirSync(dir, { recursive: true });
 
-    removeOrphanLogDir("/tmp/pi-processes-abc");
+    removeOrphanLogDir(dir);
 
-    expect(existsSync("/tmp/pi-processes-abc")).toBe(false);
+    expect(existsSync(dir)).toBe(false);
+  });
+
+  it("leaves matching basenames outside the temp dir in place", () => {
+    vol.mkdirSync("/var/logs/pi-processes-lookalike", { recursive: true });
+
+    removeOrphanLogDir("/var/logs/pi-processes-lookalike");
+
+    expect(existsSync("/var/logs/pi-processes-lookalike")).toBe(true);
   });
 
   it("leaves explicitly configured log directories in place", () => {
-    vol.mkdirSync("/var/logs/custom", { recursive: true });
+    vol.mkdirSync(join(tmpdir(), "custom"), { recursive: true });
 
-    removeOrphanLogDir("/var/logs/custom");
+    removeOrphanLogDir(join(tmpdir(), "custom"));
 
-    expect(existsSync("/var/logs/custom")).toBe(true);
+    expect(existsSync(join(tmpdir(), "custom"))).toBe(true);
   });
 });
 
@@ -519,6 +613,41 @@ describe("ProcessManager orphan records", () => {
       discarded: [],
       kept: 0,
     });
+  });
+
+  // Regression: a record-dir I/O failure used to throw out of start()
+  // after the child was spawned, leaving it alive with no stdio handlers.
+  it("keeps starting and stopping processes when the record directory is unwritable", async () => {
+    vol.mkdirSync("/state", { recursive: true });
+    vol.writeFileSync("/state/blocker", "not a directory");
+    using manager = new ProcessManager({
+      orphanRecords: { dir: "/state/blocker", identity: fakeIdentity },
+    });
+
+    const info = manager.start("srv", "sleep 60", "/work");
+
+    expect(info.status).toBe("running");
+    expect(readRecordFile(process.pid, info.id)).toBeNull();
+    expect(manager.reapOrphanedProcesses()).toEqual({
+      killed: [],
+      discarded: [],
+      kept: 0,
+    });
+
+    const child = fakeProcesses.get(info.pid);
+    assert(child, "fake child should exist");
+    const ended = new Promise<void>((resolve) => {
+      const unsub = manager.onEvent((event) => {
+        if (event.type === "process_ended" && event.info.id === info.id) {
+          unsub();
+          resolve();
+        }
+      });
+    });
+    child.finish(0);
+    await ended;
+
+    expect(() => manager.cleanup()).not.toThrow();
   });
 
   it("removes the record when the process ends", async () => {

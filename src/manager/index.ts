@@ -8,14 +8,39 @@ import type {
   ProcessInfo,
   WriteResult,
 } from "../types";
+import { isProcessGroupAlive, killProcessGroup } from "../utils";
+import {
+  isPidAlive,
+  type ProcessIdentityReader,
+  procfsIdentity,
+} from "../utils/proc-identity";
 import { formatProcess } from "./internal-types";
+import {
+  type OrphanReapReport,
+  OrphanRecordStore,
+  reapOrphanedRecords,
+  removeOrphanLogDir,
+} from "./orphan-recovery";
 import { ProcessLogStore } from "./process-log-store";
 import { ProcessOutput } from "./process-output";
 import { ProcessRegistry } from "./process-registry";
-import { ProcessRuntimeController } from "./process-runtime-controller";
+import {
+  type OrphanRecoveryContext,
+  ProcessRuntimeController,
+} from "./process-runtime-controller";
 
 interface ProcessManagerOptions {
   getConfiguredShellPath?: () => string | undefined;
+  /**
+   * Persist orphan-recovery records under `dir` so a later session can
+   * kill process groups whose pi host died without graceful shutdown
+   * (SIGKILL / OOM). Disabled when procfs identity is unavailable
+   * (non-Linux). `identity` overrides the procfs readers for tests.
+   */
+  orphanRecords?: {
+    dir: string;
+    identity?: ProcessIdentityReader;
+  };
 }
 
 export class ProcessManager {
@@ -25,6 +50,7 @@ export class ProcessManager {
   private logStore: ProcessLogStore;
   private output: ProcessOutput;
   private runtime: ProcessRuntimeController;
+  private orphans: OrphanRecoveryContext | null;
 
   constructor(options?: ProcessManagerOptions) {
     const emit = (event: ManagerEvent): void => {
@@ -39,6 +65,8 @@ export class ProcessManager {
       logStore: this.logStore,
     });
 
+    this.orphans = createOrphanRecoveryContext(options?.orphanRecords);
+
     this.runtime = new ProcessRuntimeController({
       registry: this.registry,
       logs: this.logStore,
@@ -46,6 +74,7 @@ export class ProcessManager {
       emit,
       getConfiguredShellPath:
         options?.getConfiguredShellPath ?? (() => undefined),
+      orphans: this.orphans,
     });
   }
 
@@ -175,6 +204,32 @@ export class ProcessManager {
     this.runtime.killAll();
   }
 
+  /**
+   * Kill process groups orphaned by pi sessions that died without graceful
+   * shutdown (SIGKILL / OOM kill). Call once at session start, before any
+   * process is started. Records owned by concurrent live pi sessions are
+   * left untouched. Returns what was recovered; a no-op report when orphan
+   * persistence is disabled (non-Linux).
+   */
+  reapOrphanedProcesses(): OrphanReapReport {
+    const orphans = this.orphans;
+    if (!orphans) {
+      return { killed: [], discarded: [], kept: 0 };
+    }
+    return reapOrphanedRecords(orphans.store, {
+      identity: {
+        bootId: () => orphans.host.bootId,
+        processStartTime: orphans.childStartTime,
+      },
+      isPidAlive,
+      isGroupAlive: isProcessGroupAlive,
+      killGroup: (pgid) => {
+        killProcessGroup(pgid, "SIGKILL");
+      },
+      removeLogDir: removeOrphanLogDir,
+    });
+  }
+
   clearFinished(): number {
     return this.runtime.clearFinished();
   }
@@ -188,6 +243,10 @@ export class ProcessManager {
     this.runtime.stopWatcher();
     this.output.clearAll();
     this.runtime.killAllLive();
+    // Graceful shutdown kills every live group itself; drop this manager's
+    // recovery records so the state directory only ever holds records from
+    // sessions that died without cleanup.
+    this.orphans?.store.removeWritten();
     this.logStore.cleanup();
   }
 
@@ -203,3 +262,31 @@ export type {
   ProcessStatus,
   WriteResult,
 } from "../types";
+
+/**
+ * Build the orphan-recovery context, or null when recovery is unavailable.
+ *
+ * Recovery needs a stable identity for both the pi host and each spawned
+ * child (boot ID + `/proc/PID/stat` starttime). Without procfs there is no
+ * safe way to distinguish a reused PID from the recorded process, so
+ * persistence and reaping stay off rather than risk killing the wrong
+ * group.
+ */
+function createOrphanRecoveryContext(
+  options?: ProcessManagerOptions["orphanRecords"],
+): OrphanRecoveryContext | null {
+  if (!options) return null;
+
+  const identity = options.identity ?? procfsIdentity;
+  const bootId = identity.bootId();
+  if (bootId === null) return null;
+
+  const hostStartTimeTicks = identity.processStartTime(process.pid);
+  if (hostStartTimeTicks === null) return null;
+
+  return {
+    store: new OrphanRecordStore(options.dir),
+    host: { bootId, pid: process.pid, startTimeTicks: hostStartTimeTicks },
+    childStartTime: identity.processStartTime,
+  };
+}

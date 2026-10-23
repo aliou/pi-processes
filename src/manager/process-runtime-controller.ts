@@ -1,4 +1,5 @@
 import type { ChildProcess } from "node:child_process";
+import { dirname } from "node:path";
 
 import type {
   AdoptProcessOptions,
@@ -18,6 +19,11 @@ import {
   MAX_FINISHED_RECORDS,
   MAX_TAIL_READ_BYTES,
 } from "./limits";
+import {
+  buildOrphanRecord,
+  type HostIdentity,
+  type OrphanRecordStore,
+} from "./orphan-recovery";
 import type { ProcessLogStore } from "./process-log-store";
 import type { ProcessOutput } from "./process-output";
 import type { ProcessRegistry } from "./process-registry";
@@ -28,6 +34,15 @@ interface ProcessRuntimeControllerDeps {
   output: ProcessOutput;
   emit: (event: ManagerEvent) => void;
   getConfiguredShellPath: () => string | undefined;
+  /** Orphan-record persistence; null disables recovery bookkeeping. */
+  orphans?: OrphanRecoveryContext | null;
+}
+
+/** Store plus the owning host's identity, wired by `ProcessManager`. */
+export interface OrphanRecoveryContext {
+  store: OrphanRecordStore;
+  host: HostIdentity;
+  childStartTime: (pid: number) => string | null;
 }
 
 export class ProcessRuntimeController {
@@ -36,6 +51,7 @@ export class ProcessRuntimeController {
   private output: ProcessOutput;
   private emit: (event: ManagerEvent) => void;
   private getConfiguredShellPath: () => string | undefined;
+  private orphans: OrphanRecoveryContext | null;
 
   private watcher: ReturnType<typeof setInterval> | null = null;
   private finishedReapTimer: ReturnType<typeof setTimeout> | null = null;
@@ -48,6 +64,7 @@ export class ProcessRuntimeController {
     this.output = deps.output;
     this.emit = deps.emit;
     this.getConfiguredShellPath = deps.getConfiguredShellPath;
+    this.orphans = deps.orphans ?? null;
   }
 
   start(
@@ -162,6 +179,30 @@ export class ProcessRuntimeController {
       return managed;
     }
 
+    // Persist an orphan-recovery record while the child's procfs identity is
+    // readable. If pi is SIGKILLed before this process ends, a later session
+    // uses this record to verify and kill the surviving group. Processes
+    // that never got a pid (handled above) leave no record.
+    if (this.orphans) {
+      const childStartTimeTicks = this.orphans.childStartTime(child.pid);
+      if (childStartTimeTicks !== null) {
+        this.orphans.store.write(
+          buildOrphanRecord(
+            this.orphans.host,
+            {
+              id: managed.id,
+              name: managed.name,
+              command: managed.command,
+              cwd: managed.cwd,
+              pid: child.pid,
+            },
+            dirname(managed.stdoutFile),
+            childStartTimeTicks,
+          ),
+        );
+      }
+    }
+
     if (opts.initialStdout && opts.initialStdout.length > 0) {
       const clamped = clampToTail(opts.initialStdout, MAX_TAIL_READ_BYTES);
       this.logs.appendStdout(managed.stdoutFile, clamped);
@@ -225,6 +266,12 @@ export class ProcessRuntimeController {
     managed.status = next;
 
     if (next === "exited" || next === "killed") {
+      // The process is finished, so it can no longer be orphaned; drop its
+      // recovery record before any further bookkeeping.
+      this.orphans?.store.remove({
+        hostPid: this.orphans.host.pid,
+        id: managed.id,
+      });
       managed.completionSequence ??= ++this.completionSequence;
       this.emit({ type: "process_ended", info: formatProcess(managed) });
       this.reapOldestFinished();

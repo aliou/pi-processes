@@ -1,18 +1,3 @@
-/**
- * Orphan recovery hook.
- *
- * On `session_start`, kill process groups left behind by pi sessions that
- * died without running the graceful `session_shutdown` cleanup (SIGKILL,
- * OOM kill). The manager verifies each persisted record (boot ID + `/proc`
- * starttime) before signaling, so concurrent live sessions and reused PIDs
- * are never touched.
- *
- * Recovery runs for every start reason: `reload`/`new`/`fork` sessions share
- * this pi host process (whose own records were already cleaned up at
- * `session_shutdown`), while `startup`/`resume` sessions are new hosts whose
- * predecessors may have died abnormally.
- */
-
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { ProcessManager } from "../../../src/manager";
 import { sanitizeForDisplay } from "../../shared/display-text";

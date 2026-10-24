@@ -9,9 +9,6 @@ import {
   startTimeFromStat,
 } from "./proc-identity";
 
-// /proc/PID/stat: pid (comm) state ppid pgrp session tty tpgid flags minflt
-// cminflt majflt cmajflt utime stime cutime cstime priority nice ...
-// Field 22 (starttime) is index 19 after the comm.
 function statLine(pid: number, comm: string, starttime: string): string {
   const head = [
     String(pid),

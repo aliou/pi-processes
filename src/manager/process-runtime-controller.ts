@@ -34,11 +34,9 @@ interface ProcessRuntimeControllerDeps {
   output: ProcessOutput;
   emit: (event: ManagerEvent) => void;
   getConfiguredShellPath: () => string | undefined;
-  /** Orphan-record persistence; null disables recovery bookkeeping. */
   orphans?: OrphanRecoveryContext | null;
 }
 
-/** Store plus the owning host's identity, wired by `ProcessManager`. */
 export interface OrphanRecoveryContext {
   store: OrphanRecordStore;
   host: HostIdentity;
@@ -179,10 +177,6 @@ export class ProcessRuntimeController {
       return managed;
     }
 
-    // Persist an orphan-recovery record while the child's procfs identity is
-    // readable. If pi is SIGKILLed before this process ends, a later session
-    // uses this record to verify and kill the surviving group. Processes
-    // that never got a pid (handled above) leave no record.
     if (this.orphans) {
       const childStartTimeTicks = this.orphans.childStartTime(child.pid);
       if (childStartTimeTicks !== null) {
@@ -266,8 +260,6 @@ export class ProcessRuntimeController {
     managed.status = next;
 
     if (next === "exited" || next === "killed") {
-      // The process is finished, so it can no longer be orphaned; drop its
-      // recovery record before any further bookkeeping.
       this.orphans?.store.remove({
         hostPid: this.orphans.host.pid,
         id: managed.id,

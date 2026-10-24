@@ -13,16 +13,6 @@ import {
 import { test } from "./fixtures";
 import { waitForEnd } from "./utils";
 
-/**
- * Real-process e2e for SIGKILL-orphan recovery.
- *
- * A real detached process group is started through a manager whose recovery
- * records persist in a shared state directory. "The pi host died" is
- * simulated by rewriting the record to point at a verifiably dead host (a
- * short-lived `sleep` whose /proc starttime was captured while it lived), so
- * the reap path exercises real /proc identity checks and real group kills
- * without killing the test runner.
- */
 async function deadHostIdentity(): Promise<{ pid: number; startTime: string }> {
   const child = spawn("sleep", ["0.05"]);
   assert(child.pid, "sleep should have a pid");
@@ -32,13 +22,6 @@ async function deadHostIdentity(): Promise<{ pid: number; startTime: string }> {
   return { pid: child.pid, startTime };
 }
 
-/**
- * Rewrite the record for `id` so it points at a verifiably dead host.
- *
- * A real record left by a dead pi session is named after that host's pid and
- * holds its identity, so the simulation keeps the same invariant: the
- * original file is replaced by one named after the dead host.
- */
 async function repointRecordAtDeadHost(
   stateDir: string,
   id: string,
@@ -62,11 +45,6 @@ async function repointRecordAtDeadHost(
 
 const cwdTest = test.skipIf(readBootId() === null);
 
-/**
- * Bounded wait for a group to die. `kill(-pgid, 0)` keeps succeeding while
- * zombies await reaping by init, so asserting synchronously right after the
- * leader's close event is flaky; poll instead (AGENTS.md: no fixed sleeps).
- */
 async function waitForGroupDeath(
   pgid: number,
   timeoutMs = 5000,
@@ -94,7 +72,6 @@ cwdTest(
     const originalRecord = join(stateDir, `${process.pid}-${info.id}.json`);
     assert(existsSync(originalRecord), "record should persist on start");
 
-    // Simulate the pi host dying: the record now claims a dead host.
     const recordFile = await repointRecordAtDeadHost(stateDir, info.id);
 
     const reaper = new ProcessManager({
@@ -136,8 +113,6 @@ cwdTest(
     const recordFile = join(stateDir, `${process.pid}-${info.id}.json`);
     assert(existsSync(recordFile), "record should persist on start");
 
-    // A second session sharing the state directory: the record's host (this
-    // test process) is still alive, so the group must not be touched.
     const other = new ProcessManager({ orphanRecords: { dir: stateDir } });
     const report = other.reapOrphanedProcesses();
 
@@ -168,8 +143,6 @@ cwdTest(
     const originalRecord = join(stateDir, `${process.pid}-${info.id}.json`);
     assert(existsSync(originalRecord), "record should persist on start");
 
-    // Simulate PID reuse: the recorded starttime no longer matches the live
-    // leader. The reap must discard the record without signaling the group.
     const recordFile = await repointRecordAtDeadHost(
       stateDir,
       info.id,

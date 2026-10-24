@@ -23,12 +23,6 @@ import {
 import { registerProcessSettings } from "./settings";
 import { registerProcessTool } from "./tools";
 
-/**
- * Where orphan-recovery records persist: the user's cache directory, not the
- * temporary log directory (which graceful cleanup deletes and an abnormal
- * exit leaves behind). Record files are small, one per live process, and are
- * removed when the process ends or the session shuts down.
- */
 function resolveOrphanRecordDir(): string {
   const cacheHome = process.env.XDG_CACHE_HOME || join(homedir(), ".cache");
   return join(cacheHome, "pi-processes", "orphan-records");

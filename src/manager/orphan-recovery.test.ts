@@ -25,10 +25,6 @@ import {
   STRAY_TEMP_FILE_MAX_AGE_MS,
 } from "./orphan-recovery";
 
-// ---------------------------------------------------------------------------
-// Shared fixtures
-// ---------------------------------------------------------------------------
-
 const STATE_DIR = "/state/orphans";
 
 function makeRecord(
@@ -104,10 +100,6 @@ function recordFile(record: { hostPid: number; id: string }): string {
 beforeEach(() => {
   vol.reset();
 });
-
-// ---------------------------------------------------------------------------
-// OrphanRecordStore
-// ---------------------------------------------------------------------------
 
 describe("OrphanRecordStore", () => {
   it("round-trips written records", () => {
@@ -218,10 +210,6 @@ describe("OrphanRecordStore", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// reapOrphanedRecords
-// ---------------------------------------------------------------------------
-
 describe("reapOrphanedRecords", () => {
   it("keeps a group whose owning pi host is still alive", () => {
     const store = writeRecords(makeRecord());
@@ -241,7 +229,6 @@ describe("reapOrphanedRecords", () => {
 
     const report = reapOrphanedRecords(store, deps);
 
-    // Conservative: cannot prove the host is dead, so nothing is touched.
     expect(report).toEqual({ killed: [], discarded: [], kept: 1 });
   });
 
@@ -375,8 +362,6 @@ describe("reapOrphanedRecords", () => {
     );
     const { deps } = makeDeps();
 
-    // Host 4100 is not alive: its record is reaped. Hosts 4000 (alive) and
-    // 4200 (rebooted) exercise the other two branches.
     const report = reapOrphanedRecords(store, deps);
 
     expect(report.kept).toBe(1);
@@ -461,10 +446,6 @@ describe("removeOrphanLogDir", () => {
     expect(existsSync(join(tmpdir(), "custom"))).toBe(true);
   });
 });
-
-// ---------------------------------------------------------------------------
-// ProcessManager integration
-// ---------------------------------------------------------------------------
 
 const fakeProcesses = new Map<number, FakeChildProcess>();
 let nextPid = 20_000;
@@ -615,8 +596,6 @@ describe("ProcessManager orphan records", () => {
     });
   });
 
-  // Regression: a record-dir I/O failure used to throw out of start()
-  // after the child was spawned, leaving it alive with no stdio handlers.
   it("keeps starting and stopping processes when the record directory is unwritable", async () => {
     vol.mkdirSync("/state", { recursive: true });
     vol.writeFileSync("/state/blocker", "not a directory");
@@ -719,7 +698,6 @@ describe("ProcessManager orphan records", () => {
     using manager = new ProcessManager(managerOptions());
     const info = manager.start("srv", "sleep 60", "/work");
 
-    // Tamper the persisted starttime to simulate a PID reuse.
     const file = `${STATE_DIR}/${process.pid}-${info.id}.json`;
     const record = JSON.parse(readFileSync(file, "utf-8")) as Record<
       string,

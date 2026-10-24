@@ -221,8 +221,10 @@ Beyond the bus protocol, the extensions subscribe to standard Pi extension
 hooks:
 
 - `session_start` — the core extension checks for pending config-migration and
-  import messages and notifies the user; the dock tears down any previous
-  controller and re-creates its widgets for the new session.
+  import messages and notifies the user, and reaps process groups orphaned by
+  pi sessions that died without graceful cleanup, reporting what was recovered
+  (see [orphan-recovery.md](orphan-recovery.md)); the dock tears down any
+  previous controller and re-creates its widgets for the new session.
 - `tool_call` — the core extension's background blocker inspects bash tool
   calls to optionally reject backgrounded commands when interception is
   enabled in config.

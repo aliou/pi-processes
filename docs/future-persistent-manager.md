@@ -36,6 +36,12 @@ On `session_shutdown`:
 
 On actual Node process exit, kill all live processes regardless of persistence. Persistence should only survive Pi session reloads, not application exit.
 
+The abnormal-exit slice of this landed separately: when pi is SIGKILLed (no
+handler can run), persisted identity records let the next session kill the
+orphaned groups — see [orphan-recovery.md](orphan-recovery.md). That recovery
+is deliberately minimal and does not keep the manager itself alive across
+sessions; everything in this document remains future work.
+
 ## Tests To Add
 
 - Persistent reload returns the same manager instance.

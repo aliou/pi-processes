@@ -1,3 +1,5 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { ProcessManager } from "../../src/manager";
 import { isWindowsPlatform } from "../../src/utils/platform";
@@ -12,6 +14,7 @@ import { registerLogSubscriptions } from "./handlers/subscriptions";
 import { registerBackgroundBlocker } from "./hooks/background-blocker";
 import { registerCleanupHook } from "./hooks/cleanup";
 import { registerEventBridge } from "./hooks/event-bridge";
+import { registerOrphanRecoveryHook } from "./hooks/orphan-recovery";
 import { registerProcessNotificationRenderer } from "./message-renderer";
 import {
   createNotificationRegistry,
@@ -19,6 +22,11 @@ import {
 } from "./notifications/service";
 import { registerProcessSettings } from "./settings";
 import { registerProcessTool } from "./tools";
+
+function resolveOrphanRecordDir(): string {
+  const cacheHome = process.env.XDG_CACHE_HOME || join(homedir(), ".cache");
+  return join(cacheHome, "pi-processes", "orphan-records");
+}
 
 export default async function processesExtension(
   pi: ExtensionAPI,
@@ -42,6 +50,7 @@ export default async function processesExtension(
 
   const manager = new ProcessManager({
     getConfiguredShellPath: () => configLoader.getConfig().execution.shellPath,
+    orphanRecords: { dir: resolveOrphanRecordDir() },
   });
   const notifications = createNotificationRegistry();
   const notificationService = createNotificationService({
@@ -71,6 +80,8 @@ export default async function processesExtension(
     pi,
     () => getConfig().interception.blockBackgroundCommands,
   );
+
+  registerOrphanRecoveryHook(pi, manager);
 
   registerProcessNotificationRenderer(pi);
   registerProcessTool(pi, manager, notifications);

@@ -8,14 +8,33 @@ import type {
   ProcessInfo,
   WriteResult,
 } from "../types";
+import { isProcessGroupAlive, killProcessGroup } from "../utils";
+import {
+  isPidAlive,
+  type ProcessIdentityReader,
+  procfsIdentity,
+} from "../utils/proc-identity";
 import { formatProcess } from "./internal-types";
+import {
+  type OrphanReapReport,
+  OrphanRecordStore,
+  reapOrphanedRecords,
+  removeOrphanLogDir,
+} from "./orphan-recovery";
 import { ProcessLogStore } from "./process-log-store";
 import { ProcessOutput } from "./process-output";
 import { ProcessRegistry } from "./process-registry";
-import { ProcessRuntimeController } from "./process-runtime-controller";
+import {
+  type OrphanRecoveryContext,
+  ProcessRuntimeController,
+} from "./process-runtime-controller";
 
 interface ProcessManagerOptions {
   getConfiguredShellPath?: () => string | undefined;
+  orphanRecords?: {
+    dir: string;
+    identity?: ProcessIdentityReader;
+  };
 }
 
 export class ProcessManager {
@@ -25,6 +44,7 @@ export class ProcessManager {
   private logStore: ProcessLogStore;
   private output: ProcessOutput;
   private runtime: ProcessRuntimeController;
+  private orphans: OrphanRecoveryContext | null;
 
   constructor(options?: ProcessManagerOptions) {
     const emit = (event: ManagerEvent): void => {
@@ -39,6 +59,8 @@ export class ProcessManager {
       logStore: this.logStore,
     });
 
+    this.orphans = createOrphanRecoveryContext(options?.orphanRecords);
+
     this.runtime = new ProcessRuntimeController({
       registry: this.registry,
       logs: this.logStore,
@@ -46,6 +68,7 @@ export class ProcessManager {
       emit,
       getConfiguredShellPath:
         options?.getConfiguredShellPath ?? (() => undefined),
+      orphans: this.orphans,
     });
   }
 
@@ -175,6 +198,25 @@ export class ProcessManager {
     this.runtime.killAll();
   }
 
+  reapOrphanedProcesses(): OrphanReapReport {
+    const orphans = this.orphans;
+    if (!orphans) {
+      return { killed: [], discarded: [], kept: 0 };
+    }
+    return reapOrphanedRecords(orphans.store, {
+      identity: {
+        bootId: () => orphans.host.bootId,
+        processStartTime: orphans.childStartTime,
+      },
+      isPidAlive,
+      isGroupAlive: isProcessGroupAlive,
+      killGroup: (pgid) => {
+        killProcessGroup(pgid, "SIGKILL");
+      },
+      removeLogDir: removeOrphanLogDir,
+    });
+  }
+
   clearFinished(): number {
     return this.runtime.clearFinished();
   }
@@ -188,6 +230,7 @@ export class ProcessManager {
     this.runtime.stopWatcher();
     this.output.clearAll();
     this.runtime.killAllLive();
+    this.orphans?.store.removeWritten();
     this.logStore.cleanup();
   }
 
@@ -203,3 +246,22 @@ export type {
   ProcessStatus,
   WriteResult,
 } from "../types";
+
+function createOrphanRecoveryContext(
+  options?: ProcessManagerOptions["orphanRecords"],
+): OrphanRecoveryContext | null {
+  if (!options) return null;
+
+  const identity = options.identity ?? procfsIdentity;
+  const bootId = identity.bootId();
+  if (bootId === null) return null;
+
+  const hostStartTimeTicks = identity.processStartTime(process.pid);
+  if (hostStartTimeTicks === null) return null;
+
+  return {
+    store: new OrphanRecordStore(options.dir),
+    host: { bootId, pid: process.pid, startTimeTicks: hostStartTimeTicks },
+    childStartTime: identity.processStartTime,
+  };
+}

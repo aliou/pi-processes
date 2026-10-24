@@ -1,7 +1,10 @@
 import type * as nodeFs from "node:fs";
 import { existsSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { resolveShellExecutable } from "./command-executor";
+import {
+  defaultKnownShellPaths,
+  resolveShellExecutable,
+} from "./command-executor";
 
 vi.mock("node:fs", async (importOriginal) => {
   const actual = await importOriginal<typeof nodeFs>();
@@ -44,5 +47,30 @@ describe("resolveShellExecutable", () => {
         knownPaths: ["/bin/bash", "/usr/bin/bash"],
       }),
     ).toThrow(/shell/i);
+  });
+});
+
+describe("defaultKnownShellPaths", () => {
+  it("includes the Termux $PREFIX shell when PREFIX is set", () => {
+    expect(
+      defaultKnownShellPaths({
+        PREFIX: "/data/data/com.termux/files/usr",
+      }),
+    ).toContain("/data/data/com.termux/files/usr/bin/bash");
+  });
+
+  it("includes the shell from $SHELL", () => {
+    expect(
+      defaultKnownShellPaths({ SHELL: "/opt/homebrew/bin/bash" }),
+    ).toContain("/opt/homebrew/bin/bash");
+  });
+
+  it("keeps the static paths when no env hints are present", () => {
+    expect(defaultKnownShellPaths({})).toEqual([
+      "/run/current-system/sw/bin/bash",
+      "/bin/bash",
+      "/usr/bin/bash",
+      "/usr/local/bin/bash",
+    ]);
   });
 });

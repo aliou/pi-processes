@@ -10,12 +10,19 @@ interface ResolveShellExecutableOptions {
   knownPaths: string[];
 }
 
-const DEFAULT_KNOWN_SHELL_PATHS = [
-  "/run/current-system/sw/bin/bash",
-  "/bin/bash",
-  "/usr/bin/bash",
-  "/usr/local/bin/bash",
-];
+export function defaultKnownShellPaths(
+  env: NodeJS.ProcessEnv = process.env,
+): string[] {
+  return [
+    "/run/current-system/sw/bin/bash",
+    "/bin/bash",
+    "/usr/bin/bash",
+    "/usr/local/bin/bash",
+    // Termux/Android has no /bin or /usr/bin: bash lives under $PREFIX.
+    ...(env.PREFIX ? [`${env.PREFIX}/bin/bash`] : []),
+    ...(env.SHELL ? [env.SHELL] : []),
+  ];
+}
 
 function isExistingAbsolutePath(shell: string | undefined): shell is string {
   return typeof shell === "string" && isAbsolute(shell) && existsSync(shell);
@@ -48,7 +55,7 @@ export function spawnCommand(
 ): ChildProcess {
   const shellExecutable = resolveShellExecutable({
     configuredShell,
-    knownPaths: DEFAULT_KNOWN_SHELL_PATHS,
+    knownPaths: defaultKnownShellPaths(env),
   });
 
   return spawn(shellExecutable, ["-lc", command], {

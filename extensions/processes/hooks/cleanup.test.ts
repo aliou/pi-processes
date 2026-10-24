@@ -1,7 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
 
-import { createNotificationRegistry } from "../notifications/registry";
 import { registerCleanupHook } from "./cleanup";
 
 describe("registerCleanupHook", () => {
@@ -22,12 +21,10 @@ describe("registerCleanupHook", () => {
     const notificationService = {
       dispose: vi.fn(() => calls.push("notificationService.dispose")),
     };
-    const notifications = createNotificationRegistry();
     const disposer = vi.fn(() => calls.push("disposer"));
 
     registerCleanupHook(pi, {
       manager: manager as never,
-      notifications,
       notificationService,
       disposers: [disposer],
     });

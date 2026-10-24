@@ -1,7 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
+import type { LogMatcherSpec } from "../../../../src/wake";
 import { sanitizeForDisplay } from "../../../shared/display-text";
-import type { LogMatcherConfig } from "../../notifications/registry";
 import { buildMatcherLine, ProcessActionHeader } from "../components";
 import type { ProcessesParamsType, UpdateDetails } from "../schema";
 import { buildField } from "../utils";
@@ -222,9 +222,9 @@ function buildWatchSection(details: UpdateDetails, theme: Theme): Container {
 }
 
 export function findRemovedMatchers(
-  before: LogMatcherConfig[],
-  after: LogMatcherConfig[],
-): LogMatcherConfig[] {
+  before: LogMatcherSpec[],
+  after: LogMatcherSpec[],
+): LogMatcherSpec[] {
   const remaining = new Map<string, number>();
   for (const matcher of after) {
     const key = matcherKey(matcher);
@@ -240,7 +240,7 @@ export function findRemovedMatchers(
   });
 }
 
-function matcherKey(matcher: LogMatcherConfig): string {
+function matcherKey(matcher: LogMatcherSpec): string {
   return JSON.stringify([
     matcher.pattern,
     matcher.mode ?? "literal",

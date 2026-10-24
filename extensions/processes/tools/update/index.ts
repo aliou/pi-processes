@@ -1,18 +1,16 @@
 import type { ProcessManager } from "../../../../src/manager";
 import { LIVE_STATUSES } from "../../../../src/types";
 import type {
-  LogMatcherConfig,
-  NotificationRegistry,
+  LogMatcherSpec,
   WatchRemoveSpec,
   WatchUpdateResult,
-} from "../../notifications/registry";
+} from "../../../../src/wake";
 import { normalizeLogMatchItems } from "../notify";
 import type { ProcessesParamsType, UpdateDetails } from "../schema";
 
 export function executeUpdate(
   params: ProcessesParamsType,
   manager: ProcessManager,
-  notifications: NotificationRegistry,
 ): UpdateDetails {
   if (!params.id) {
     return {
@@ -87,14 +85,9 @@ export function executeUpdate(
   }
 
   let watchError: string | undefined;
-  const watchesBefore =
-    notifications.getWatchState(params.id)?.logMatches ?? [];
-  let watchesApplied: LogMatcherConfig[] = [];
-  const watchResult = applyWatchUpdate(
-    params.id,
-    params.watches,
-    notifications,
-  );
+  const watchesBefore = manager.getWatchState(params.id)?.logMatches ?? [];
+  let watchesApplied: LogMatcherSpec[] = [];
+  const watchResult = applyWatchUpdate(params.id, params.watches, manager);
 
   if (params.watches && !watchResult) {
     watchError = `process update could not update watches for ${params.id}`;
@@ -111,7 +104,7 @@ export function executeUpdate(
 
   const currentWatches =
     watchResult?.logMatches ??
-    notifications.getWatchState(params.id)?.logMatches ??
+    manager.getWatchState(params.id)?.logMatches ??
     [];
 
   if (watchError) {
@@ -151,14 +144,14 @@ export function executeUpdate(
 function applyWatchUpdate(
   processId: string,
   watches: ProcessesParamsType["watches"],
-  notifications: NotificationRegistry,
+  manager: ProcessManager,
 ): WatchUpdateResult | null {
   if (!watches) return null;
 
   const { mode } = watches;
 
   if (mode === "clear") {
-    return notifications.clearWatches(processId);
+    return manager.clearWatches(processId);
   }
 
   const items = watches.items;
@@ -175,13 +168,13 @@ function applyWatchUpdate(
     });
 
     return mode === "append"
-      ? notifications.appendWatches(processId, normalized)
-      : notifications.replaceWatches(processId, normalized);
+      ? manager.appendWatches(processId, normalized)
+      : manager.replaceWatches(processId, normalized);
   }
 
   if (mode === "remove") {
     const specs = normalizeWatchRemoveSpecs(items);
-    return notifications.removeWatches(processId, specs);
+    return manager.removeWatches(processId, specs);
   }
 
   throw new Error(`unsupported watch update mode: ${String(mode)}`);

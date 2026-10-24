@@ -19,7 +19,6 @@ import type {
 import { describe, expect, it, vi } from "vitest";
 
 import type { ProcessManager } from "../../../src/manager";
-import type { NotificationRegistry } from "../notifications/registry";
 import { registerProcessTool } from "./index";
 
 type RenderCallFn = NonNullable<ToolDefinition["renderCall"]>;
@@ -40,7 +39,7 @@ const theme = {
 
 function captureRenderCall(): HostRenderCall {
   const pi = { registerTool: vi.fn() } as unknown as ExtensionAPI;
-  registerProcessTool(pi, {} as ProcessManager, {} as NotificationRegistry);
+  registerProcessTool(pi, {} as ProcessManager);
   const tool = vi.mocked(pi.registerTool).mock.calls[0]?.[0] as ToolDefinition;
   if (!tool.renderCall) throw new Error("process tool was not registered");
   return tool.renderCall as unknown as HostRenderCall;

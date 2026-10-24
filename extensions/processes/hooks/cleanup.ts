@@ -1,7 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import type { ProcessManager } from "../../../src/manager";
-import type { NotificationRegistry } from "../notifications/registry";
 
 interface NotificationService {
   dispose(): void;
@@ -11,7 +10,6 @@ type Disposer = () => void;
 
 interface CleanupHookDeps {
   manager: ProcessManager;
-  notifications: NotificationRegistry;
   notificationService: NotificationService;
   disposers?: Disposer[];
   disposeOverlays?: () => void;
@@ -36,7 +34,6 @@ export function registerCleanupHook(
     }
 
     deps.notificationService.dispose();
-    deps.notifications.clear();
     deps.manager.killAll();
     deps.manager.cleanup();
   });

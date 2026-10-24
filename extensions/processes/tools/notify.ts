@@ -1,23 +1,10 @@
 import {
   MAX_LOG_MATCH_PATTERN_LENGTH,
   MAX_LOG_MATCHERS_PER_PROCESS,
-} from "../notifications/log-matchers";
-import type { LogMatcherConfig, NotifyConfig } from "../notifications/registry";
+} from "../../../src/manager/log-matchers";
+import type { LogMatcherSpec, ProcessWakeConfig } from "../../../src/wake";
+import { DEFAULT_WAKE_ATTENTION } from "../../../src/wake";
 import type { NotifyParamsType } from "./schema";
-
-const DEFAULT_NOTIFY_CONFIG = {
-  // Builds, tests, and other one-shot commands are started because the agent
-  // needs the result, so success defaults to a turn. Long-running servers
-  // rarely exit 0, and callers that only need the result as future context can
-  // pass onSuccess: "context".
-  onSuccess: "turn",
-  onFailure: "turn",
-  // External kills (outside this manager) surface as context by default so
-  // the agent and user learn that a managed process disappeared. Intentional
-  // stops via the tool/command path are classified separately and never reach
-  // this branch.
-  onKilled: "context",
-} as const satisfies Pick<NotifyConfig, "onSuccess" | "onFailure" | "onKilled">;
 
 export const MAX_NOTIFY_LOG_MATCHERS = MAX_LOG_MATCHERS_PER_PROCESS;
 export const MAX_NOTIFY_PATTERN_LENGTH = MAX_LOG_MATCH_PATTERN_LENGTH;
@@ -29,15 +16,15 @@ export const MAX_NOTIFY_PATTERN_LENGTH = MAX_LOG_MATCH_PATTERN_LENGTH;
 
 export function normalizeNotifyConfig(
   input: NotifyParamsType | undefined,
-): NotifyConfig {
+): ProcessWakeConfig {
   if (!input) {
-    return { ...DEFAULT_NOTIFY_CONFIG, logMatches: [] };
+    return { ...DEFAULT_WAKE_ATTENTION, logMatches: [] };
   }
 
   return {
-    onSuccess: input.onSuccess ?? DEFAULT_NOTIFY_CONFIG.onSuccess,
-    onFailure: input.onFailure ?? DEFAULT_NOTIFY_CONFIG.onFailure,
-    onKilled: input.onKilled ?? DEFAULT_NOTIFY_CONFIG.onKilled,
+    onSuccess: input.onSuccess ?? DEFAULT_WAKE_ATTENTION.onSuccess,
+    onFailure: input.onFailure ?? DEFAULT_WAKE_ATTENTION.onFailure,
+    onKilled: input.onKilled ?? DEFAULT_WAKE_ATTENTION.onKilled,
     logMatches: normalizeLogMatches(input.logMatches ?? [], {
       actionLabel: "process start",
       pathPrefix: "notify.logMatches",
@@ -46,27 +33,27 @@ export function normalizeNotifyConfig(
 }
 
 export function normalizeLogMatchItems(
-  input: LogMatcherConfig[],
+  input: LogMatcherSpec[],
   options: {
     actionLabel: string;
     pathPrefix: string;
   },
-): LogMatcherConfig[] {
+): LogMatcherSpec[] {
   return input.map((entry, index) => normalizeLogMatch(entry, index, options));
 }
 
 function normalizeLogMatches(
-  input: LogMatcherConfig[],
+  input: LogMatcherSpec[],
   options: { actionLabel: string; pathPrefix: string },
-): LogMatcherConfig[] {
+): LogMatcherSpec[] {
   return input.map((entry, index) => normalizeLogMatch(entry, index, options));
 }
 
 function normalizeLogMatch(
-  input: LogMatcherConfig,
+  input: LogMatcherSpec,
   index: number,
   options: { actionLabel: string; pathPrefix: string },
-): LogMatcherConfig {
+): LogMatcherSpec {
   const path = `${options.pathPrefix}[${index}]`;
 
   // An empty or whitespace-only literal pattern matches every line

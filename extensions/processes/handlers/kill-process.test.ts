@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { ProcessManager } from "../../../src/manager";
+import { ProcessManager } from "../../../src/manager";
 import type { KillResult, ProcessInfo } from "../../../src/types";
-import { createNotificationRegistry } from "../notifications/registry";
 import { killIntentionally } from "./kill-process";
 
 function makeInfo(overrides: Partial<ProcessInfo> = {}): ProcessInfo {
@@ -26,20 +25,25 @@ function makeInfo(overrides: Partial<ProcessInfo> = {}): ProcessInfo {
   };
 }
 
+function createManager(kill: () => Promise<KillResult>): ProcessManager {
+  const manager = new ProcessManager();
+  vi.spyOn(manager, "kill").mockImplementation(kill);
+  return manager;
+}
+
 describe("killIntentionally", () => {
   it("marks intentional stop before killing", async () => {
-    const registry = createNotificationRegistry();
     let markedBeforeKill = false;
-    const kill = vi.fn(async () => {
-      markedBeforeKill = registry.consumeIntentionalStop("proc_1");
+    const manager = createManager(async () => {
+      markedBeforeKill = manager.consumeIntentionalStop("proc_1");
       return { ok: true, info: makeInfo() } as KillResult;
     });
-    const manager = { kill } as unknown as ProcessManager;
 
-    await killIntentionally(manager, registry, "proc_1", { signal: "SIGKILL" });
+    await killIntentionally(manager, "proc_1", { signal: "SIGKILL" });
 
     expect(markedBeforeKill).toBe(true);
-    expect(kill).toHaveBeenCalledWith("proc_1", { signal: "SIGKILL" });
+    expect(manager.kill).toHaveBeenCalledWith("proc_1", { signal: "SIGKILL" });
+    manager.cleanup();
   });
 
   it("clears marker on not_found and error failures", async () => {
@@ -49,59 +53,51 @@ describe("killIntentionally", () => {
     ];
 
     for (const result of cases) {
-      const registry = createNotificationRegistry();
-      const manager = {
-        kill: vi.fn(async () => result),
-      } as unknown as ProcessManager;
+      const manager = createManager(async () => result);
 
-      await killIntentionally(manager, registry, "proc_1");
+      await killIntentionally(manager, "proc_1");
 
-      expect(registry.consumeIntentionalStop("proc_1")).toBe(false);
+      expect(manager.consumeIntentionalStop("proc_1")).toBe(false);
+      manager.cleanup();
     }
   });
 
   it("preserves marker on timeout failure", async () => {
-    const registry = createNotificationRegistry();
-    const manager = {
-      kill: vi.fn(
-        async () =>
-          ({ ok: false, reason: "timeout", info: makeInfo() }) as KillResult,
-      ),
-    } as unknown as ProcessManager;
+    const manager = createManager(
+      async () =>
+        ({ ok: false, reason: "timeout", info: makeInfo() }) as KillResult,
+    );
 
-    await killIntentionally(manager, registry, "proc_1");
+    await killIntentionally(manager, "proc_1");
 
-    expect(registry.consumeIntentionalStop("proc_1")).toBe(true);
+    expect(manager.consumeIntentionalStop("proc_1")).toBe(true);
+    manager.cleanup();
   });
 
   it("clears marker for already-finished successful kill result", async () => {
-    const registry = createNotificationRegistry();
-    const manager = {
-      kill: vi.fn(
-        async () =>
-          ({
-            ok: true,
-            info: makeInfo({ status: "exited", success: true }),
-          }) as KillResult,
-      ),
-    } as unknown as ProcessManager;
+    const manager = createManager(
+      async () =>
+        ({
+          ok: true,
+          info: makeInfo({ status: "exited", success: true }),
+        }) as KillResult,
+    );
 
-    await killIntentionally(manager, registry, "proc_1");
+    await killIntentionally(manager, "proc_1");
 
-    expect(registry.consumeIntentionalStop("proc_1")).toBe(false);
+    expect(manager.consumeIntentionalStop("proc_1")).toBe(false);
+    manager.cleanup();
   });
 
   it("clears marker when kill throws", async () => {
-    const registry = createNotificationRegistry();
-    const manager = {
-      kill: vi.fn(async () => {
-        throw new Error("boom");
-      }),
-    } as unknown as ProcessManager;
+    const manager = createManager(async () => {
+      throw new Error("boom");
+    });
 
-    await expect(
-      killIntentionally(manager, registry, "proc_1"),
-    ).rejects.toThrow(/process stop failed/);
-    expect(registry.consumeIntentionalStop("proc_1")).toBe(false);
+    await expect(killIntentionally(manager, "proc_1")).rejects.toThrow(
+      /process stop failed/,
+    );
+    expect(manager.consumeIntentionalStop("proc_1")).toBe(false);
+    manager.cleanup();
   });
 });

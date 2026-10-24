@@ -1,6 +1,6 @@
-import type { LogMatcherConfig } from "../notifications/registry";
+import type { LogMatcherSpec } from "../../../src/wake";
 
-export function formatMatcherForModel(matcher: LogMatcherConfig): string {
+export function formatMatcherForModel(matcher: LogMatcherSpec): string {
   const mode = matcher.mode ?? "literal";
   const stream = matcher.stream ?? "both";
   const repeat = matcher.repeat ? " (repeat)" : "";
@@ -9,6 +9,6 @@ export function formatMatcherForModel(matcher: LogMatcherConfig): string {
   return `[${stream}] ${mode} ${on}${repeat} ${JSON.stringify(matcher.pattern)}`;
 }
 
-export function formatPatternsForModel(matchers: LogMatcherConfig[]): string {
+export function formatPatternsForModel(matchers: LogMatcherSpec[]): string {
   return JSON.stringify(matchers.map((matcher) => matcher.pattern));
 }

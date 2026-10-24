@@ -64,6 +64,19 @@ export const ProcessInfoSchema = Type.Object({
 
 export type ProcessInfo = Static<typeof ProcessInfoSchema>;
 
+export const PROCESS_ATTENTIONS = ["turn", "context", "ignore"] as const;
+
+export type ProcessAttention = (typeof PROCESS_ATTENTIONS)[number];
+
+export interface WatchMatch {
+  matcherIndex: number;
+  pattern: string;
+  mode: "literal" | "regex";
+  stream: "stdout" | "stderr";
+  line: string;
+  on: ProcessAttention;
+}
+
 export type ManagerEvent =
   | { type: "process_started"; info: ProcessInfo }
   | { type: "process_ended"; info: ProcessInfo }
@@ -73,6 +86,7 @@ export type ManagerEvent =
       appendedText?: Array<{ type: "stdout" | "stderr"; text: string }>;
       droppedLines?: number;
     }
+  | { type: "process_watch_matched"; id: string; matches: WatchMatch[] }
   | { type: "processes_changed" };
 
 /** Options for adopting an externally spawned child process. */

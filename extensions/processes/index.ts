@@ -13,10 +13,7 @@ import { registerBackgroundBlocker } from "./hooks/background-blocker";
 import { registerCleanupHook } from "./hooks/cleanup";
 import { registerEventBridge } from "./hooks/event-bridge";
 import { registerProcessNotificationRenderer } from "./message-renderer";
-import {
-  createNotificationRegistry,
-  createNotificationService,
-} from "./notifications/service";
+import { createNotificationService } from "./notifications/service";
 import { registerProcessSettings } from "./settings";
 import { registerProcessTool } from "./tools";
 
@@ -43,12 +40,9 @@ export default async function processesExtension(
   const manager = new ProcessManager({
     getConfiguredShellPath: () => configLoader.getConfig().execution.shellPath,
   });
-  const notifications = createNotificationRegistry();
   const notificationService = createNotificationService({
     events: pi.events,
     manager,
-    registry: notifications,
-    getProcess: (id) => manager.get(id),
   });
 
   const getConfig = () => configLoader.getConfig();
@@ -62,7 +56,7 @@ export default async function processesExtension(
   const disposers = [
     registerEventBridge(pi.events, manager),
     registerRequestHandlers(pi.events, manager, getConfig),
-    registerCommandHandlers(pi.events, manager, notifications),
+    registerCommandHandlers(pi.events, manager),
     registerLogSubscriptions(pi.events, manager),
     registerNotificationDelivery(pi.events, pi),
   ];
@@ -73,7 +67,7 @@ export default async function processesExtension(
   );
 
   registerProcessNotificationRenderer(pi);
-  registerProcessTool(pi, manager, notifications);
+  registerProcessTool(pi, manager);
   registerProcessSettings(pi);
   registerOverviewCommand(pi, { events: pi.events, registerOverlay });
   registerKillCommand(pi);
@@ -81,7 +75,6 @@ export default async function processesExtension(
 
   registerCleanupHook(pi, {
     manager,
-    notifications,
     notificationService,
     disposers,
     disposeOverlays: () => {

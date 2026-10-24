@@ -25,6 +25,8 @@ export type {
   ProcessProtocolNotificationKind,
   ProcessProtocolNotificationLogMatch,
   ProcessProtocolNotificationPayload,
+  ProcessProtocolWakeConditions,
+  ProcessProtocolWakeWatch,
 } from "./notifications";
 export { PROCESS_PROTOCOL_ATTENTIONS } from "./notifications";
 export type {

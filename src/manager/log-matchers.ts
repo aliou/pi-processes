@@ -1,14 +1,14 @@
-import { compileLineMatcher } from "../../../src/utils/match-line";
-import { plainTextForDisplay } from "../../shared/display-text";
-import type { NotifyConfig } from "./registry";
-import type { Attention } from "./types";
+import type { ProcessAttention, WatchMatch } from "../types";
+import { stripAnsi } from "../utils/ansi";
+import { compileLineMatcher } from "../utils/match-line";
+import type { ProcessWakeConfig } from "../wake";
 
 export interface CompiledLogMatcher {
   pattern: string;
   mode: "literal" | "regex";
   stream: "stdout" | "stderr" | "both";
   repeat: boolean;
-  on: Attention;
+  on: ProcessAttention;
   lineMatcher: ((line: string) => boolean) | null;
   matcherIndex: number;
   fired: boolean;
@@ -19,8 +19,11 @@ export const MAX_LOG_MATCHERS_PER_PROCESS = 20;
 export const MAX_LOG_MATCH_PATTERN_LENGTH = 500;
 const MAX_LINE_LENGTH = 10_000;
 const LOG_MATCH_COOLDOWN_MS = 15_000;
+const TAB_WIDTH = 8;
 
-export function compileLogMatchers(config: NotifyConfig): CompiledLogMatcher[] {
+export function compileLogMatchers(
+  config: ProcessWakeConfig,
+): CompiledLogMatcher[] {
   const raw = config.logMatches;
   if (!raw || raw.length === 0) return [];
 
@@ -67,21 +70,12 @@ export function compileLogMatchers(config: NotifyConfig): CompiledLogMatcher[] {
   return matchers;
 }
 
-export interface LogMatchResult {
-  matcherIndex: number;
-  pattern: string;
-  mode: "literal" | "regex";
-  stream: "stdout" | "stderr";
-  line: string;
-  on: Attention;
-}
-
 export function evaluateLogMatchers(
   matchers: CompiledLogMatcher[],
   appendedText: Array<{ type: "stdout" | "stderr"; text: string }>,
   now: number,
-): LogMatchResult[] {
-  const results: LogMatchResult[] = [];
+): WatchMatch[] {
+  const results: WatchMatch[] = [];
 
   const lines = splitAppendedIntoLines(appendedText);
 
@@ -134,13 +128,37 @@ function splitAppendedIntoLines(
       // Match the same per-line visible text the log views render. This keeps
       // CR-overwritten progress and invisible escape bytes from firing
       // watches, without making watches depend on viewport width.
-      const displayLine = plainTextForDisplay(line);
+      const displayLine = plainTextForLogLine(line);
       if (displayLine.length === 0) continue;
       lines.push({ type: entry.type, text: displayLine });
     }
   }
 
   return lines;
+}
+
+function plainTextForLogLine(line: string): string {
+  const carriageReturn = line.lastIndexOf("\r");
+  const visible = carriageReturn === -1 ? line : line.slice(carriageReturn + 1);
+  const clean = stripAnsi(visible);
+  if (!clean.includes("\t")) return clean;
+  return expandTabs(clean);
+}
+
+function expandTabs(text: string): string {
+  let out = "";
+  let column = 0;
+  for (const ch of text) {
+    if (ch === "\t") {
+      const spaces = TAB_WIDTH - (column % TAB_WIDTH);
+      out += " ".repeat(spaces);
+      column += spaces;
+      continue;
+    }
+    out += ch;
+    column += 1;
+  }
+  return out;
 }
 
 function streamMatches(

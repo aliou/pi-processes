@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ProcessManager } from "../../../../src/manager";
+import { ProcessManager } from "../../../../src/manager";
 import type { ProcessInfo } from "../../../../src/types";
-import { createNotificationRegistry } from "../../notifications/registry";
 import { executeUpdate } from "../update";
 import { executeList, formatListDetails } from ".";
 
@@ -28,10 +27,12 @@ function makeInfo(overrides: Partial<ProcessInfo> = {}): ProcessInfo {
 }
 
 function makeManager(processes: ProcessInfo[]): ProcessManager {
-  return {
-    list: () => processes,
-    get: (id: string) => processes.find((process) => process.id === id) ?? null,
-  } as unknown as ProcessManager;
+  const manager = new ProcessManager();
+  vi.spyOn(manager, "list").mockReturnValue(processes);
+  vi.spyOn(manager, "get").mockImplementation(
+    (id: string) => processes.find((process) => process.id === id) ?? null,
+  );
+  return manager;
 }
 
 describe("executeList duration", () => {
@@ -51,11 +52,8 @@ describe("executeList duration", () => {
       makeInfo({ startTime: now - 5000, endTime: null, status: "running" }),
     ]);
 
-    const details = executeList(
-      manager,
-      { action: "list" },
-      createNotificationRegistry(),
-    );
+    const details = executeList(manager, { action: "list" });
+    manager.cleanup();
 
     expect(details.processes[0].duration).toBe("5s");
   });
@@ -74,11 +72,8 @@ describe("executeList duration", () => {
       }),
     ]);
 
-    const details = executeList(
-      manager,
-      { action: "list" },
-      createNotificationRegistry(),
-    );
+    const details = executeList(manager, { action: "list" });
+    manager.cleanup();
 
     expect(details.processes[0].duration).toBe("1m 30s");
   });
@@ -92,11 +87,8 @@ describe("executeList duration", () => {
       makeInfo({ id: "b", startTime: now - 3000, endTime: null }),
     ]);
 
-    const details = executeList(
-      manager,
-      { action: "list" },
-      createNotificationRegistry(),
-    );
+    const details = executeList(manager, { action: "list" });
+    manager.cleanup();
 
     const durations = details.processes.map((p) => p.duration);
     expect(durations).toEqual(["3s", "3s"]);
@@ -111,11 +103,8 @@ describe("executeList duration", () => {
       makeInfo({ startTime: now + 50, endTime: null, status: "running" }),
     ]);
 
-    const details = executeList(
-      manager,
-      { action: "list" },
-      createNotificationRegistry(),
-    );
+    const details = executeList(manager, { action: "list" });
+    manager.cleanup();
 
     expect(details.processes[0].duration).toBe("0s");
   });
@@ -124,12 +113,11 @@ describe("executeList duration", () => {
 describe("executeList watches", () => {
   it("includes current watches for live processes", () => {
     const manager = makeManager([makeInfo()]);
-    const registry = createNotificationRegistry();
-    registry.register("proc_1", {
+    manager.registerWakeConfig("proc_1", {
       logMatches: [{ pattern: "ready" }, { pattern: "ERROR\nretry" }],
     });
 
-    const details = executeList(manager, { action: "list" }, registry);
+    const details = executeList(manager, { action: "list" });
 
     expect(details.processes[0].watches).toEqual([
       { pattern: "ready" },
@@ -138,26 +126,30 @@ describe("executeList watches", () => {
     expect(formatListDetails(details)).toContain(
       'patterns=["ready","ERROR\\nretry"]',
     );
+    manager.cleanup();
   });
 
   it("hides registered watches for finished processes", () => {
     const manager = makeManager([
       makeInfo({ status: "exited", success: true, endTime: 2000 }),
     ]);
-    const registry = createNotificationRegistry();
-    registry.register("proc_1", { logMatches: [{ pattern: "stale" }] });
+    manager.registerWakeConfig("proc_1", {
+      logMatches: [{ pattern: "stale" }],
+    });
 
-    const details = executeList(manager, { action: "list" }, registry);
+    const details = executeList(manager, { action: "list" });
 
     expect(details.processes[0].watches).toEqual([]);
     expect(formatListDetails(details)).toContain("patterns=[]");
+    manager.cleanup();
   });
 
   it("reflects append, replace, remove, and clear updates", () => {
     const process = makeInfo();
     const manager = makeManager([process]);
-    const registry = createNotificationRegistry();
-    registry.register(process.id, { logMatches: [{ pattern: "initial" }] });
+    manager.registerWakeConfig(process.id, {
+      logMatches: [{ pattern: "initial" }],
+    });
 
     executeUpdate(
       {
@@ -166,10 +158,9 @@ describe("executeList watches", () => {
         watches: { mode: "append", items: [{ pattern: "appended" }] },
       },
       manager,
-      registry,
     );
     expect(
-      formatListDetails(executeList(manager, { action: "list" }, registry)),
+      formatListDetails(executeList(manager, { action: "list" })),
     ).toContain('patterns=["initial","appended"]');
 
     executeUpdate(
@@ -182,10 +173,9 @@ describe("executeList watches", () => {
         },
       },
       manager,
-      registry,
     );
     expect(
-      formatListDetails(executeList(manager, { action: "list" }, registry)),
+      formatListDetails(executeList(manager, { action: "list" })),
     ).toContain('patterns=["first","second"]');
 
     executeUpdate(
@@ -195,10 +185,9 @@ describe("executeList watches", () => {
         watches: { mode: "remove", items: [{ index: 0 }] },
       },
       manager,
-      registry,
     );
     expect(
-      formatListDetails(executeList(manager, { action: "list" }, registry)),
+      formatListDetails(executeList(manager, { action: "list" })),
     ).toContain('patterns=["second"]');
 
     executeUpdate(
@@ -208,10 +197,10 @@ describe("executeList watches", () => {
         watches: { mode: "clear" },
       },
       manager,
-      registry,
     );
     expect(
-      formatListDetails(executeList(manager, { action: "list" }, registry)),
+      formatListDetails(executeList(manager, { action: "list" })),
     ).toContain("patterns=[]");
+    manager.cleanup();
   });
 });

@@ -9,13 +9,11 @@ import {
   type CommandKillPayload,
   type CommandStartPayload,
 } from "../../shared/protocol";
-import type { NotificationRegistry } from "../notifications/registry";
 import { killIntentionally } from "./kill-process";
 
 export function registerCommandHandlers(
   events: EventBus,
   manager: ProcessManager,
-  notifications: NotificationRegistry,
 ): () => void {
   const disposers = [
     events.on(CHANNELS.COMMAND_START, (payload) => {
@@ -27,7 +25,7 @@ export function registerCommandHandlers(
           command.command,
           command.cwd ?? process.cwd(),
         );
-        notifications.register(info.id, {});
+        manager.registerWakeConfig(info.id, {});
         safeReply(command.reply, { ok: true, process: info });
       } catch (err) {
         safeReply(command.reply, {
@@ -39,7 +37,7 @@ export function registerCommandHandlers(
     events.on(CHANNELS.COMMAND_KILL, (payload) => {
       const command = payload as CommandKillPayload;
 
-      void killIntentionally(manager, notifications, command.id, {
+      void killIntentionally(manager, command.id, {
         signal: command.signal,
         timeoutMs: command.timeoutMs,
       }).then(
@@ -67,7 +65,7 @@ export function registerCommandHandlers(
             startTime: command.startTime,
           },
         );
-        notifications.register(info.id, {});
+        manager.registerWakeConfig(info.id, {});
         safeReply(command.reply, { ok: true, info });
       } catch (error) {
         safeReply(command.reply, {

@@ -1,10 +1,11 @@
 import type { ProcessInfo } from "../../../src/types";
+import type { ProcessListEntry } from "../../../src/wake";
 
 // UI emits, core listens and calls reply synchronously.
 // Reply callbacks make this an in-process protocol, not serializable IPC/RPC.
 
 export interface RequestListPayload {
-  reply: (processes: ProcessInfo[]) => void;
+  reply: (processes: ProcessListEntry[]) => void;
 }
 
 export interface RequestGetPayload {

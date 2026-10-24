@@ -1,7 +1,6 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import type { ProcessManager } from "../../../../src/manager";
-import type { NotificationRegistry } from "../../notifications/registry";
 import { normalizeNotifyConfig } from "../notify";
 import type { ProcessesParamsType, StartDetails } from "../schema";
 import { formatMatcherForModel } from "../watch-format";
@@ -11,7 +10,6 @@ export function executeStart(
   params: ProcessesParamsType,
   manager: ProcessManager,
   ctx: ExtensionContext,
-  notifications: NotificationRegistry,
 ): StartDetails {
   if (!params.name) {
     throw new Error("process start requires name");
@@ -30,7 +28,7 @@ export function executeStart(
     cwd,
     buildSessionEnv(ctx),
   );
-  notifications.register(process.id, notify);
+  manager.registerWakeConfig(process.id, notify);
 
   return {
     action: "start",

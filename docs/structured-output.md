@@ -21,14 +21,14 @@ their owners instead of being re-described per consumer:
 | `PROCESS_STATUSES`, `PROCESS_END_REASONS`, `ProcessSignalInfoSchema`, `ProcessInfoSchema` | `src/types.ts` | status enum unions, every member that embeds a process, list's `ListProcessSchema` |
 | `LINE_MATCH_MODES` | `src/utils/match-line.ts` | matcher/matcher schemas on both sides |
 | `PROCESS_PROTOCOL_ATTENTIONS` | `extensions/shared/protocol/notifications.ts` | notify attention fields everywhere |
-| `LogMatcherConfigSchema`, `NotifyConfigSchema` | `extensions/processes/notifications/registry.ts` | tool input (`tools/schema.ts`), `start`/`update`/`list` members, `WatchUpdateItemParams` |
+| `LogMatcherConfigSchema`, `NotifyConfigSchema` | `extensions/processes/tools/notify-config.ts` | tool input (`tools/schema.ts`), `start`/`update`/`list` members, `WatchUpdateItemParams` |
 | `PROCESS_*` input tuples (streams, list filters/sorts, watch-update modes) | `extensions/processes/tools/schema.ts` | input params + their own members |
 | member schemas → details types (`StartDetails`, `ListDetails`, …) | `extensions/processes/tools/schema.ts` | action executors return them; dispatcher passes them as `structuredContent` |
 
-The tool input reuses the registry schemas directly (`NotifyParams` is
+The tool input reuses the notify-config schemas directly (`NotifyParams` is
 `Type.Object(NotifyConfigSchema.properties, …)`), so the model-facing notify
-parameters, the runtime registry config, and the structured output are the
-same object shape by construction.
+parameters, the manager's wake config, and the structured output are the same
+object shape by construction.
 
 pi renders the union into codemode's tool declarations (roughly 2 KB of
 TypeScript text in the system prompt while codemode is active). Keep field

@@ -1,10 +1,8 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ProcessManager } from "../../../../src/manager";
+import { ProcessManager } from "../../../../src/manager";
 import type { ProcessInfo } from "../../../../src/types";
-import type { NotificationRegistry } from "../../notifications/registry";
-import { createNotificationRegistry } from "../../notifications/registry";
 import { executeStart, formatStartDetails } from ".";
 
 const processInfo: ProcessInfo = {
@@ -33,15 +31,16 @@ const ctx = {
   },
 } as ExtensionContext;
 
-function createFakeRegistry(): NotificationRegistry {
-  return createNotificationRegistry();
+function createManager(start: ReturnType<typeof vi.fn>): ProcessManager {
+  const manager = new ProcessManager();
+  vi.spyOn(manager, "start").mockImplementation(start as never);
+  return manager;
 }
 
 describe("executeStart", () => {
   it("validates notify before starting the process", () => {
     const start = vi.fn(() => processInfo);
-    const manager = { start } as unknown as ProcessManager;
-    const registry = createFakeRegistry();
+    const manager = createManager(start);
 
     expect(() =>
       executeStart(
@@ -53,17 +52,16 @@ describe("executeStart", () => {
         },
         manager,
         ctx,
-        registry,
       ),
     ).toThrow(/not a valid regular expression/);
 
     expect(start).not.toHaveBeenCalled();
+    manager.cleanup();
   });
 
   it("returns normalized notify config in start details", () => {
     const start = vi.fn(() => processInfo);
-    const manager = { start } as unknown as ProcessManager;
-    const registry = createFakeRegistry();
+    const manager = createManager(start);
 
     const details = executeStart(
       {
@@ -74,7 +72,6 @@ describe("executeStart", () => {
       },
       manager,
       ctx,
-      registry,
     );
 
     expect(start).toHaveBeenCalledWith(
@@ -97,12 +94,12 @@ describe("executeStart", () => {
         },
       ],
     });
+    manager.cleanup();
   });
 
-  it("registers notify config with the notification registry after successful start", () => {
+  it("registers wake config with the manager after successful start", () => {
     const start = vi.fn(() => processInfo);
-    const manager = { start } as unknown as ProcessManager;
-    const registry = createFakeRegistry();
+    const manager = createManager(start);
 
     const notify = { logMatches: [{ pattern: "ready" }] };
     executeStart(
@@ -114,22 +111,21 @@ describe("executeStart", () => {
       },
       manager,
       ctx,
-      registry,
     );
 
-    const registered = registry.get("proc_1");
+    const registered = manager.getWakeConfig("proc_1");
     expect(registered).not.toBeNull();
     expect(registered?.onSuccess).toBe("turn");
     expect(registered?.onFailure).toBe("turn");
     expect(registered?.onKilled).toBe("context");
     expect(registered?.logMatches).toHaveLength(1);
     expect(registered?.logMatches?.[0]?.pattern).toBe("ready");
+    manager.cleanup();
   });
 
-  it("does not register notify config when validation fails", () => {
+  it("does not register wake config when validation fails", () => {
     const start = vi.fn(() => processInfo);
-    const manager = { start } as unknown as ProcessManager;
-    const registry = createFakeRegistry();
+    const manager = createManager(start);
 
     expect(() =>
       executeStart(
@@ -141,17 +137,16 @@ describe("executeStart", () => {
         },
         manager,
         ctx,
-        registry,
       ),
     ).toThrow(/not a valid regular expression/);
 
-    expect(registry.get("proc_1")).toBeNull();
+    expect(manager.getWakeConfig("proc_1")).toBeNull();
+    manager.cleanup();
   });
 
   it("starts with the explicit cwd when provided", () => {
     const start = vi.fn(() => ({ ...processInfo, cwd: "/explicit" }));
-    const manager = { start } as unknown as ProcessManager;
-    const registry = createFakeRegistry();
+    const manager = createManager(start);
 
     const details = executeStart(
       {
@@ -162,7 +157,6 @@ describe("executeStart", () => {
       },
       manager,
       ctx,
-      registry,
     );
 
     expect(start).toHaveBeenCalledWith(
@@ -172,12 +166,12 @@ describe("executeStart", () => {
       expect.anything(),
     );
     expect(details.process.cwd).toBe("/explicit");
+    manager.cleanup();
   });
 
   it("falls back to ctx.cwd when cwd is not provided", () => {
     const start = vi.fn(() => ({ ...processInfo, cwd: "/repo" }));
-    const manager = { start } as unknown as ProcessManager;
-    const registry = createFakeRegistry();
+    const manager = createManager(start);
 
     executeStart(
       {
@@ -187,7 +181,6 @@ describe("executeStart", () => {
       },
       manager,
       ctx,
-      registry,
     );
 
     expect(start).toHaveBeenCalledWith(
@@ -196,12 +189,12 @@ describe("executeStart", () => {
       "/repo",
       expect.anything(),
     );
+    manager.cleanup();
   });
 
   it("starts with PI_* session variables injected into the child env", () => {
     const start = vi.fn((..._args: unknown[]) => processInfo);
-    const manager = { start } as unknown as ProcessManager;
-    const registry = createFakeRegistry();
+    const manager = createManager(start);
 
     executeStart(
       {
@@ -211,12 +204,12 @@ describe("executeStart", () => {
       },
       manager,
       ctx,
-      registry,
     );
 
     const env = start.mock.calls[0]?.[3] as NodeJS.ProcessEnv;
     expect(env.PI_SESSION_ID).toBe("session-123");
     expect(env.PI_SESSION_FILE).toBe("/tmp/session-123.jsonl");
+    manager.cleanup();
   });
 });
 

@@ -2,11 +2,8 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import { type Static, Type } from "typebox";
 import { KILL_FAILURE_REASONS, ProcessInfoSchema } from "../../../src/types";
 import { LINE_MATCH_MODES } from "../../../src/utils/match-line";
-import {
-  LogMatcherConfigSchema,
-  NotifyConfigSchema,
-} from "../notifications/registry";
 import { MAX_NOTIFY_LOG_MATCHERS, MAX_NOTIFY_PATTERN_LENGTH } from "./notify";
+import { LogMatcherConfigSchema, NotifyConfigSchema } from "./notify-config";
 
 // --- Output action constants ---
 

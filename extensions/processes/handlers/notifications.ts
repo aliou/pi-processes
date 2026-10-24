@@ -72,6 +72,13 @@ export function registerNotificationDelivery(
     return count;
   };
 
+  const stampSessionIdle = (
+    payload: ProcessProtocolNotificationPayload,
+  ): ProcessProtocolNotificationPayload => ({
+    ...payload,
+    sessionIdle: sessionIdle === true,
+  });
+
   const sendSuppressedSummary = (count: number) => {
     if (count === 0) return;
     const details: ProcessProtocolNotificationPayload = {
@@ -85,7 +92,7 @@ export function registerNotificationDelivery(
     };
     sendProcessNotificationMessage(
       pi,
-      details,
+      stampSessionIdle(details),
       attentionToSendOptions(details.attention),
     );
   };
@@ -127,7 +134,9 @@ export function registerNotificationDelivery(
       }
 
       if (payload.attention === "turn" && sessionIdle === true) {
-        sendProcessNotificationMessage(pi, payload, { triggerTurn: false });
+        sendProcessNotificationMessage(pi, stampSessionIdle(payload), {
+          triggerTurn: false,
+        });
         if (!wakePending) {
           wakePending = true;
           try {
@@ -140,7 +149,7 @@ export function registerNotificationDelivery(
       }
 
       const options = attentionToSendOptions(payload.attention);
-      sendProcessNotificationMessage(pi, payload, options);
+      sendProcessNotificationMessage(pi, stampSessionIdle(payload), options);
     },
   );
 

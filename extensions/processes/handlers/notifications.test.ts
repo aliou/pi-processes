@@ -97,6 +97,86 @@ describe("registerNotificationDelivery", () => {
     expect(sendMessage).not.toHaveBeenCalled();
   });
 
+  it("persists sessionIdle false for a notification delivered during an active run", () => {
+    const events = createEventBus();
+    const { pi, handlers, sendMessage } = piWithNotificationApi();
+    registerNotificationDelivery(events, pi);
+    fireLifecycle(handlers, ["session_start", "agent_start"], false);
+
+    events.emit(CHANNELS.NOTIFICATION, makePayload({ attention: "context" }));
+
+    const [message] = sendMessage.mock.calls[0];
+    expect(message.details.sessionIdle).toBe(false);
+  });
+
+  it("persists sessionIdle true for a notification delivered while the host is idle", () => {
+    const events = createEventBus();
+    const { pi, handlers, sendMessage, sendUserMessage } =
+      piWithNotificationApi();
+    registerNotificationDelivery(events, pi);
+    fireLifecycle(
+      handlers,
+      ["session_start", "turn_end", "agent_end", "agent_settled"],
+      true,
+    );
+
+    const payload = makePayload({ attention: "turn" });
+    events.emit(CHANNELS.NOTIFICATION, payload);
+
+    const [message] = sendMessage.mock.calls[0];
+    expect(message.details.sessionIdle).toBe(true);
+    expect(sendUserMessage).toHaveBeenCalledTimes(1);
+    expect(payload.sessionIdle).toBeUndefined();
+    expect(message.details).not.toBe(payload);
+  });
+
+  it("does not mutate the payload broadcast on the notification channel", () => {
+    const events = createEventBus();
+    const sendMessage = vi.fn();
+    const observed: ProcessProtocolNotificationPayload[] = [];
+    events.on(CHANNELS.NOTIFICATION, (raw: unknown) => {
+      observed.push(raw as ProcessProtocolNotificationPayload);
+    });
+    registerNotificationDelivery(events, piWithSendMessage(sendMessage));
+
+    const payload = makePayload({ attention: "context" });
+    events.emit(CHANNELS.NOTIFICATION, payload);
+
+    expect(observed).toHaveLength(1);
+    expect(observed[0]).toBe(payload);
+    expect(payload.sessionIdle).toBeUndefined();
+    expect(sendMessage.mock.calls[0][0].details).not.toBe(payload);
+  });
+
+  it("records the idle state on the suppressed log-match summary", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    const events = createEventBus();
+    const { pi, handlers, sendMessage } = piWithNotificationApi();
+    registerNotificationDelivery(events, pi);
+    fireLifecycle(
+      handlers,
+      ["session_start", "turn_end", "agent_end", "agent_settled"],
+      true,
+    );
+
+    for (let index = 0; index < 30; index++) {
+      events.emit(
+        CHANNELS.NOTIFICATION,
+        makePayload({ kind: "log_match", attention: "turn" }),
+      );
+    }
+    expect(sendMessage).toHaveBeenCalledTimes(20);
+
+    vi.advanceTimersByTime(60_000);
+    expect(sendMessage).toHaveBeenCalledTimes(21);
+    const [summary] = sendMessage.mock.calls.at(-1) ?? [];
+    expect(summary.details.kind).toBe("log_match_suppressed");
+    expect(summary.details.sessionIdle).toBe(true);
+
+    vi.useRealTimers();
+  });
+
   it("caps log-match delivery, summarizes suppression, and exempts lifecycle events", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));

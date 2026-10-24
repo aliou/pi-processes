@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ProcessInfo } from "../../../src/types";
-import type { NotifyConfig } from "../notifications/registry";
+import type { ProcessWakeConfig } from "../../../src/wake";
 import { buildOutputStructuredContent } from "./output";
 import {
   type ClearDetails,
@@ -36,7 +36,7 @@ function runningProcess(): ProcessInfo {
   };
 }
 
-const notify: NotifyConfig = {
+const notify: ProcessWakeConfig = {
   onSuccess: "turn",
   onFailure: "turn",
   onKilled: "context",

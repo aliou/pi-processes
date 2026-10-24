@@ -5,13 +5,20 @@ notifications that reach the agent, which user options control each path, and
 which paths bypass user config. It covers the event flow only — UI rendering
 (`/ps`, dock, logs overlay) is out of scope.
 
-There are two layers:
+There are three layers:
 
-1. **NotificationService** (`extensions/processes/notifications/service.ts`)
-   listens to the `ProcessManager` event bus, classifies the end, resolves an
-   attention level, and emits a language-neutral payload on
-   `CHANNELS.NOTIFICATION`.
-2. **Delivery listener** (`extensions/processes/handlers/notifications.ts`)
+1. **ProcessManager wake state** (`src/manager/process-wake.ts`, the
+   `ProcessWakeController`) owns each process's notify config, log watches,
+   one-shot fired state, and intentional-stop markers. It evaluates watches on
+   `process_output_changed` and emits `process_watch_matched`; it clears a
+   process's wake state after `process_ended`.
+2. **NotificationService** (`extensions/processes/notifications/service.ts`)
+   subscribes to the manager's `process_ended` and `process_watch_matched`
+   events, classifies the end, resolves an attention level, and emits a
+   language-neutral payload on `CHANNELS.NOTIFICATION`. It is a message
+   shaper only; all wake state and watch evaluation live in the
+   pi-agnostic manager.
+3. **Delivery listener** (`extensions/processes/handlers/notifications.ts`)
    subscribes to `CHANNELS.NOTIFICATION`, applies log-match rate limiting, and
    converts each payload into a persisted Pi custom message via
    `sendProcessNotificationMessage`.
@@ -42,10 +49,45 @@ This package targets pi 1.0.0; if you must support older pi, send
 `deliverAs: "nextTurn"` instead — it defers the message until the next user
 prompt on every version.
 
+### Session idle state in persisted messages
+
+Every delivered notification records `sessionIdle` in the persisted
+`ad-process:notification` message `details`: whether the session was idle at
+send time. The delivery listener (`registerNotificationDelivery` in
+`extensions/processes/handlers/notifications.ts`) stamps it on a shallow copy
+of the payload at delivery time, from the same `sessionIdle` variable that
+drives the idle-wake path above. The payload broadcast on
+`CHANNELS.NOTIFICATION` is never mutated and never carries the field, so UI
+extensions observing the channel are unaffected. This covers the suppressed
+log-match summary too, so saved history can distinguish a completion that woke
+an idle session from one steered into an active run.
+
+### Wake conditions
+
+`ProcessManager.getWakeConditions(processId)` (backed by
+`ProcessWakeController` in `src/manager/process-wake.ts`) is the single source
+of truth for what can still wake the agent on behalf of a process. It returns
+`null` for unknown or ended processes:
+
+- `exitAttention` — the effective attention per end state, from the
+  per-process wake config resolved through `resolveWakeAttention` and
+  `DEFAULT_WAKE_ATTENTION` (a process with no registered config gets the
+  defaults).
+- `watches` — the still-configured log watches with defaults resolved, plus
+  each watch's `fired` flag from the controller's live
+  `CompiledLogMatcher` state, the only place one-shot fired state exists.
+  A `repeat: false` watch that already fired reports `fired: true`.
+
+`ProcessManager.listWithWake()` attaches these conditions as a `wake` field
+on every live process in the list. The `processes:request:list` handler
+replies with it directly (see [events.md](events.md)); ended processes omit
+the field.
+
 ## Per-process notify config
 
-Registered by the `process start` and `process update` tools
-(`normalizeNotifyConfig` in `extensions/processes/tools/notify.ts`):
+Registered with the manager (`registerWakeConfig`) by the `process start`
+and `process update` tools (`normalizeNotifyConfig` in
+`extensions/processes/tools/notify.ts`):
 
 | Field        | Type                              | Default   |
 | ------------ | --------------------------------- | --------- |
@@ -87,9 +129,10 @@ provider request on — no user prompt required.
 ## Lifecycle notifications
 
 `NotificationService.handleProcessEnded` runs on every `process_ended` event
-(deferred one microtask so the start tool can register the notify config
-first). It classifies the end, resolves attention from the per-process config
-or defaults, and either emits or suppresses.
+(deferred one microtask so the start tool can register the wake config
+first; the manager clears its wake state for the process in a later
+microtask). It classifies the end, resolves attention from the manager's
+per-process wake config or defaults, and either emits or suppresses.
 
 ### Classification
 
@@ -110,8 +153,8 @@ tool result (`KillResult.reason: "timeout"`) instead.
 
 ### Attention resolution
 
-`resolveAttention` picks the config field for the kind, falling back to
-`DEFAULT_ATTENTION`:
+`resolveWakeAttention` (in `src/wake.ts`) picks the config field for the
+kind, falling back to `DEFAULT_WAKE_ATTENTION`:
 
 | Kind      | Config field | Default   |
 | --------- | ------------ | --------- |
@@ -139,7 +182,7 @@ without waking or steering the agent.
 
 A stop is *intentional* when it goes through `killIntentionally`
 (`extensions/processes/handlers/kill-process.ts`), which calls
-`registry.markIntentionalStop(id)` before `manager.kill`. Three entry points
+`manager.markIntentionalStop(id)` before `manager.kill`. Three entry points
 use it:
 
 - The `process stop` tool.
@@ -171,7 +214,7 @@ child process exits 0
         NotificationService.handleEvent               extensions/processes/notifications/service.ts
           queueMicrotask → handleProcessEnded
             classifyProcessEnd → "success"
-            resolveAttention → config.onSuccess ?? "turn"
+            resolveWakeAttention → config.onSuccess ?? "turn"
             emit kind=success attention=<onSuccess>
               delivery listener → sendProcessNotificationMessage(triggerTurn=<onSuccess>)
 ```
@@ -188,7 +231,7 @@ child process exits non-zero
       emit process_ended
         handleProcessEnded
           classifyProcessEnd → "crash"          (exitCode !== 0)
-          resolveAttention → config.onFailure ?? "turn"
+          resolveWakeAttention → config.onFailure ?? "turn"
           forced display: onFailure==="ignore" → upgraded to "context"
           emit kind=crash attention=<resolved or "context">
             delivery listener → sendProcessNotificationMessage
@@ -206,7 +249,7 @@ spawn error (or liveness tick detects lost/missing_pid)
       emit process_ended
         handleProcessEnded
           classifyProcessEnd → "crash"
-          resolveAttention → config.onFailure ?? "turn"
+          resolveWakeAttention → config.onFailure ?? "turn"
           forced display: ignore → "context"
           emit kind=crash attention=<resolved or "context">
 ```
@@ -223,7 +266,7 @@ external signal kills the process group
         handleProcessEnded
           isIntentionalStop? no (no marker)
           classifyProcessEnd → "killed"
-          resolveAttention → config.onKilled ?? "context"
+          resolveWakeAttention → config.onKilled ?? "context"
           (no forced display for killed)
           attention==="ignore" → suppressed; else emit kind=killed
             delivery listener → sendProcessNotificationMessage(triggerTurn=<onKilled>)
@@ -239,7 +282,7 @@ Default: a context message (no turn). `onKilled: "turn` promotes to a turn.
   requestKill / executeStop
     COMMAND_KILL handler                         extensions/processes/handlers/commands.ts
       killIntentionally                          extensions/processes/handlers/kill-process.ts
-        registry.markIntentionalStop(id)
+        manager.markIntentionalStop(id)
         manager.kill(id, opts)
           transition(managed, "killed"|"exited")
             emit process_ended
@@ -266,24 +309,27 @@ No notification. The timeout is reported through the tool/command result only.
 
 ## Log-watch notifications
 
-`NotificationService.handleOutputChanged` runs on every
-`process_output_changed` event. It syncs the compiled matcher set for the
-process, evaluates matchers against the appended text, and emits one
-`log_match` payload per match with the matcher's `on` attention.
+The manager evaluates watches: `ProcessWakeController.handleOutputChanged`
+runs on every `process_output_changed` event routed through the manager. It
+syncs the compiled matcher set for the process, evaluates matchers against
+the appended text, and emits a `process_watch_matched` manager event with
+the matches. The NotificationService then emits one `log_match` payload per
+match with the matcher's `on` attention.
 
 ```
 process emits output
   ProcessOutput append
     emit process_output_changed { id, appendedText }
-      NotificationService.handleOutputChanged
-        registry.getWatchState(id) → null? return
+      ProcessWakeController.handleOutputChanged        src/manager/process-wake.ts
+        registry wake state for id → none? return
         syncMatcherState(id, watchState)
-        evaluateLogMatchers(matchers, appendedText, now)
+        evaluateLogMatchers(matchers, appendedText, now)   src/manager/log-matchers.ts
           per matcher: skip if !repeat && fired; cooldown if repeat+fired
-          per line: stream filter, plainTextForDisplay, lineMatcher
-        for each match:
-          emit kind=log_match attention=match.on
-            delivery listener → rate-limit check → sendProcessNotificationMessage
+          per line: stream filter, plainTextForLogLine, lineMatcher
+        emit process_watch_matched { id, matches }
+          NotificationService.handleWatchMatches
+            emit kind=log_match attention=match.on
+              delivery listener → rate-limit check → sendProcessNotificationMessage
 ```
 
 Matcher behavior:
@@ -291,7 +337,8 @@ Matcher behavior:
 - `repeat: false` (default) fires once per process lifetime.
 - `repeat: true` fires again after a 15s cooldown
   (`LOG_MATCH_COOLDOWN_MS`).
-- Lines are normalized with `plainTextForDisplay` before matching, so CR
+- Lines are normalized with `plainTextForLogLine`
+  (`src/manager/log-matchers.ts`) before matching, so CR
   progress lines and escape bytes do not fire watches.
 - Lines longer than 10 000 chars are skipped.
 
@@ -334,11 +381,17 @@ The summary is always `context`.
 
 ## References
 
-- `extensions/processes/notifications/service.ts` — event handling, attention
-  resolution, intentional-stop bypass, log-match emission.
+- `extensions/processes/notifications/service.ts` — manager-event
+  subscription, attention resolution, intentional-stop bypass,
+  log-match message shaping.
 - `extensions/processes/notifications/classify.ts` — end classification.
-- `extensions/processes/notifications/registry.ts` — per-process config and
-  intentional-stop markers.
+- `src/manager/process-wake.ts` — the `ProcessWakeController`: per-process
+  wake config, watch state, one-shot fired state, and intentional-stop
+  markers, plus watch evaluation and `getWakeConditions`/`listWithWake`.
+- `src/manager/log-matchers.ts` — watch compilation, evaluation, cooldown,
+  and matcher caps.
+- `src/wake.ts` — plain wake-domain types, `DEFAULT_WAKE_ATTENTION`, and
+  `resolveWakeAttention`.
 - `extensions/processes/handlers/kill-process.ts` — intentional stop marking.
 - `extensions/processes/handlers/notifications.ts` — delivery listener,
   log-match rate limiting, and the idle-host wake.

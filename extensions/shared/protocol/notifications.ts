@@ -1,8 +1,14 @@
 import type {
+  ProcessAttention,
   ProcessEndReason,
   ProcessSignalInfo,
   ProcessStatus,
 } from "../../../src/types";
+import { PROCESS_ATTENTIONS } from "../../../src/types";
+import type {
+  ProcessWakeConditions,
+  ProcessWakeWatch,
+} from "../../../src/wake";
 
 /**
  * Notification event payload broadcast on {@link CHANNELS.NOTIFICATION}.
@@ -14,14 +20,14 @@ import type {
  * delivery listener converts it back into a persisted custom message, while UI
  * extensions use it for highlighting (e.g. log-match markers).
  */
-export const PROCESS_PROTOCOL_ATTENTIONS = [
-  "turn",
-  "context",
-  "ignore",
-] as const;
+export type ProcessProtocolAttention = ProcessAttention;
 
-export type ProcessProtocolAttention =
-  (typeof PROCESS_PROTOCOL_ATTENTIONS)[number];
+export const PROCESS_PROTOCOL_ATTENTIONS = PROCESS_ATTENTIONS;
+
+export type {
+  ProcessWakeConditions as ProcessProtocolWakeConditions,
+  ProcessWakeWatch as ProcessProtocolWakeWatch,
+};
 
 export type ProcessProtocolNotificationKind =
   | "success"
@@ -52,4 +58,5 @@ export interface ProcessProtocolNotificationPayload {
   signal?: ProcessSignalInfo | null;
   logMatch?: ProcessProtocolNotificationLogMatch;
   attention: ProcessProtocolAttention;
+  sessionIdle?: boolean;
 }

@@ -1,40 +1,15 @@
 import type { EventBus } from "@earendil-works/pi-coding-agent";
 
 import type { ProcessManager } from "../../../src/manager";
-import type { ManagerEvent, ProcessInfo } from "../../../src/types";
+import type { ManagerEvent, ProcessInfo, WatchMatch } from "../../../src/types";
+import { resolveWakeAttention } from "../../../src/wake";
 import { CHANNELS } from "../../shared/protocol";
 import { classifyProcessEnd } from "./classify";
-import {
-  type CompiledLogMatcher,
-  compileLogMatchers,
-  evaluateLogMatchers,
-  type LogMatchResult,
-} from "./log-matchers";
-import type { NotifyConfig, WatchState } from "./registry";
-import {
-  createNotificationRegistry,
-  type NotificationRegistry,
-} from "./registry";
 import type {
   Attention,
   ProcessNotificationDetails,
   ProcessNotificationKind,
 } from "./types";
-
-const DEFAULT_ATTENTION: Record<
-  "onSuccess" | "onFailure" | "onKilled",
-  Attention
-> = {
-  // Keep in sync with DEFAULT_NOTIFY_CONFIG in tools/notify.ts. Success
-  // defaults to a turn because "context" is only seen by an agent that is
-  // still streaming when the process ends.
-  onSuccess: "turn",
-  onFailure: "turn",
-  // External kills surface as context by default (see DEFAULT_NOTIFY_CONFIG
-  // in tools/notify.ts for rationale). Intentional stops are classified
-  // separately and never reach this branch.
-  onKilled: "context",
-};
 
 export interface NotificationServiceDeps {
   /**
@@ -46,22 +21,13 @@ export interface NotificationServiceDeps {
    */
   events: EventBus;
   manager: ProcessManager;
-  registry: NotificationRegistry;
-  getProcess: (id: string) => ProcessInfo | null;
-}
-
-interface ProcessMatcherState {
-  matchers: CompiledLogMatcher[];
-  revision: number;
-  generation: number;
 }
 
 export function createNotificationService(deps: NotificationServiceDeps): {
   dispose: () => void;
 } {
-  const { events, manager, registry, getProcess } = deps;
+  const { events, manager } = deps;
   let disposed = false;
-  const matcherStates = new Map<string, ProcessMatcherState>();
 
   const unsubscribe = manager.onEvent(handleEvent);
 
@@ -70,7 +36,7 @@ export function createNotificationService(deps: NotificationServiceDeps): {
 
     if (event.type === "process_ended") {
       // Defer to a microtask so that tool code (e.g. executeStart) can
-      // register the notify config in the registry before we read it.
+      // register the wake config in the manager before we read it.
       // manager.start() may synchronously emit process_ended for missing_pid.
       queueMicrotask(() => {
         if (disposed) return;
@@ -79,33 +45,27 @@ export function createNotificationService(deps: NotificationServiceDeps): {
       return;
     }
 
-    if (event.type === "process_output_changed") {
-      handleOutputChanged(event);
+    if (event.type === "process_watch_matched") {
+      handleWatchMatches(event.id, event.matches);
       return;
     }
   }
 
   function handleProcessEnded(info: ProcessInfo): void {
-    const isIntentionalStop = registry.consumeIntentionalStop(info.id);
+    const isIntentionalStop = manager.consumeIntentionalStop(info.id);
     const kind = classifyProcessEnd(info);
 
     if (isIntentionalStop) {
       const details = buildLifecycleDetails(info, kind, "context");
       events.emit(CHANNELS.NOTIFICATION, details);
-
-      cleanupMatcherState(info.id);
-      registry.unregister(info.id);
       return;
     }
 
-    const config = registry.get(info.id);
-    const attention = resolveAttention(kind, config);
+    const attention = resolveEndAttention(info.id, kind);
 
     const shouldForceDisplay = kind === "crash" || kind === "failure";
 
     if (attention === "ignore" && !shouldForceDisplay) {
-      cleanupMatcherState(info.id);
-      registry.unregister(info.id);
       return;
     }
 
@@ -114,61 +74,41 @@ export function createNotificationService(deps: NotificationServiceDeps): {
 
     const details = buildLifecycleDetails(info, kind, effectiveAttention);
     events.emit(CHANNELS.NOTIFICATION, details);
-
-    cleanupMatcherState(info.id);
-    registry.unregister(info.id);
   }
 
-  function handleOutputChanged(
-    event: ManagerEvent & { type: "process_output_changed" },
-  ): void {
-    if (!event.appendedText || event.appendedText.length === 0) return;
-
-    const watchState = registry.getWatchState(event.id);
-    if (!watchState) return;
-
-    const state = syncMatcherState(event.id, watchState);
-    if (!state) return;
-
-    const matchTime = performance.now();
-    const matches = evaluateLogMatchers(
-      state.matchers,
-      event.appendedText,
-      matchTime,
-    );
-
-    const processInfo = getProcess(event.id);
-    const timestamp = Date.now();
-
-    for (const match of matches) {
-      const attention = match.on;
-      const details = buildLogMatchDetails(
-        event.id,
-        processInfo,
-        match,
-        attention,
-        timestamp,
-      );
-      events.emit(CHANNELS.NOTIFICATION, details);
-    }
-  }
-
-  function resolveAttention(
+  function resolveEndAttention(
+    processId: string,
     kind: ProcessNotificationKind,
-    config: NotifyConfig | null,
   ): Attention {
+    const config = manager.getWakeConfig(processId);
     switch (kind) {
       case "success":
-        return config?.onSuccess ?? DEFAULT_ATTENTION.onSuccess;
+        return resolveWakeAttention("onSuccess", config);
       case "failure":
       case "crash":
-        return config?.onFailure ?? DEFAULT_ATTENTION.onFailure;
+        return resolveWakeAttention("onFailure", config);
       case "killed":
-        return config?.onKilled ?? DEFAULT_ATTENTION.onKilled;
+        return resolveWakeAttention("onKilled", config);
       case "log_match":
         return "turn";
       case "log_match_suppressed":
         return "context";
+    }
+  }
+
+  function handleWatchMatches(processId: string, matches: WatchMatch[]): void {
+    const processInfo = manager.get(processId);
+    const timestamp = Date.now();
+
+    for (const match of matches) {
+      const details = buildLogMatchDetails(
+        processId,
+        processInfo,
+        match,
+        match.on,
+        timestamp,
+      );
+      events.emit(CHANNELS.NOTIFICATION, details);
     }
   }
 
@@ -221,7 +161,7 @@ export function createNotificationService(deps: NotificationServiceDeps): {
   function buildLogMatchDetails(
     processId: string,
     processInfo: ProcessInfo | null,
-    match: LogMatchResult,
+    match: WatchMatch,
     attention: Attention,
     timestamp: number,
   ): ProcessNotificationDetails {
@@ -248,95 +188,10 @@ export function createNotificationService(deps: NotificationServiceDeps): {
     };
   }
 
-  function syncMatcherState(
-    processId: string,
-    watchState: WatchState,
-  ): ProcessMatcherState | null {
-    const existing = matcherStates.get(processId);
-
-    if (!existing) {
-      const matchers = compileLogMatchers({
-        logMatches: watchState.logMatches,
-      });
-      if (matchers.length === 0) return null;
-      const state: ProcessMatcherState = {
-        matchers,
-        revision: watchState.revision,
-        generation: watchState.generation,
-      };
-      matcherStates.set(processId, state);
-      return state;
-    }
-
-    if (existing.revision === watchState.revision) return existing;
-
-    const next = compileLogMatchers({ logMatches: watchState.logMatches });
-
-    if (existing.generation === watchState.generation) {
-      preserveMatcherRuntimeState(existing.matchers, next);
-    }
-
-    if (next.length === 0) {
-      matcherStates.delete(processId);
-      return null;
-    }
-
-    const state: ProcessMatcherState = {
-      matchers: next,
-      revision: watchState.revision,
-      generation: watchState.generation,
-    };
-    matcherStates.set(processId, state);
-    return state;
-  }
-
-  function preserveMatcherRuntimeState(
-    prev: CompiledLogMatcher[],
-    next: CompiledLogMatcher[],
-  ): void {
-    const byKey = new Map<string, CompiledLogMatcher[]>();
-    for (const m of prev) {
-      const key = matcherIdentityKey(m);
-      const bucket = byKey.get(key);
-      if (bucket) {
-        bucket.push(m);
-      } else {
-        byKey.set(key, [m]);
-      }
-    }
-
-    for (const m of next) {
-      const key = matcherIdentityKey(m);
-      const bucket = byKey.get(key);
-      if (!bucket || bucket.length === 0) continue;
-      const donor = bucket.shift();
-      if (!donor) continue;
-      m.fired = donor.fired;
-      m.lastMatchTime = donor.lastMatchTime;
-    }
-  }
-
-  function matcherIdentityKey(m: {
-    pattern: string;
-    mode: string;
-    stream: string;
-    repeat: boolean;
-    on: string;
-  }): string {
-    return JSON.stringify([m.pattern, m.mode, m.stream, m.repeat, m.on]);
-  }
-
-  function cleanupMatcherState(processId: string): void {
-    matcherStates.delete(processId);
-  }
-
   return {
     dispose() {
       disposed = true;
       unsubscribe();
-      matcherStates.clear();
     },
   };
 }
-
-export { createNotificationRegistry };

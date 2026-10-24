@@ -1,6 +1,5 @@
 import type { ProcessManager } from "../../../../src/manager";
 import { LIVE_STATUSES, type ProcessInfo } from "../../../../src/types";
-import type { NotificationRegistry } from "../../notifications/registry";
 import type {
   ListDetails,
   ListProcess,
@@ -15,7 +14,6 @@ import { formatPatternsForModel } from "../watch-format";
 export function executeList(
   manager: ProcessManager,
   params: ProcessesParamsType,
-  notifications: NotificationRegistry,
 ): ListDetails {
   const filters = resolveListFilters(params);
   const allProcesses = manager.list();
@@ -33,7 +31,7 @@ export function executeList(
     ...process,
     duration: formatProcessRuntime(process, now),
     watches: LIVE_STATUSES.has(process.status)
-      ? (notifications.getWatchState(process.id)?.logMatches ?? [])
+      ? (manager.getWatchState(process.id)?.logMatches ?? [])
       : [],
   }));
 

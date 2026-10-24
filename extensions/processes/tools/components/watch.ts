@@ -1,10 +1,10 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 
-import type { LogMatcherConfig } from "../../notifications/registry";
+import type { LogMatcherSpec } from "../../../../src/wake";
 
 export function buildMatcherLine(
-  matcher: LogMatcherConfig,
+  matcher: LogMatcherSpec,
   theme: Theme,
   prefix = "",
 ): Text {

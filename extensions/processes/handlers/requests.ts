@@ -21,7 +21,7 @@ export function registerRequestHandlers(
     events.on(CHANNELS.REQUEST_LIST, (payload) => {
       const request = payload as RequestListPayload;
 
-      request.reply(manager.list());
+      request.reply(manager.listWithWake());
     }),
     events.on(CHANNELS.REQUEST_GET, (payload) => {
       const request = payload as RequestGetPayload;

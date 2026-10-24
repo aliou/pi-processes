@@ -67,7 +67,8 @@ extensions/processes/cleanup/
   stop-with-cleanup.ts
 ```
 
-The cleanup registry stores cleanup config by process id, similar to the notification registry.
+The cleanup registry stores cleanup config by process id, similar to the
+manager's per-process wake state.
 
 The shared stop helper should be used by:
 

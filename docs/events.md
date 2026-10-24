@@ -92,7 +92,23 @@ UI emits, core replies synchronously.
 
 #### processes:request:list
 
-Request the full process list, returned in registry insertion order.
+Request the full process list, returned in registry insertion order. Each
+live process (running, terminating, or terminate timeout) additionally carries
+a `wake` object describing how it can still wake the agent:
+
+- `exitAttention` — the effective attention for each end state (`success`,
+  `failure`, `killed`), resolved from the process's wake config with the
+  defaults (`ProcessManager.getWakeConditions`, backed by the
+  `ProcessWakeController` in `src/manager/process-wake.ts`).
+- `watches` — every still-configured log watch with its pattern, mode,
+  stream, repeat, attention, and whether it has already fired. One-shot
+  (`repeat: false`) watches that fired report `fired: true`, so a client
+  reading the reply does not have to reconstruct spent watches from the
+  original start config.
+
+Ended processes are returned without the `wake` field. Wake conditions are
+the source of truth for "what can still wake Pi"; see
+[notifications.md](notifications.md).
 
 #### processes:request:get
 
@@ -213,6 +229,12 @@ cross-extension protocol.
   kill result instead.
 - `process_output_changed` — new output accumulated, carrying appended lines
   and any dropped-line count. Also drives log subscriptions.
+- `process_watch_matched` — a live process's log watches matched: carries the
+  process id and one match entry per fired watch. Emitted by the
+  `ProcessWakeController` (`src/manager/process-wake.ts`) while routing the
+  output event, before the public `processes:output_changed` broadcast. The
+  notification service turns each match into a `processes:notification`
+  payload.
 - `processes_changed` — the registry list changed (used by `/ps:clear`).
 
 ## Pi Lifecycle Events

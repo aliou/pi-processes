@@ -1,9 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ProcessManager } from "../../../../src/manager";
+import { ProcessManager } from "../../../../src/manager";
 import type { ProcessInfo } from "../../../../src/types";
-import type { NotificationRegistry } from "../../notifications/registry";
-import { createNotificationRegistry } from "../../notifications/registry";
 import { executeUpdate, formatUpdateDetails } from ".";
 
 const runningProcess: ProcessInfo = {
@@ -32,28 +30,33 @@ const exitedProcess: ProcessInfo = {
   endTime: 2000,
 };
 
+const managers: ProcessManager[] = [];
+
+afterEach(() => {
+  for (const manager of managers) manager.cleanup();
+  managers.length = 0;
+});
+
 function createFakeManager(getReturn: ProcessInfo | null = runningProcess) {
-  return {
-    get: (_id: string) => getReturn,
-    rename: vi.fn((_id: string, name: string) => {
+  const manager = new ProcessManager();
+  vi.spyOn(manager, "get").mockReturnValue(getReturn);
+  vi.spyOn(manager, "rename").mockImplementation(
+    (_id: string, name: string) => {
       if (!getReturn) return null;
       return { ...getReturn, name };
-    }),
-  } as unknown as ProcessManager;
-}
-
-function createFakeRegistry(): NotificationRegistry {
-  return createNotificationRegistry();
+    },
+  );
+  managers.push(manager);
+  return manager;
 }
 
 describe("executeUpdate", () => {
   describe("validation", () => {
     it("returns error when id is missing", () => {
       const manager = createFakeManager();
-      const registry = createFakeRegistry();
-      registry.register("proc_1", {});
+      manager.registerWakeConfig("proc_1", {});
 
-      const details = executeUpdate({ action: "update" }, manager, registry);
+      const details = executeUpdate({ action: "update" }, manager);
 
       expect(details.ok).toBe(false);
       expect(details.error).toBe("process update requires id");
@@ -61,12 +64,10 @@ describe("executeUpdate", () => {
 
     it("returns error for unknown process", () => {
       const manager = createFakeManager(null);
-      const registry = createFakeRegistry();
 
       const details = executeUpdate(
         { action: "update", id: "proc_1" },
         manager,
-        registry,
       );
 
       expect(details.ok).toBe(false);
@@ -75,13 +76,11 @@ describe("executeUpdate", () => {
 
     it("returns error for non-running process", () => {
       const manager = createFakeManager(exitedProcess);
-      const registry = createFakeRegistry();
-      registry.register("proc_1", {});
+      manager.registerWakeConfig("proc_1", {});
 
       const details = executeUpdate(
         { action: "update", id: "proc_1" },
         manager,
-        registry,
       );
 
       expect(details.ok).toBe(false);
@@ -92,13 +91,11 @@ describe("executeUpdate", () => {
   describe("rename", () => {
     it("renames a running process", () => {
       const manager = createFakeManager();
-      const registry = createFakeRegistry();
-      registry.register("proc_1", {});
+      manager.registerWakeConfig("proc_1", {});
 
       const details = executeUpdate(
         { action: "update", id: "proc_1", name: "build" },
         manager,
-        registry,
       );
 
       expect(details.ok).toBe(true);
@@ -109,13 +106,11 @@ describe("executeUpdate", () => {
 
     it("reports no rename when name is unchanged", () => {
       const manager = createFakeManager();
-      const registry = createFakeRegistry();
-      registry.register("proc_1", {});
+      manager.registerWakeConfig("proc_1", {});
 
       const details = executeUpdate(
         { action: "update", id: "proc_1", name: "dev" },
         manager,
-        registry,
       );
 
       expect(details.ok).toBe(true);
@@ -125,13 +120,11 @@ describe("executeUpdate", () => {
 
     it("returns error for empty name", () => {
       const manager = createFakeManager();
-      const registry = createFakeRegistry();
-      registry.register("proc_1", {});
+      manager.registerWakeConfig("proc_1", {});
 
       const details = executeUpdate(
         { action: "update", id: "proc_1", name: "  " },
         manager,
-        registry,
       );
 
       expect(details.ok).toBe(false);
@@ -142,13 +135,11 @@ describe("executeUpdate", () => {
   describe("watches", () => {
     it("returns null watch mode when no watches param", () => {
       const manager = createFakeManager();
-      const registry = createFakeRegistry();
-      registry.register("proc_1", {});
+      manager.registerWakeConfig("proc_1", {});
 
       const details = executeUpdate(
         { action: "update", id: "proc_1", name: "new-name" },
         manager,
-        registry,
       );
 
       expect(details.watches.mode).toBeNull();
@@ -156,8 +147,7 @@ describe("executeUpdate", () => {
 
     it("appends watches to existing matchers", () => {
       const manager = createFakeManager();
-      const registry = createFakeRegistry();
-      registry.register("proc_1", {
+      manager.registerWakeConfig("proc_1", {
         logMatches: [{ pattern: "ready" }],
       });
 
@@ -171,7 +161,6 @@ describe("executeUpdate", () => {
           },
         },
         manager,
-        registry,
       );
 
       expect(details.ok).toBe(true);
@@ -183,8 +172,7 @@ describe("executeUpdate", () => {
 
     it("replaces all watches", () => {
       const manager = createFakeManager();
-      const registry = createFakeRegistry();
-      registry.register("proc_1", {
+      manager.registerWakeConfig("proc_1", {
         logMatches: [{ pattern: "ready" }, { pattern: "listening" }],
       });
 
@@ -198,7 +186,6 @@ describe("executeUpdate", () => {
           },
         },
         manager,
-        registry,
       );
 
       expect(details.ok).toBe(true);
@@ -213,8 +200,7 @@ describe("executeUpdate", () => {
 
     it("clears all watches", () => {
       const manager = createFakeManager();
-      const registry = createFakeRegistry();
-      registry.register("proc_1", {
+      manager.registerWakeConfig("proc_1", {
         logMatches: [{ pattern: "ready" }],
       });
 
@@ -225,7 +211,6 @@ describe("executeUpdate", () => {
           watches: { mode: "clear" },
         },
         manager,
-        registry,
       );
 
       expect(details.ok).toBe(true);
@@ -235,8 +220,7 @@ describe("executeUpdate", () => {
 
     it("removes watches by index", () => {
       const manager = createFakeManager();
-      const registry = createFakeRegistry();
-      registry.register("proc_1", {
+      manager.registerWakeConfig("proc_1", {
         logMatches: [{ pattern: "ready" }, { pattern: "error" }],
       });
 
@@ -250,7 +234,6 @@ describe("executeUpdate", () => {
           },
         },
         manager,
-        registry,
       );
 
       expect(details.ok).toBe(true);
@@ -261,8 +244,7 @@ describe("executeUpdate", () => {
 
     it("removes watches by pattern", () => {
       const manager = createFakeManager();
-      const registry = createFakeRegistry();
-      registry.register("proc_1", {
+      manager.registerWakeConfig("proc_1", {
         logMatches: [{ pattern: "ready" }, { pattern: "error" }],
       });
 
@@ -276,7 +258,6 @@ describe("executeUpdate", () => {
           },
         },
         manager,
-        registry,
       );
 
       expect(details.ok).toBe(true);
@@ -286,8 +267,7 @@ describe("executeUpdate", () => {
 
     it("removes multiple watches matching the same pattern", () => {
       const manager = createFakeManager();
-      const registry = createFakeRegistry();
-      registry.register("proc_1", {
+      manager.registerWakeConfig("proc_1", {
         logMatches: [
           { pattern: "ready" },
           { pattern: "error" },
@@ -305,7 +285,6 @@ describe("executeUpdate", () => {
           },
         },
         manager,
-        registry,
       );
 
       expect(details.ok).toBe(true);
@@ -315,8 +294,7 @@ describe("executeUpdate", () => {
 
     it("removes watches by pattern with stream filter", () => {
       const manager = createFakeManager();
-      const registry = createFakeRegistry();
-      registry.register("proc_1", {
+      manager.registerWakeConfig("proc_1", {
         logMatches: [
           { pattern: "ready", stream: "stdout" },
           { pattern: "ready", stream: "stderr" },
@@ -333,7 +311,6 @@ describe("executeUpdate", () => {
           },
         },
         manager,
-        registry,
       );
 
       expect(details.ok).toBe(true);
@@ -343,8 +320,7 @@ describe("executeUpdate", () => {
 
     it("requires items for non-clear modes", () => {
       const manager = createFakeManager();
-      const registry = createFakeRegistry();
-      registry.register("proc_1", {});
+      manager.registerWakeConfig("proc_1", {});
 
       expect(() =>
         executeUpdate(
@@ -354,15 +330,13 @@ describe("executeUpdate", () => {
             watches: { mode: "append", items: [] },
           },
           manager,
-          registry,
         ),
       ).toThrow("process update watches.items is required for mode=append");
     });
 
     it("requires pattern or index for remove items", () => {
       const manager = createFakeManager();
-      const registry = createFakeRegistry();
-      registry.register("proc_1", {});
+      manager.registerWakeConfig("proc_1", {});
 
       expect(() =>
         executeUpdate(
@@ -375,15 +349,13 @@ describe("executeUpdate", () => {
             },
           },
           manager,
-          registry,
         ),
       ).toThrow("requires either index or pattern");
     });
 
     it("rejects empty pattern in remove items", () => {
       const manager = createFakeManager();
-      const registry = createFakeRegistry();
-      registry.register("proc_1", {});
+      manager.registerWakeConfig("proc_1", {});
 
       expect(() =>
         executeUpdate(
@@ -396,14 +368,12 @@ describe("executeUpdate", () => {
             },
           },
           manager,
-          registry,
         ),
       ).toThrow("must not be empty");
     });
 
     it("returns error when watch update targets unregistered notification config", () => {
       const manager = createFakeManager();
-      const registry = createFakeRegistry();
 
       const details = executeUpdate(
         {
@@ -412,7 +382,6 @@ describe("executeUpdate", () => {
           watches: { mode: "clear" },
         },
         manager,
-        registry,
       );
 
       expect(details.ok).toBe(false);

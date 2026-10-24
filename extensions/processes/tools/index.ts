@@ -9,7 +9,6 @@ import {
 import { type Component, Container, Text } from "@earendil-works/pi-tui";
 
 import type { ProcessManager } from "../../../src/manager";
-import type { NotificationRegistry } from "../notifications/registry";
 import { executeClear, formatClearDetails } from "./clear";
 import * as clearRender from "./clear/render";
 import { ToolLayout } from "./components";
@@ -50,7 +49,6 @@ type ProcessDetails =
 export function registerProcessTool(
   pi: ExtensionAPI,
   manager: ProcessManager,
-  notifications: NotificationRegistry,
 ): void {
   pi.registerTool(
     defineTool({
@@ -82,7 +80,7 @@ export function registerProcessTool(
           };
         }
 
-        const details = await execute(params, manager, ctx, notifications);
+        const details = await execute(params, manager, ctx);
         return {
           content: [{ type: "text", text: formatDetails(details) }],
           details,
@@ -99,19 +97,18 @@ async function execute(
   params: ProcessesParamsType,
   manager: ProcessManager,
   ctx: ExtensionContext,
-  notifications: NotificationRegistry,
 ): Promise<Exclude<ProcessDetails, OutputDetails>> {
   switch (params.action) {
     case "start":
-      return executeStart(params, manager, ctx, notifications);
+      return executeStart(params, manager, ctx);
     case "list":
-      return executeList(manager, params, notifications);
+      return executeList(manager, params);
     case "stop":
-      return executeStop(params, manager, notifications);
+      return executeStop(params, manager);
     case "write":
       return executeWrite(params, manager);
     case "update":
-      return executeUpdate(params, manager, notifications);
+      return executeUpdate(params, manager);
     case "clear":
       return executeClear(manager);
     default:

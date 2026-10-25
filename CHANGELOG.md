@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.13.3
+
+### Patch Changes
+
+- d986a8f: Resolve the shell from the Termux `$PREFIX` (`$PREFIX/bin/bash`) and `$SHELL` on systems without `/bin/bash`, such as Android/Termux where Nix and standard Unix paths don't exist.
+
 ## 0.13.2
 
 ### Patch Changes

@@ -51,3 +51,15 @@
  			}
  			const steps = typeof input === "string" ? [{ type: "prompt" as const, content: input }] : input;
  			let response: string | undefined;
+@@ -222,6 +233,11 @@
+ 	}
++	try {
++		await session?.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
++	} catch (error) {
++		cleanupErrors.push(error);
++	}
+ 	try {
+ 		session?.dispose();
+ 	} catch (error) {
+ 		cleanupErrors.push(error);
+ 	}

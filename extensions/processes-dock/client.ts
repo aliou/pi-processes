@@ -1,7 +1,9 @@
 import type { EventBus } from "@earendil-works/pi-coding-agent";
-import type { ProcessInfo } from "../../src/types";
+import type { KillResult, ProcessInfo } from "../../src/types";
 import {
   CHANNELS,
+  type CommandKillPayload,
+  type CommandOpenLogsPayload,
   type ProcessProtocolConfig,
   type RequestCombinedOutputPayload,
   type RequestConfigPayload,
@@ -57,4 +59,23 @@ export function requestConfig(events: EventBus): ProcessProtocolConfig {
   if (!config)
     throw new Error("processes core extension did not reply to config request");
   return config;
+}
+
+export function requestKill(events: EventBus, id: string): Promise<KillResult> {
+  return new Promise((resolve) => {
+    const payload: CommandKillPayload = {
+      id,
+      timeoutMs: 3000,
+      reply: (result) => resolve(result),
+    };
+    events.emit(CHANNELS.COMMAND_KILL, payload);
+  });
+}
+
+export function requestOpenLogs(events: EventBus, processId: string): void {
+  const payload: CommandOpenLogsPayload = {
+    processId,
+    reply: () => undefined,
+  };
+  events.emit(CHANNELS.COMMAND_OPEN_LOGS, payload);
 }

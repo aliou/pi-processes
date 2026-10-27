@@ -42,7 +42,7 @@ Component roles; run `ls` for the full tree.
 
 ## Package metadata
 
-The package targets Pi `1.0.0`.
+Target one Pi release at a time: the packages it bundles are pinned in `devDependencies` and bumped together when retargeting.
 
 Pi bundles core packages for extensions. Keep direct imports of these packages in `peerDependencies` with `"*"` ranges and exact local versions in `devDependencies`:
 

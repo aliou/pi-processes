@@ -1,4 +1,8 @@
-import type { EventBus, ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+  EventBus,
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 
 import {
   CHANNELS,
@@ -29,6 +33,7 @@ export function registerNotificationDelivery(
   pi: ExtensionAPI,
 ): () => void {
   let compacting = false;
+  let idleContext: ExtensionContext | null = null;
   let heldDuringCompaction: ProcessProtocolNotificationPayload[] = [];
   const deliver = (payload: ProcessProtocolNotificationPayload) => {
     if (compacting) {
@@ -37,7 +42,7 @@ export function registerNotificationDelivery(
     }
     sendProcessNotificationMessage(
       pi,
-      payload,
+      { ...payload, sessionIdle: idleContext?.isIdle() },
       attentionToSendOptions(payload.attention),
     );
   };
@@ -59,6 +64,9 @@ export function registerNotificationDelivery(
     pi.on("session_compact_failed", () => {
       compacting = false;
       flushHeld();
+    }),
+    pi.on("session_start", (_event, ctx) => {
+      idleContext = ctx;
     }),
   ];
 

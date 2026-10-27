@@ -2,7 +2,10 @@ import type { EventBus } from "@earendil-works/pi-coding-agent";
 
 import type { ProcessManager } from "../../../src/manager";
 import type { ManagerEvent, ProcessInfo } from "../../../src/types";
-import { CHANNELS } from "../../shared/protocol";
+import {
+  CHANNELS,
+  type ProcessProtocolWakeConditions,
+} from "../../shared/protocol";
 import { classifyProcessEnd } from "./classify";
 import {
   type CompiledLogMatcher,
@@ -58,6 +61,9 @@ interface ProcessMatcherState {
 
 export function createNotificationService(deps: NotificationServiceDeps): {
   dispose: () => void;
+  getWakeConditions: (
+    processId: string,
+  ) => ProcessProtocolWakeConditions | null;
 } {
   const { events, manager, registry, getProcess } = deps;
   let disposed = false;
@@ -330,12 +336,41 @@ export function createNotificationService(deps: NotificationServiceDeps): {
     matcherStates.delete(processId);
   }
 
+  function getWakeConditions(
+    processId: string,
+  ): ProcessProtocolWakeConditions | null {
+    const config = registry.get(processId);
+    if (!config) return null;
+    const watchState = registry.getWatchState(processId);
+    const state = watchState ? syncMatcherState(processId, watchState) : null;
+    const firedByIndex = new Map<number, boolean>();
+    for (const matcher of state?.matchers ?? []) {
+      firedByIndex.set(matcher.matcherIndex, matcher.fired);
+    }
+    return {
+      exitAttention: {
+        success: config.onSuccess ?? DEFAULT_ATTENTION.onSuccess,
+        failure: config.onFailure ?? DEFAULT_ATTENTION.onFailure,
+        killed: config.onKilled ?? DEFAULT_ATTENTION.onKilled,
+      },
+      watches: (watchState?.logMatches ?? []).map((entry, index) => ({
+        pattern: entry.pattern,
+        mode: entry.mode ?? "literal",
+        stream: entry.stream ?? "both",
+        repeat: entry.repeat ?? false,
+        on: entry.on ?? "turn",
+        fired: firedByIndex.get(index) ?? false,
+      })),
+    };
+  }
+
   return {
     dispose() {
       disposed = true;
       unsubscribe();
       matcherStates.clear();
     },
+    getWakeConditions,
   };
 }
 

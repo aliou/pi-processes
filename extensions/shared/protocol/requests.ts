@@ -1,10 +1,33 @@
 import type { ProcessInfo } from "../../../src/types";
+import type { ProcessProtocolAttention } from "./notifications";
 
 // UI emits, core listens and calls reply synchronously.
 // Reply callbacks make this an in-process protocol, not serializable IPC/RPC.
 
+export interface ProcessProtocolWakeWatch {
+  pattern: string;
+  mode: "literal" | "regex";
+  stream: "stdout" | "stderr" | "both";
+  repeat: boolean;
+  on: ProcessProtocolAttention;
+  fired: boolean;
+}
+
+export interface ProcessProtocolWakeConditions {
+  exitAttention: {
+    success: ProcessProtocolAttention;
+    failure: ProcessProtocolAttention;
+    killed: ProcessProtocolAttention;
+  };
+  watches: ProcessProtocolWakeWatch[];
+}
+
+export type ProcessListEntry = ProcessInfo & {
+  wake?: ProcessProtocolWakeConditions;
+};
+
 export interface RequestListPayload {
-  reply: (processes: ProcessInfo[]) => void;
+  reply: (processes: ProcessListEntry[]) => void;
 }
 
 export interface RequestGetPayload {

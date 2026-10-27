@@ -30,6 +30,8 @@ function piWithSendMessage(sendMessage: ReturnType<typeof vi.fn>) {
 
 function piWithLifecycleHandlers(sendMessage: ReturnType<typeof vi.fn>) {
   const handlers = new Map<string, (event: never, ctx: never) => unknown>();
+  const isIdle = vi.fn((): boolean => true);
+  const ctx = { isIdle };
   const pi = {
     sendMessage,
     on: (event: string, handler: (event: unknown, ctx: unknown) => unknown) => {
@@ -39,12 +41,13 @@ function piWithLifecycleHandlers(sendMessage: ReturnType<typeof vi.fn>) {
   } as never;
   return {
     pi,
+    isIdle,
     fire: (event: string) =>
       (
         handlers.get(event) as
           | ((event: unknown, ctx: unknown) => unknown)
           | undefined
-      )?.({}, {}),
+      )?.({}, ctx),
   };
 }
 
@@ -242,5 +245,41 @@ describe("registerNotificationDelivery", () => {
 
     dispose();
     vi.useRealTimers();
+  });
+
+  it("records the live isIdle observation at send time", () => {
+    const events = createEventBus();
+    const sendMessage = vi.fn();
+    const { pi, isIdle, fire } = piWithLifecycleHandlers(sendMessage);
+    const dispose = registerNotificationDelivery(events, pi);
+
+    fire("session_start");
+    isIdle.mockReturnValueOnce(true).mockReturnValueOnce(false);
+    events.emit(CHANNELS.NOTIFICATION, makePayload({ attention: "turn" }));
+    events.emit(CHANNELS.NOTIFICATION, makePayload({ attention: "context" }));
+    expect(sendMessage.mock.calls[0][0].details.sessionIdle).toBe(true);
+    expect(sendMessage.mock.calls[1][0].details.sessionIdle).toBe(false);
+    expect(isIdle).toHaveBeenCalledTimes(2);
+
+    dispose();
+  });
+
+  it("records the isIdle observation for notifications flushed after compaction", () => {
+    const events = createEventBus();
+    const sendMessage = vi.fn();
+    const { pi, isIdle, fire } = piWithLifecycleHandlers(sendMessage);
+    const dispose = registerNotificationDelivery(events, pi);
+
+    fire("session_start");
+    fire("session_before_compact");
+    events.emit(CHANNELS.NOTIFICATION, makePayload({ attention: "turn" }));
+    expect(sendMessage).not.toHaveBeenCalled();
+
+    isIdle.mockReturnValue(false);
+    fire("session_compact");
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage.mock.calls[0][0].details.sessionIdle).toBe(false);
+
+    dispose();
   });
 });

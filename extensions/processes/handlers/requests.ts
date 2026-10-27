@@ -2,6 +2,7 @@ import type { EventBus } from "@earendil-works/pi-coding-agent";
 import type { ProcessManager } from "../../../src/manager";
 import {
   CHANNELS,
+  type ProcessProtocolWakeConditions,
   type RequestCombinedOutputPayload,
   type RequestConfigPayload,
   type RequestFileSizePayload,
@@ -16,12 +17,18 @@ export function registerRequestHandlers(
   events: EventBus,
   manager: ProcessManager,
   getConfig: () => ProcessProtocolConfig,
+  getWakeConditions: (id: string) => ProcessProtocolWakeConditions | null,
 ): () => void {
   const disposers = [
     events.on(CHANNELS.REQUEST_LIST, (payload) => {
       const request = payload as RequestListPayload;
 
-      request.reply(manager.list());
+      request.reply(
+        manager.list().map((info) => {
+          const wake = getWakeConditions(info.id);
+          return wake ? { ...info, wake } : info;
+        }),
+      );
     }),
     events.on(CHANNELS.REQUEST_GET, (payload) => {
       const request = payload as RequestGetPayload;

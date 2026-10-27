@@ -92,7 +92,17 @@ UI emits, core replies synchronously.
 
 #### processes:request:list
 
-Request the full process list, returned in registry insertion order.
+Request the full process list, returned in registry insertion order. Each
+entry additionally carries a `wake` object when the process still has a
+notification config (ended processes have none and omit the field):
+
+- `exitAttention` — the effective attention for each end state (`success`,
+  `failure`, `killed`), resolved from the process's notify config with the
+  defaults (`turn` / `turn` / `context`).
+- `watches` — every still-configured log watch with its pattern, mode,
+  stream, repeat, attention, and whether it has already fired. A one-shot
+  (`repeat: false`) watch that fired can no longer wake the agent; `repeat`
+  watches fire again after the 15s cooldown.
 
 #### processes:request:get
 

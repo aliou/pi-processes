@@ -27,6 +27,16 @@ after its current tool calls finish. On an idle host the same options start a
 new run from the notification, and pi emits `before_agent_start` for runs
 started by custom messages, so handler-added system prompt sections survive.
 
+While a compaction is in progress (`session_before_compact` until
+`session_compact` / `session_compact_failed`), deliveries are held instead of
+sent: pi's `prompt()` refuses prompts during compaction, and a
+turn notification sent mid-compaction would otherwise append to the session
+and start a run before the compaction entry. Held notifications
+are delivered in arrival order with their original attention once compaction
+ends, whether it succeeded, failed, or was cancelled. Log-match rate limiting
+still applies at arrival time, so a burst during compaction counts against
+the same 20-per-60s window.
+
 `context` and emitted `ignore` notifications are sent with `triggerTurn: false`
 and no `deliverAs`: they never wake or steer the agent, and they persist as
 displayed custom messages immediately. While a turn is running, Pi holds them

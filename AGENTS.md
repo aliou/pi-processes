@@ -16,7 +16,7 @@ During UI tests that require processes to be running, either give the user a pro
 
 ## Dependencies and scripts
 
-Track the Pi release the package targets: bump the bundled devDependency pins together when retargeting. Keep imported Pi-bundled packages in `peerDependencies` with `"*"` ranges and exact local versions in `devDependencies`: `@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`, and `typebox`. Run `pnpm install` after package metadata changes and check Pi package resolution with `pnpm why @earendil-works/pi-tui` and `pnpm why @earendil-works/pi-ai`.
+The package requires Pi >=1.4.0. Track the Pi release the package targets: bump the bundled devDependency pins together when retargeting. Keep imported Pi-bundled packages in `peerDependencies` with `"*"` ranges, except `@earendil-works/pi-coding-agent` which requires `">=1.4.0"`, and exact local versions in `devDependencies`: `@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`, and `typebox`. Run `pnpm install` after package metadata changes and check Pi package resolution with `pnpm why @earendil-works/pi-tui` and `pnpm why @earendil-works/pi-ai`.
 
 Scripts live in `package.json`. The non-obvious ones:
 

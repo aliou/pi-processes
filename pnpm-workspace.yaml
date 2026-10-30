@@ -8,7 +8,7 @@ allowBuilds:
   "@google/genai": false
 
 minimumReleaseAgeExclude:
-  - '@aliou/pi-utils-settings@0.19.2'
+  - '@aliou/pi-utils-settings@0.19.2 || 0.24.0'
   - '@earendil-works/chord@1.0.0'
   - '@earendil-works/pi-agent-core@1.0.0'
   - '@earendil-works/pi-ai@1.0.0'

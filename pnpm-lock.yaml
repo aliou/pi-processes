@@ -13,8 +13,8 @@ importers:
   .:
     dependencies:
       '@aliou/pi-utils-settings':
-        specifier: ^0.19.1
-        version: 0.19.2(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.3)(zod@4.6.5))(@earendil-works/pi-tui@1.4.0)(ts-json-schema-generator@2.9.0)
+        specifier: ^0.24.0
+        version: 0.24.0(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.3)(zod@4.6.5))(@earendil-works/pi-tui@1.4.0)(ts-json-schema-generator@2.9.0)
       '@aliou/pi-utils-ui':
         specifier: ^0.5.0
         version: 0.5.0(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.3)(zod@4.6.5))(@earendil-works/pi-tui@1.4.0)
@@ -75,11 +75,11 @@ packages:
     peerDependencies:
       '@biomejs/biome': '>=2.4.0'
 
-  '@aliou/pi-utils-settings@0.19.2':
-    resolution: {integrity: sha512-eN8FrLTPvSqsuvHT3fuM3jNbPm974bcGUbp00BaM68BeW1qRmZBtfrOA/03fFeoF1jyIE1rkMWXywUo+pkpHIg==}
+  '@aliou/pi-utils-settings@0.24.0':
+    resolution: {integrity: sha512-XIrqu3YhCdfpz3O7grfsTPzSOkxA36tYbblLthvqeUBfBZhNknm+jTrwB7M8giJzlwo8FeNYCqmtRZpPqULdFA==}
     hasBin: true
     peerDependencies:
-      '@earendil-works/pi-coding-agent': '>=0.74.0 <1'
+      '@earendil-works/pi-coding-agent': '>=1.4.0 <2'
       ts-json-schema-generator: '>=2.4.0 <3'
     peerDependenciesMeta:
       '@earendil-works/pi-coding-agent':
@@ -1778,7 +1778,7 @@ snapshots:
     dependencies:
       '@biomejs/biome': 2.5.14
 
-  '@aliou/pi-utils-settings@0.19.2(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.3)(zod@4.6.5))(@earendil-works/pi-tui@1.4.0)(ts-json-schema-generator@2.9.0)':
+  '@aliou/pi-utils-settings@0.24.0(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.3)(zod@4.6.5))(@earendil-works/pi-tui@1.4.0)(ts-json-schema-generator@2.9.0)':
     dependencies:
       '@aliou/pi-utils-ui': 0.5.0(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.3)(zod@4.6.5))(@earendil-works/pi-tui@1.4.0)
     optionalDependencies:

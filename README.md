@@ -99,7 +99,11 @@ Pass `input` for the bytes to write, and set `end: true` to close stdin (for exa
 
 ## Adjust settings
 
-Use `/ps:settings` to configure the extension.
+Use `/ps:settings` to configure the extension. Project settings in
+`.pi/extensions/processes.json` apply only after Pi trusts the project.
+Untrusted project files are left unchanged, and the Local tab displays
+“Project not trusted” instead of editable settings. Use `/trust` and restart
+Pi to apply project settings. Global and Memory settings remain available.
 
 Available settings include:
 

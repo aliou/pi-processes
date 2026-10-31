@@ -25,7 +25,27 @@ function makePayload(
 }
 
 function piWithSendMessage(sendMessage: ReturnType<typeof vi.fn>) {
-  return { sendMessage } as never;
+  return { sendMessage, on: () => () => {} } as never;
+}
+
+function piWithLifecycleHandlers(sendMessage: ReturnType<typeof vi.fn>) {
+  const handlers = new Map<string, (event: never, ctx: never) => unknown>();
+  const pi = {
+    sendMessage,
+    on: (event: string, handler: (event: unknown, ctx: unknown) => unknown) => {
+      handlers.set(event, handler as (event: never, ctx: never) => unknown);
+      return () => {};
+    },
+  } as never;
+  return {
+    pi,
+    fire: (event: string) =>
+      (
+        handlers.get(event) as
+          | ((event: unknown, ctx: unknown) => unknown)
+          | undefined
+      )?.({}, {}),
+  };
 }
 
 describe("registerNotificationDelivery", () => {
@@ -100,6 +120,121 @@ describe("registerNotificationDelivery", () => {
       expect.objectContaining({
         kind: "log_match_suppressed",
         summary: expect.stringContaining("Suppressed 10"),
+        attention: "context",
+      }),
+    );
+    expect(options).toEqual({ triggerTurn: false });
+
+    dispose();
+    vi.useRealTimers();
+  });
+
+  it("holds notifications during compaction and delivers them in order when it succeeds", () => {
+    const events = createEventBus();
+    const sendMessage = vi.fn();
+    const { pi, fire } = piWithLifecycleHandlers(sendMessage);
+    const dispose = registerNotificationDelivery(events, pi);
+
+    fire("session_before_compact");
+    events.emit(CHANNELS.NOTIFICATION, makePayload({ attention: "turn" }));
+    events.emit(CHANNELS.NOTIFICATION, makePayload({ attention: "context" }));
+    expect(sendMessage).not.toHaveBeenCalled();
+
+    fire("session_compact");
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+    const [firstMessage, firstOptions] = sendMessage.mock.calls[0];
+    expect(firstMessage.details.attention).toBe("turn");
+    expect(firstOptions).toEqual({ triggerTurn: true, deliverAs: "steer" });
+    const [secondMessage, secondOptions] = sendMessage.mock.calls[1];
+    expect(secondMessage.details.attention).toBe("context");
+    expect(secondOptions).toEqual({ triggerTurn: false });
+
+    events.emit(CHANNELS.NOTIFICATION, makePayload({ attention: "turn" }));
+    expect(sendMessage).toHaveBeenCalledTimes(3);
+    dispose();
+  });
+
+  it("delivers held notifications when compaction fails or is aborted", () => {
+    const events = createEventBus();
+    const sendMessage = vi.fn();
+    const { pi, fire } = piWithLifecycleHandlers(sendMessage);
+    const dispose = registerNotificationDelivery(events, pi);
+
+    fire("session_before_compact");
+    events.emit(CHANNELS.NOTIFICATION, makePayload({ attention: "turn" }));
+
+    fire("session_compact_failed");
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    const [, options] = sendMessage.mock.calls[0];
+    expect(options).toEqual({ triggerTurn: true, deliverAs: "steer" });
+
+    fire("session_before_compact");
+    events.emit(CHANNELS.NOTIFICATION, makePayload({ attention: "turn" }));
+    fire("session_compact_failed");
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+    dispose();
+  });
+
+  it("keeps log-match rate limiting for notifications that arrive during compaction", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    const events = createEventBus();
+    const sendMessage = vi.fn();
+    const { pi, fire } = piWithLifecycleHandlers(sendMessage);
+    const dispose = registerNotificationDelivery(events, pi);
+
+    fire("session_before_compact");
+    for (let index = 0; index < 25; index++) {
+      events.emit(
+        CHANNELS.NOTIFICATION,
+        makePayload({ kind: "log_match", attention: "turn" }),
+      );
+    }
+    expect(sendMessage).not.toHaveBeenCalled();
+
+    fire("session_compact");
+    expect(sendMessage).toHaveBeenCalledTimes(20);
+
+    vi.advanceTimersByTime(60_000);
+    expect(sendMessage).toHaveBeenCalledTimes(21);
+    const [summary] = sendMessage.mock.calls.at(-1) ?? [];
+    expect(summary.details).toEqual(
+      expect.objectContaining({
+        kind: "log_match_suppressed",
+        summary: expect.stringContaining("Suppressed 5"),
+      }),
+    );
+
+    dispose();
+    vi.useRealTimers();
+  });
+
+  it("holds the timer-driven suppressed summary during compaction and delivers it when compaction ends", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    const events = createEventBus();
+    const sendMessage = vi.fn();
+    const { pi, fire } = piWithLifecycleHandlers(sendMessage);
+    const dispose = registerNotificationDelivery(events, pi);
+
+    fire("session_before_compact");
+    for (let index = 0; index < 25; index++) {
+      events.emit(
+        CHANNELS.NOTIFICATION,
+        makePayload({ kind: "log_match", attention: "turn" }),
+      );
+    }
+
+    vi.advanceTimersByTime(60_000);
+    expect(sendMessage).not.toHaveBeenCalled();
+
+    fire("session_compact");
+    expect(sendMessage).toHaveBeenCalledTimes(21);
+    const [summary, options] = sendMessage.mock.calls.at(-1) ?? [];
+    expect(summary.details).toEqual(
+      expect.objectContaining({
+        kind: "log_match_suppressed",
+        summary: expect.stringContaining("Suppressed 5"),
         attention: "context",
       }),
     );

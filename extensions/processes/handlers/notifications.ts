@@ -28,6 +28,40 @@ export function registerNotificationDelivery(
   events: EventBus,
   pi: ExtensionAPI,
 ): () => void {
+  let compacting = false;
+  let heldDuringCompaction: ProcessProtocolNotificationPayload[] = [];
+  const deliver = (payload: ProcessProtocolNotificationPayload) => {
+    if (compacting) {
+      heldDuringCompaction.push(payload);
+      return;
+    }
+    sendProcessNotificationMessage(
+      pi,
+      payload,
+      attentionToSendOptions(payload.attention),
+    );
+  };
+  const flushHeld = () => {
+    const held = heldDuringCompaction;
+    heldDuringCompaction = [];
+    for (const payload of held) {
+      deliver(payload);
+    }
+  };
+  const compactionDisposers = [
+    pi.on("session_before_compact", () => {
+      compacting = true;
+    }),
+    pi.on("session_compact", () => {
+      compacting = false;
+      flushHeld();
+    }),
+    pi.on("session_compact_failed", () => {
+      compacting = false;
+      flushHeld();
+    }),
+  ];
+
   let windowStart: number | null = null;
   let sentInWindow = 0;
   let suppressed = 0;
@@ -59,11 +93,7 @@ export function registerNotificationDelivery(
       summary: `Suppressed ${count} log-match notifications because output was too fast.`,
       attention: "context",
     };
-    sendProcessNotificationMessage(
-      pi,
-      details,
-      attentionToSendOptions(details.attention),
-    );
+    deliver(details);
   };
 
   const flushSuppressedSummary = () => {
@@ -102,13 +132,14 @@ export function registerNotificationDelivery(
         sentInWindow++;
       }
 
-      const options = attentionToSendOptions(payload.attention);
-      sendProcessNotificationMessage(pi, payload, options);
+      deliver(payload);
     },
   );
 
   return () => {
     disposeListener();
+    for (const dispose of compactionDisposers) dispose();
     resetWindow();
+    heldDuringCompaction = [];
   };
 }

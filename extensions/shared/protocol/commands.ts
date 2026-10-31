@@ -22,6 +22,13 @@ export interface CommandKillPayload {
   reply: (result: KillResult) => void;
 }
 
+export interface CommandOpenLogsPayload {
+  processId: string;
+  reply: (result: CommandOpenLogsResult) => void;
+}
+
+export type CommandOpenLogsResult = { ok: true } | { ok: false; error: string };
+
 export interface CommandClearPayload {
   reply: (cleared: number) => void;
 }

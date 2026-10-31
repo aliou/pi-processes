@@ -501,7 +501,7 @@ function selectPinnedProcess(
     : null;
 }
 
-function sortProcesses(processes: ProcessInfo[]): ProcessInfo[] {
+export function sortProcesses(processes: ProcessInfo[]): ProcessInfo[] {
   return [...processes].sort((a, b) => {
     const aLive = LIVE_STATUSES.has(a.status) ? 1 : 0;
     const bLive = LIVE_STATUSES.has(b.status) ? 1 : 0;

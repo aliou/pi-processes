@@ -29,6 +29,9 @@
           "$ref": "#/definitions/WidgetConfig",
           "description": "Dock and status widget settings."
         },
+        "shortcuts": {
+          "$ref": "#/definitions/ShortcutsConfig"
+        },
         "$schema": {
           "type": "string"
         },
@@ -134,6 +137,15 @@
         "dockHeight": {
           "type": "number",
           "description": "Number of log rows displayed in the expanded process dock."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ShortcutsConfig": {
+      "type": "object",
+      "properties": {
+        "focusKey": {
+          "type": "string"
         }
       },
       "additionalProperties": false

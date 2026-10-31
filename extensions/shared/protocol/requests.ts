@@ -69,6 +69,9 @@ export interface ProcessProtocolConfig {
     dockDefaultState: "closed" | "collapsed" | "expanded";
     dockHeight: number;
   };
+  shortcuts: {
+    focusKey: string;
+  };
 }
 
 export interface RequestConfigPayload {

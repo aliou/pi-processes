@@ -1,6 +1,11 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { isWindowsPlatform } from "../../src/utils/platform";
-import { registerLogsCommand } from "./commands/logs";
+import { CHANNELS, type CommandOpenLogsPayload } from "../shared/protocol";
+import {
+  handleOpenLogsCommand,
+  type OpenLogsOptions,
+  registerLogsCommand,
+} from "./commands/logs";
 
 export default async function processesLogsExtension(
   pi: ExtensionAPI,
@@ -12,15 +17,37 @@ export default async function processesLogsExtension(
 
   const openOverlays = new Set<{ dispose: () => void }>();
 
-  registerLogsCommand(pi, {
+  const options: OpenLogsOptions = {
     events: pi.events,
     registerOverlay: (overlay) => {
       openOverlays.add(overlay);
       return () => openOverlays.delete(overlay);
     },
+  };
+
+  registerLogsCommand(pi, options);
+
+  let disposeOpenLogsCommand: (() => void) | null = null;
+
+  pi.on("session_start", (_event, ctx) => {
+    disposeOpenLogsCommand?.();
+    disposeOpenLogsCommand = pi.events.on(
+      CHANNELS.COMMAND_OPEN_LOGS,
+      (payload) => {
+        const command = payload as CommandOpenLogsPayload;
+        void handleOpenLogsCommand(
+          ctx,
+          options,
+          command.processId,
+          command.reply,
+        );
+      },
+    );
   });
 
   pi.on("session_shutdown", () => {
+    disposeOpenLogsCommand?.();
+    disposeOpenLogsCommand = null;
     for (const overlay of [...openOverlays]) overlay.dispose();
     openOverlays.clear();
   });

@@ -17,6 +17,7 @@ export const CHANNELS = {
   // Command channels (UI -> core, callback)
   COMMAND_START: "processes:command:start",
   COMMAND_KILL: "processes:command:kill",
+  COMMAND_OPEN_LOGS: "processes:command:open_logs",
   COMMAND_CLEAR: "processes:command:clear",
   // Other extensions emit this to hand an already-running child process
   // over to the manager (e.g. backgrounding a foreground tool command).

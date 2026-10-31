@@ -1,5 +1,16 @@
 # @aliou/pi-processes
 
+## 0.13.4
+
+### Patch Changes
+
+- a68725a: Hold process notifications while a compaction is in progress and deliver them once it ends. A turn notification that fired mid-compaction could previously append to the session and start a run before the compaction entry landed. Notifications that arrive between `session_before_compact` and `session_compact` / `session_compact_failed` are now held and delivered in arrival order with their original attention, including when compaction fails or is cancelled; log-match rate limiting still applies at arrival time.
+- 4400cf1: Turn notifications always use Pi's steer path: on an idle host the notification starts a new run directly, and pi emits `before_agent_start` for runs started by custom messages, so handler-added system prompt sections survive the run. The idle-host workaround that persisted turn notifications without a turn and woke the host with a bare user message is removed.
+- 4400cf1: Update the bundled Pi dependency pins to the Pi release this package targets. Peer ranges stay `"*"`, so installers keep resolving the versions the host bundles, and a single version of each Pi-bundled package is resolved.
+- 7c12878: Expose idle-at-delivery and remaining wake conditions over the extension protocol. Persisted `ad-process:notification` message details now record `sessionIdle`, whether the Pi session was idle when the notification was delivered, so saved history can distinguish a completion that woke an idle session from one steered into an active run. The `processes:request:list` reply now carries a `wake` field per process with a notification config: the resolved exit attentions (`success`/`failure`/`killed`) and every configured log watch with whether it has already fired, so clients can tell when an idle session can still be woken by a process. Both fields are additive; delivery behaviour is unchanged.
+- f399db5: Add reusable behavioral evals for process-tool use, validate returned running processes and accepted watches rather than attempted calls, and shut down managed processes when eval sessions finish.
+- 0fb886f: Apply project settings only after Pi trusts the project. Untrusted repositories cannot override shell selection or background-command interception, and their config files are left unchanged. Show an ignored-config notice at session start and disable editing in the Local settings tab until trusted. Requires Pi >=1.4.0 and uses pi-utils-settings 0.24.0.
+
 ## 0.13.3
 
 ### Patch Changes

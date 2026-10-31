@@ -29,11 +29,22 @@ export type ProcessToolCall = {
   arguments: JsonObject;
 };
 
+export type ProcessEvalResult = {
+  action: "start" | "update";
+  processId: string | null;
+  pid: number | null;
+  status: string | null;
+  ok: boolean;
+  watchPatterns: string[];
+};
+
 export type ProcessEvalOutput = {
   response: string;
   toolCalls: ProcessToolCall[];
   bashCommands: string[];
   activeTools: string[];
+  successfulStarts: number;
+  processResults: ProcessEvalResult[];
 };
 
 /**
@@ -63,10 +74,37 @@ export function createProcessesHarnessWithSkill(
   });
 }
 
-function buildOutput(
+export function buildOutput(
   response: string,
-  session: AgentSession,
+  session: Pick<AgentSession, "messages" | "getActiveToolNames">,
 ): ProcessEvalOutput {
+  const processResults: ProcessEvalResult[] = [];
+  for (const message of session.messages) {
+    if (message.role !== "toolResult" || message.toolName !== "process")
+      continue;
+    const details = message.details as JsonObject | undefined;
+    if (details?.action !== "start" && details?.action !== "update") continue;
+    const process = isJsonObject(details.process) ? details.process : {};
+    const notify = isJsonObject(details.notify) ? details.notify : {};
+    const watches = isJsonObject(details.watches) ? details.watches : {};
+    const items =
+      details.action === "start" ? notify.logMatches : watches.items;
+    processResults.push({
+      action: details.action,
+      processId: typeof process.id === "string" ? process.id : null,
+      pid: typeof process.pid === "number" ? process.pid : null,
+      status: typeof process.status === "string" ? process.status : null,
+      ok:
+        !message.isError && (details.action === "start" || details.ok === true),
+      watchPatterns: Array.isArray(items)
+        ? items.flatMap((item) =>
+            isJsonObject(item) && typeof item.pattern === "string"
+              ? [item.pattern]
+              : [],
+          )
+        : [],
+    });
+  }
   return {
     response,
     toolCalls: toolCallsNamed(session, "process"),
@@ -74,12 +112,14 @@ function buildOutput(
       .map((call) => call.arguments.command)
       .filter((command): command is string => typeof command === "string"),
     activeTools: session.getActiveToolNames(),
+    successfulStarts: successfulStartResults(processResults).length,
+    processResults,
   };
 }
 
 /** Every call to `toolName` in the session, in order. */
 function toolCallsNamed(
-  session: AgentSession,
+  session: Pick<AgentSession, "messages">,
   toolName: string,
 ): ProcessToolCall[] {
   const calls: ProcessToolCall[] = [];
@@ -115,6 +155,35 @@ export function hasLogMatchWatch(call: ProcessToolCall): boolean {
     return watches.items.length > 0;
   }
   return false;
+}
+
+function successfulStartResults(
+  results: ProcessEvalResult[],
+): ProcessEvalResult[] {
+  return results.filter(
+    (result) =>
+      result.action === "start" &&
+      result.ok &&
+      result.processId !== null &&
+      result.pid !== null &&
+      Number.isInteger(result.pid) &&
+      result.pid > 0 &&
+      result.status === "running",
+  );
+}
+
+export function watchPatternsForStartedProcess(
+  results: ProcessEvalResult[],
+  updatesOnly = false,
+): string[] {
+  const starts = successfulStartResults(results);
+  return results.flatMap((result) =>
+    result.ok &&
+    starts.some((start) => start.processId === result.processId) &&
+    (result.action === "update" || (!updatesOnly && starts.includes(result)))
+      ? result.watchPatterns
+      : [],
+  );
 }
 
 function isJsonObject(value: JsonValue | undefined): value is JsonObject {

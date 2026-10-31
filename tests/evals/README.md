@@ -32,7 +32,7 @@ Two kinds of code live in this directory, and the distinction matters when somet
 | `vendor/pi-evals/pi-harness.ts` | Copied from `packages/evals/src/pi-harness.ts` in `earendil-works/pi`, then patched. |
 | `vendor/pi-evals/vitest-evals/` | Copied from `packages/evals/src/vitest-evals/` — artifacts, reporter, summary, harness table. |
 | `vendor/pi-evals/upstream-package.json` | The upstream `package.json`, kept only as a dependency-version reference. |
-| `agent-dir/` | Generated at run time. Holds the private Aperture base URL, so none of it is committed. |
+| `agent-dir/` | Generated local model configuration and connection settings. Never commit this directory. |
 
 `@earendil-works/pi-evals` is `"private": true` and not published to npm, so it cannot be installed. It is copied
 in from the pi repo at a pinned tag by:
@@ -54,8 +54,7 @@ Upstream's harness deliberately refuses to load extensions: it builds its own te
 `SettingsManager.inMemory()`, forwards `resourceLoaderOptions` only when `transformSystemPrompt` is set, and hard
 asserts that zero extensions loaded. There is no external hook, so the patch adds
 `additionalExtensionPaths` / `additionalSkillPaths`, always forwards `resourceLoaderOptions`, and relaxes the
-guard to expect exactly the injected extensions. It also widens one `process.env` parameter type that
-`@types/node` 25 rejects.
+guard to expect exactly the injected extensions. It also widens the environment parameter type for compatibility and emits `session_shutdown` before disposal on successful and failed runs, so injected extensions release their processes and listeners.
 
 That guard is load-bearing: if the extension path is wrong, evals fail with `Expected the isolated eval session to
 load exactly 1 extension(s), got 0` rather than silently passing with no `process` tool present.
@@ -63,13 +62,14 @@ load exactly 1 extension(s), got 0` rather than silently passing with no `proces
 ## Running
 
 ```bash
-pnpm test:evals                              # whole suite
-pnpm test:evals tests/evals/smoke.eval.ts    # one file
-pnpm test:evals -t "smoke"                   # one test by name
-pnpm typecheck:evals                         # free, no model calls
+pnpm typecheck:evals
+pnpm test:evals tests/evals/harness.eval.ts
+pnpm test:evals tests/evals/smoke.eval.ts
+pnpm test:evals tests/evals/guidance.eval.ts
+pnpm test:evals
 ```
 
-First run `pnpm typecheck:evals`; it needs the vendored harness present but costs nothing.
+First run `pnpm typecheck:evals`; it needs the vendored harness present but costs nothing. `harness.eval.ts` also makes no model calls: it checks result guards with synthetic returned details.
 
 ### Artifacts
 
@@ -79,26 +79,11 @@ process, so this is set on `process.env` rather than `test.env`.
 
 ### Configuration
 
-`vitest.config.ts` pins everything that decides which model runs, so an ambient `PI_PROVIDER=anthropic` in your
-shell cannot redirect evals at a paid account:
+`vitest.config.ts` isolates evals from your normal agent directory and pins provider/model defaults. Select a local model explicitly with `PI_EVAL_PROVIDER` and `PI_EVAL_MODEL`; ambient `PI_PROVIDER` and `PI_MODEL` do not override the eval defaults.
 
-- `PI_CODING_AGENT_DIR` → `tests/evals/agent-dir/`, never your real `~/.pi/agent`.
-- `PI_PROVIDER` / `PI_MODEL` → `aperture` / `syn:small:text`. Override with `PI_EVAL_PROVIDER` / `PI_EVAL_MODEL`.
+Copy `.env.test.example` to the ignored `.env.test` and configure your local connection settings. `global-setup.ts` generates the ignored `tests/evals/agent-dir/models.json` before each run. Existing environment settings take precedence over `.env.test`.
 
-The Aperture base URL is private, and `models.json` has no environment-variable interpolation, so `global-setup.ts`
-generates that file at run time:
-
-```bash
-cp .env.test.example .env.test   # then fill in APERTURE_BASE_URL
-```
-
-A real `APERTURE_BASE_URL` in the environment wins over `.env.test`, which is how CI injects its secret. Aperture
-is reachable over Tailscale; CI connects with `tailscale/github-action` before running.
-
-Only built-in providers and those declared in the generated `models.json` work. The harness calls
-`ModelRuntime.create()` and resolves the model *before* building the session, so providers that your normal setup
-registers through extensions do not exist yet. `Eval model not found: <provider>/<id>` means it needs a `providers`
-entry, not an extension.
+Keep provider registration, model catalogues, credentials and experimental configuration in local untracked state, not committed eval setup. The current setup regenerates its default model configuration. The harness resolves models before loading extensions, so provider registration must be available in the local agent directory rather than supplied by an extension.
 
 ## Verifying an eval is trustworthy
 

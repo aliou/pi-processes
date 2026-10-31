@@ -113,6 +113,7 @@ Available settings include:
 - process panel size
 - log overlay size, history limits, follow mode, and auto-hide
 - dock default state and line count
+- tool exposure (`direct`, `model-only`, `codemode`, `deferred`, or `hidden`; Global tab only, applied on the next session start)
 
 ## Platform support
 

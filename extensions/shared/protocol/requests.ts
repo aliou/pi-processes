@@ -1,3 +1,5 @@
+import type { ToolExposure } from "@earendil-works/pi-coding-agent";
+
 import type { ProcessInfo } from "../../../src/types";
 import type { ProcessProtocolAttention } from "./notifications";
 
@@ -92,6 +94,7 @@ export interface ProcessProtocolConfig {
     dockDefaultState: "closed" | "collapsed" | "expanded";
     dockHeight: number;
   };
+  toolExposure: ToolExposure;
 }
 
 export interface RequestConfigPayload {

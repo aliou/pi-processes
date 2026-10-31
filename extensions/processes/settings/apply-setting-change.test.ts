@@ -28,6 +28,11 @@ describe("applySettingChange", () => {
     expect(applySettingChange("output.maxOutputLines", "250", base)).toBeNull();
   });
 
+  it("stores tool exposure values", () => {
+    const deferred = applySettingChange("toolExposure", "deferred", base);
+    expect(deferred?.toolExposure).toBe("deferred");
+  });
+
   it("returns null for unknown setting IDs", () => {
     expect(applySettingChange("unknown.field", "value", base)).toBeNull();
   });

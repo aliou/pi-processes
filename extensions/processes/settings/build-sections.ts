@@ -14,6 +14,7 @@ import {
 import type { SettingItem } from "@earendil-works/pi-tui";
 
 import type { ProcessConfig, ProcessProtocolConfig } from "../config";
+import { TOOL_EXPOSURES } from "../config";
 
 interface BuildSectionsContext {
   setDraft: (config: ProcessConfig) => void;
@@ -33,6 +34,9 @@ export function buildSections(
     label: "Core",
     items: [
       buildShellPathItem(scopedConfig, resolved, ctx),
+      ...(ctx.scope === "global"
+        ? [toolExposureItem(scopedConfig, resolved)]
+        : []),
       boolItem(
         "interception.blockBackgroundCommands",
         "Block background commands",
@@ -383,6 +387,21 @@ function buildDockDetailItem(
         onDone: (summary) => done(summary),
       });
     },
+  };
+}
+
+function toolExposureItem(
+  scopedConfig: ProcessConfig,
+  resolved: ProcessProtocolConfig,
+): SettingItem {
+  return {
+    id: "toolExposure",
+    label: "Tool exposure",
+    description:
+      "How the process tool is registered. Applies on the next session start.",
+    currentValue:
+      scopedConfig.toolExposure ?? `inherited: ${resolved.toolExposure}`,
+    values: [...TOOL_EXPOSURES],
   };
 }
 

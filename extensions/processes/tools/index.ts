@@ -5,10 +5,12 @@ import {
   type ExtensionContext,
   type Theme,
   type ToolDefinition,
+  type ToolExposure,
 } from "@earendil-works/pi-coding-agent";
 import { type Component, Container, Text } from "@earendil-works/pi-tui";
 
 import type { ProcessManager } from "../../../src/manager";
+import { TOOL_EXPOSURES } from "../config";
 import type { NotificationRegistry } from "../notifications/registry";
 import { executeClear, formatClearDetails } from "./clear";
 import * as clearRender from "./clear/render";
@@ -51,11 +53,13 @@ export function registerProcessTool(
   pi: ExtensionAPI,
   manager: ProcessManager,
   notifications: NotificationRegistry,
+  exposure: ToolExposure,
 ): void {
   pi.registerTool(
     defineTool({
       name: "process",
       label: "Process",
+      exposure: TOOL_EXPOSURES.includes(exposure) ? exposure : "direct",
       description:
         "Start, list, stop, write to stdin, update, clear, and inspect output of long-running background processes.",
       promptSnippet:

@@ -37,6 +37,14 @@ ends, whether it succeeded, failed, or was cancelled. Log-match rate limiting
 still applies at arrival time, so a burst during compaction counts against
 the same 20-per-60s window.
 
+Every persisted `ad-process:notification` message records `sessionIdle` in its
+details: whether Pi reported the session idle at delivery time, observed live
+via `ctx.isIdle()` at the moment the message is sent (including compaction),
+so saved history can distinguish a completion that woke an idle session from
+one steered into an active run. The field is recorded once per send: for
+notifications flushed when a compaction ends, it reflects whatever Pi reports
+at that moment. The payload broadcast on `CHANNELS.NOTIFICATION` is unchanged.
+
 `context` and emitted `ignore` notifications are sent with `triggerTurn: false`
 and no `deliverAs`: they never wake or steer the agent, and they persist as
 displayed custom messages immediately. While a turn is running, Pi holds them

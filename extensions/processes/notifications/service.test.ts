@@ -423,6 +423,96 @@ describe("NotificationService", () => {
     service.dispose();
   });
 
+  describe("getWakeConditions", () => {
+    it("resolves exit attentions with defaults and reports unfired watches", () => {
+      const fakeManager = createFakeManager();
+      const spy = createNotificationSpy();
+      const registry = createNotificationRegistry();
+
+      registry.register("proc_1", {
+        onSuccess: "context",
+        logMatches: [{ pattern: "ready" }],
+      });
+
+      const service = createNotificationService({
+        events: spy.events,
+        manager: fakeManager as never,
+        registry,
+        getProcess: (id) => processes.get(id) ?? null,
+      });
+
+      expect(service.getWakeConditions("proc_1")).toEqual({
+        exitAttention: {
+          success: "context",
+          failure: "turn",
+          killed: "context",
+        },
+        watches: [
+          {
+            pattern: "ready",
+            mode: "literal",
+            stream: "both",
+            repeat: false,
+            on: "turn",
+            fired: false,
+          },
+        ],
+      });
+
+      service.dispose();
+    });
+
+    it("reports fired one-shot watches after a match", () => {
+      const fakeManager = createFakeManager();
+      const spy = createNotificationSpy();
+      const registry = createNotificationRegistry();
+
+      registry.register("proc_1", {
+        logMatches: [{ pattern: "ready" }, { pattern: "later", repeat: true }],
+      });
+
+      const service = createNotificationService({
+        events: spy.events,
+        manager: fakeManager as never,
+        registry,
+        getProcess: (id) => processes.get(id) ?? null,
+      });
+
+      fakeManager.emit({
+        type: "process_output_changed",
+        id: "proc_1",
+        appendedText: [{ type: "stdout", text: "ready now" }],
+      });
+
+      const wake = service.getWakeConditions("proc_1");
+      expect(wake?.watches[0]).toMatchObject({ pattern: "ready", fired: true });
+      expect(wake?.watches[1]).toMatchObject({
+        pattern: "later",
+        repeat: true,
+        fired: false,
+      });
+
+      service.dispose();
+    });
+
+    it("returns null for unregistered processes", () => {
+      const fakeManager = createFakeManager();
+      const spy = createNotificationSpy();
+      const registry = createNotificationRegistry();
+
+      const service = createNotificationService({
+        events: spy.events,
+        manager: fakeManager as never,
+        registry,
+        getProcess: (id) => processes.get(id) ?? null,
+      });
+
+      expect(service.getWakeConditions("proc_missing")).toBeNull();
+
+      service.dispose();
+    });
+  });
+
   describe("disposal", () => {
     it("does not emit after dispose()", async () => {
       const fakeManager = createFakeManager();

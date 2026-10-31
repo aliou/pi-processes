@@ -52,7 +52,7 @@ describe("registerRequestHandlers", () => {
       getFileSize: vi.fn(() => ({ stdout: 1, stderr: 2 })),
     } as unknown as ProcessManager;
 
-    registerRequestHandlers(events, manager, getConfig);
+    registerRequestHandlers(events, manager, getConfig, () => null);
 
     const listReply = vi.fn();
     events.emit(CHANNELS.REQUEST_LIST, { reply: listReply });
@@ -114,10 +114,39 @@ describe("registerRequestHandlers", () => {
     };
     const reply = vi.fn();
 
-    registerRequestHandlers(events, manager, () => config);
+    registerRequestHandlers(
+      events,
+      manager,
+      () => config,
+      () => null,
+    );
     events.emit(CHANNELS.REQUEST_CONFIG, { reply });
 
     expect(reply).toHaveBeenCalledWith(config);
+  });
+
+  it("attaches wake conditions to list entries when available", () => {
+    const events = createEventBus();
+    const info = makeInfo({ id: "proc_1" });
+    const ended = makeInfo({ id: "proc_2", status: "exited" });
+    const manager = {
+      list: vi.fn(() => [info, ended]),
+    } as unknown as ProcessManager;
+    const wake = {
+      exitAttention: { success: "turn", failure: "turn", killed: "context" },
+      watches: [],
+    } as const satisfies {
+      exitAttention: { success: "turn"; failure: "turn"; killed: "context" };
+      watches: never[];
+    };
+    const reply = vi.fn();
+
+    registerRequestHandlers(events, manager, getConfig, (id) =>
+      id === "proc_1" ? wake : null,
+    );
+    events.emit(CHANNELS.REQUEST_LIST, { reply });
+
+    expect(reply).toHaveBeenCalledWith([{ ...info, wake }, ended]);
   });
 
   it("disposes event listeners", () => {
@@ -125,7 +154,12 @@ describe("registerRequestHandlers", () => {
     const manager = { list: vi.fn(() => []) } as unknown as ProcessManager;
     const reply = vi.fn();
 
-    const dispose = registerRequestHandlers(events, manager, getConfig);
+    const dispose = registerRequestHandlers(
+      events,
+      manager,
+      getConfig,
+      () => null,
+    );
     dispose();
     events.emit(CHANNELS.REQUEST_LIST, { reply });
 

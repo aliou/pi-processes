@@ -28,7 +28,10 @@ export type {
 } from "./notifications";
 export { PROCESS_PROTOCOL_ATTENTIONS } from "./notifications";
 export type {
+  ProcessListEntry,
   ProcessProtocolConfig,
+  ProcessProtocolWakeConditions,
+  ProcessProtocolWakeWatch,
   RequestCombinedOutputPayload,
   RequestConfigPayload,
   RequestFileSizePayload,

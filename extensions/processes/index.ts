@@ -61,7 +61,9 @@ export default async function processesExtension(
 
   const disposers = [
     registerEventBridge(pi.events, manager),
-    registerRequestHandlers(pi.events, manager, getConfig),
+    registerRequestHandlers(pi.events, manager, getConfig, (id) =>
+      notificationService.getWakeConditions(id),
+    ),
     registerCommandHandlers(pi.events, manager, notifications),
     registerLogSubscriptions(pi.events, manager),
     registerNotificationDelivery(pi.events, pi),

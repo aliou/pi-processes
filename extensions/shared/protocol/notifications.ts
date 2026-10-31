@@ -52,4 +52,5 @@ export interface ProcessProtocolNotificationPayload {
   signal?: ProcessSignalInfo | null;
   logMatch?: ProcessProtocolNotificationLogMatch;
   attention: ProcessProtocolAttention;
+  sessionIdle?: boolean;
 }

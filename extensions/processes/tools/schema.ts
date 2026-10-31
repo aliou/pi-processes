@@ -1,8 +1,10 @@
 import { StringEnum } from "@earendil-works/pi-ai";
-import { type Static, Type } from "typebox";
+import { type Static, type TSchema, Type } from "typebox";
 import { KILL_FAILURE_REASONS, ProcessInfoSchema } from "../../../src/types";
 import { LINE_MATCH_MODES } from "../../../src/utils/match-line";
+import { PROCESS_PROTOCOL_ATTENTIONS } from "../../shared/protocol";
 import {
+  LOG_MATCH_STREAMS,
   LogMatcherConfigSchema,
   NotifyConfigSchema,
 } from "../notifications/registry";
@@ -46,26 +48,27 @@ export const PROCESS_LIST_SORTS = [
 ] as const;
 
 const WatchUpdateItemParams = Type.Object({
-  ...LogMatcherConfigSchema.properties,
+  mode: Type.Optional(StringEnum(LINE_MATCH_MODES)),
+  stream: Type.Optional(StringEnum(LOG_MATCH_STREAMS)),
+  repeat: Type.Optional(Type.Boolean()),
+  on: Type.Optional(StringEnum(PROCESS_PROTOCOL_ATTENTIONS)),
   index: Type.Optional(
     Type.Integer({
       minimum: 0,
-      description:
-        "Matcher index to remove. Only for remove mode. If pattern is also provided, index takes precedence.",
+      description: "Matcher to remove; takes precedence over pattern.",
     }),
   ),
   pattern: Type.Optional(
     Type.String({
       maxLength: MAX_NOTIFY_PATTERN_LENGTH,
-      description:
-        "Log pattern. Required for append and replace modes. Optional for remove mode (use index or pattern).",
+      description: "Required for append and replace.",
     }),
   ),
 });
 
 export const NotifyParams = Type.Object(NotifyConfigSchema.properties, {
   description:
-    "Notify settings. Attention: turn wakes or steers the agent; context persists immediately without waking or steering the agent (mid-run, pi appends it after the current tool results); ignore suppresses successful exits and external kills but retains log matches as context. Failures always notify, with ignore downgraded to context.",
+    "Notify settings. Attention: turn wakes or steers the agent; context persists immediately without waking or steering the agent (mid-run, pi appends it after the current tool results); ignore suppresses successful exits and external kills but retains log matches as context. Failures always notify, with ignore downgraded to context. Keep turn for anything whose result you need immediately.",
 });
 
 export const ProcessesParams = Type.Object({
@@ -83,87 +86,76 @@ export const ProcessesParams = Type.Object({
   ),
   cwd: Type.Optional(
     Type.String({
-      description:
-        "Working directory for start. Defaults to the agent's current working directory. Only for start.",
+      description: "Defaults to the agent's working directory. Only for start.",
     }),
   ),
   notify: Type.Optional(NotifyParams),
   id: Type.Optional(
     Type.String({
       description:
-        "Opaque process ID returned by start or list (for example, proc_ab12). Required for stop, output, write, and update. Process names are not accepted.",
+        "ID from start or list, not the name. Required for stop, output, write, and update.",
     }),
   ),
-  limit: Type.Optional(
-    Type.Number({ description: "Maximum number of processes to list." }),
-  ),
+  limit: Type.Optional(Type.Number({ description: "Only for list." })),
   sortBy: Type.Optional(
     StringEnum(PROCESS_LIST_SORTS, {
-      description: "Sort order for process list results.",
+      description: "Only for list.",
     }),
   ),
   statuses: Type.Optional(
     Type.Array(StringEnum(PROCESS_LIST_STATUS_FILTERS), {
       description:
-        "Process list status filters. Use all for no filtering; finished means exited successfully; failed means exited unsuccessfully or terminate_timeout.",
+        "Only for list. finished: exited successfully; failed: exited unsuccessfully or terminate_timeout.",
     }),
   ),
   stream: Type.Optional(
     StringEnum(PROCESS_OUTPUT_STREAMS, {
-      description:
-        "Output stream to return. Defaults to both. Only for output action.",
+      description: "Defaults to both. Only for output.",
     }),
   ),
   tailLines: Type.Optional(
     Type.Integer({
       minimum: 1,
       maximum: MAX_OUTPUT_TAIL_LINES,
-      description:
-        "Maximum matching lines to return per selected stream. Defaults to 100. Only for output action.",
+      description: "Lines per stream. Defaults to 100. Only for output.",
     }),
   ),
   pattern: Type.Optional(
     Type.String({
       maxLength: MAX_OUTPUT_PATTERN_LENGTH,
       description:
-        "Optional output filter. Literal by default; regex only when mode is regex. Only for output action.",
+        "Line filter, literal unless mode is regex. Only for output.",
     }),
   ),
   input: Type.Optional(
     Type.String({
-      description:
-        "Text to write to the process stdin. Only for write action. Defaults to an empty string when closing stdin with end.",
+      description: "Text for stdin. Only for write.",
     }),
   ),
   end: Type.Optional(
     Type.Boolean({
-      description:
-        "Close stdin after writing. Use to signal end-of-input (EOF). Only for write action.",
+      description: "Close stdin after writing (EOF). Only for write.",
     }),
   ),
   mode: Type.Optional(
     StringEnum(PROCESS_OUTPUT_MATCH_MODES, {
-      description:
-        "Pattern matching mode for output filter. Defaults to literal. Only for output action.",
+      description: "Defaults to literal. Only for output.",
     }),
   ),
   watches: Type.Optional(
     Type.Object(
       {
-        mode: StringEnum(PROCESS_WATCH_UPDATE_MODES, {
-          description: "How to update log watches.",
-        }),
+        mode: StringEnum(PROCESS_WATCH_UPDATE_MODES),
         items: Type.Optional(
           Type.Array(WatchUpdateItemParams, {
             maxItems: MAX_NOTIFY_LOG_MATCHERS,
             description:
-              "Watch entries. For append/replace, provide full matcher definitions. For remove, provide index or pattern to identify matchers to remove. Ignored for clear.",
+              "Same fields as notify.logMatches. Full matchers for append and replace; index or pattern for remove.",
           }),
         ),
       },
       {
-        description:
-          "Update log watches on a running process. Only for update action.",
+        description: "Only for update.",
       },
     ),
   ),
@@ -335,3 +327,21 @@ export const ProcessToolOutputSchema = Type.Union(
   },
 );
 export type ProcessToolOutput = Static<typeof ProcessToolOutputSchema>;
+
+const DECLARATION_OMITTED_KEYWORDS = new Set([
+  "description",
+  "maxItems",
+  "maxLength",
+]);
+
+function toDeclaration(schema: TSchema): TSchema {
+  return JSON.parse(JSON.stringify(schema), (keyword, value) => {
+    if (DECLARATION_OMITTED_KEYWORDS.has(keyword) && typeof value !== "object")
+      return undefined;
+    return keyword === "type" && value === "integer" ? "number" : value;
+  });
+}
+
+export const ProcessToolOutputDeclaration = Type.Unsafe<ProcessToolOutput>(
+  toDeclaration(ProcessToolOutputSchema),
+);

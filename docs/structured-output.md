@@ -30,9 +30,12 @@ The tool input reuses the registry schemas directly (`NotifyParams` is
 parameters, the runtime registry config, and the structured output are the
 same object shape by construction.
 
-pi renders the union into codemode's tool declarations (roughly 2 KB of
-TypeScript text in the system prompt while codemode is active). Keep field
-descriptions sparse and drop them if that ever matters.
+pi renders the declared output schema into codemode's tool declarations while
+codemode is active, and every description or constraint turns an object into
+one commented line per field. The tool therefore declares
+`ProcessToolOutputDeclaration`: the same union with descriptions, length limits,
+and integer constraints removed, so objects render on one line. The details
+types stay derived from `ProcessToolOutputSchema`.
 
 ## Drift protection is compile-time only
 

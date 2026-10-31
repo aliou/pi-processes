@@ -1,3 +1,4 @@
+import { Value } from "typebox/value";
 import { describe, expect, it } from "vitest";
 
 import type { ProcessInfo } from "../../../src/types";
@@ -8,7 +9,9 @@ import {
   type ListDetails,
   type ListProcess,
   type OutputDetails,
+  ProcessesParams,
   type ProcessToolOutput,
+  ProcessToolOutputDeclaration,
   ProcessToolOutputSchema,
   type StartDetails,
   type StopDetails,
@@ -34,6 +37,22 @@ function runningProcess(): ProcessInfo {
     signal: null,
     errorMessage: null,
   };
+}
+
+function propertyPaths(schema: unknown, path = ""): string[] {
+  if (Array.isArray(schema)) {
+    return schema.flatMap((item, index) =>
+      propertyPaths(item, `${path}[${index}]`),
+    );
+  }
+  if (typeof schema !== "object" || schema === null) return [];
+  return Object.entries(schema).flatMap(([keyword, value]) => {
+    if (keyword !== "properties") return propertyPaths(value, path);
+    return Object.entries(value).flatMap(([name, child]) => [
+      `${path}.${name}`,
+      ...propertyPaths(child, `${path}.${name}`),
+    ]);
+  });
 }
 
 const notify: NotifyConfig = {
@@ -118,6 +137,55 @@ describe("ProcessToolOutputSchema", () => {
     ];
 
     expect(mirrored).toHaveLength(7);
+  });
+});
+
+describe("ProcessesParams", () => {
+  const update = (items: unknown[]) => ({
+    action: "update",
+    id: "proc_ab12",
+    watches: { mode: "remove", items },
+  });
+
+  it("keeps update watch fields optional and validated", () => {
+    expect(Value.Check(ProcessesParams, update([{ index: 0 }]))).toBe(true);
+    expect(
+      Value.Check(
+        ProcessesParams,
+        update([{ pattern: "FATAL", mode: "literal", on: "turn" }]),
+      ),
+    ).toBe(true);
+    expect(Value.Check(ProcessesParams, update([{ mode: "glob" }]))).toBe(
+      false,
+    );
+    expect(Value.Check(ProcessesParams, update([{ on: "later" }]))).toBe(false);
+  });
+
+  it("describes update watch fields once, under notify.logMatches", () => {
+    const fields = JSON.parse(JSON.stringify(ProcessesParams)).properties
+      .watches.properties.items.items.properties;
+
+    for (const name of ["mode", "stream", "repeat", "on"]) {
+      expect(fields[name]).not.toHaveProperty("description");
+    }
+  });
+});
+
+describe("ProcessToolOutputDeclaration", () => {
+  it("omits descriptions, length limits, and integer constraints", () => {
+    const declaration = JSON.stringify(ProcessToolOutputDeclaration);
+
+    expect(declaration).not.toMatch(/"description":"/);
+    expect(declaration).not.toMatch(/"maxItems"|"maxLength"|"integer"/);
+  });
+
+  it("keeps every field of the output schema", () => {
+    const fields = propertyPaths(ProcessToolOutputDeclaration);
+
+    expect(fields).toEqual(propertyPaths(ProcessToolOutputSchema));
+    expect(
+      fields.some((field) => field.endsWith(".signal[0].description")),
+    ).toBe(true);
   });
 });
 

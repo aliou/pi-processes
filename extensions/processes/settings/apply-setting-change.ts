@@ -25,6 +25,11 @@ export function applySettingChange(
     return updated;
   }
 
+  if (id === "toolExposure") {
+    setNestedValue(updated, id, newValue);
+    return updated;
+  }
+
   // Unknown field: fall through to default string storage
   return null;
 }

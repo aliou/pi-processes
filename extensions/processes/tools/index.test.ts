@@ -15,10 +15,12 @@ import type {
   ExtensionAPI,
   Theme,
   ToolDefinition,
+  ToolExposure,
 } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ProcessManager } from "../../../src/manager";
+import { DEFAULT_CONFIG } from "../config";
 import type { NotificationRegistry } from "../notifications/registry";
 import { registerProcessTool } from "./index";
 
@@ -38,13 +40,50 @@ const theme = {
   bold: (text: string) => text,
 } as Theme;
 
-function captureRenderCall(): HostRenderCall {
+function captureRegisteredTool(
+  exposure: ToolExposure = "direct",
+): ToolDefinition {
   const pi = { registerTool: vi.fn() } as unknown as ExtensionAPI;
-  registerProcessTool(pi, {} as ProcessManager, {} as NotificationRegistry);
+  registerProcessTool(
+    pi,
+    {} as ProcessManager,
+    {} as NotificationRegistry,
+    exposure,
+  );
   const tool = vi.mocked(pi.registerTool).mock.calls[0]?.[0] as ToolDefinition;
+  if (!tool) throw new Error("process tool was not registered");
+  return tool;
+}
+
+function captureRenderCall(): HostRenderCall {
+  const tool = captureRegisteredTool();
   if (!tool.renderCall) throw new Error("process tool was not registered");
   return tool.renderCall as unknown as HostRenderCall;
 }
+
+describe("tool exposure", () => {
+  it("defaults to direct", () => {
+    expect(DEFAULT_CONFIG.toolExposure).toBe("direct");
+  });
+
+  it("registers with the configured exposure", () => {
+    for (const exposure of [
+      "direct",
+      "model-only",
+      "codemode",
+      "deferred",
+      "hidden",
+    ] as const) {
+      expect(captureRegisteredTool(exposure).exposure).toBe(exposure);
+    }
+  });
+
+  it("falls back to direct for an unknown value", () => {
+    expect(captureRegisteredTool("always" as ToolExposure).exposure).toBe(
+      "direct",
+    );
+  });
+});
 
 describe("renderCall host argument order", () => {
   it("renders with pi order: (args, theme, context)", () => {

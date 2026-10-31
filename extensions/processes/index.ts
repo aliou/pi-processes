@@ -77,7 +77,7 @@ export default async function processesExtension(
   );
 
   registerProcessNotificationRenderer(pi);
-  registerProcessTool(pi, manager, notifications);
+  registerProcessTool(pi, manager, notifications, getConfig().toolExposure);
   registerProcessSettings(pi);
   registerOverviewCommand(pi, { events: pi.events, registerOverlay });
   registerKillCommand(pi);

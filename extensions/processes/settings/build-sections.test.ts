@@ -40,6 +40,42 @@ describe("buildSections", () => {
     expect(getBlockerValue(inherited)).toBe("inherited: off");
   });
 
+  it("cycles tool exposure as an inline item", () => {
+    const scoped: ProcessConfig = { toolExposure: "deferred" };
+    const sections = buildSections(scoped, resolved, ctx);
+    const exposureItem = sections
+      .find((s) => s.label === "Core")
+      ?.items.find((item) => item.id === "toolExposure");
+
+    expect(exposureItem?.currentValue).toBe("deferred");
+    expect(exposureItem?.values).toEqual([
+      "direct",
+      "model-only",
+      "codemode",
+      "deferred",
+      "hidden",
+    ]);
+
+    const inherited = buildSections(null, resolved, ctx);
+    const inheritedItem = inherited
+      .find((s) => s.label === "Core")
+      ?.items.find((item) => item.id === "toolExposure");
+    expect(inheritedItem?.currentValue).toBe("inherited: direct");
+  });
+
+  it("offers tool exposure only in the global scope", () => {
+    for (const scope of ["local", "memory"] as const) {
+      const sections = buildSections({ toolExposure: "deferred" }, resolved, {
+        ...ctx,
+        scope,
+      });
+      const ids = sections
+        .find((s) => s.label === "Core")
+        ?.items.map((item) => item.id);
+      expect(ids).not.toContain("toolExposure");
+    }
+  });
+
   it("summarizes logs settings in a submenu item", () => {
     const scoped: ProcessConfig = {
       output: { maxOutputLines: 500 },

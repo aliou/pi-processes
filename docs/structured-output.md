@@ -83,20 +83,25 @@ contain the line arrays; the serialized `{content, details}` stay under the
 `schema.test.ts`, including a compile-time probe that every
 non-output details object is assignable to the union.
 
-## Exposure stays `direct`
+## Tool exposure
 
-`process` keeps its default `direct` exposure and is not made `model-only`,
-even though codemode scripts can call it:
+`process` defaults to `direct` exposure:
 
 - nested calls run through the same input validation, `tool_call`/`tool_result`
   hooks, and permission checks as direct model calls — there is no permission
   gap in keeping it scriptable.
 - a codemode script that wants a background process can spawn one unmanaged
-  via `bash` anyway; `model-only` would only trade managed starts (logs,
-  watches, notifications, dock) for unmanaged ones.
-- pi's guidance reserves `model-only` for tools that orchestrate other tools or
-  ask the user; `process` does neither.
+  via `bash` anyway.
 - read-only `list` and `output` calls are legitimately scriptable.
+
+The `toolExposure` setting (pi's `ToolExposure`) makes every exposure
+configurable, defaulting to `direct` in `DEFAULT_CONFIG`. `registerProcessTool`
+passes it as the `exposure` of the `defineTool` call. The value is read at
+extension load, before project settings apply, so it is a global setting:
+`/ps:settings` offers it only in the Global tab, and a change takes effect on
+the next session start. `deferred` keeps the tool callable and discoverable via tool
+search while leaving the declared tool list, for sessions that rarely manage
+processes.
 
 Permission extensions that want to gate script-issued calls can key on
 `parentToolCallId` in `tool_call`/`tool_result` events.

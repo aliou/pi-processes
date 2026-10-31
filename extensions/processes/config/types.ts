@@ -5,7 +5,17 @@
  * Runtime config uses the shared protocol shape returned by REQUEST_CONFIG.
  */
 
+import type { ToolExposure } from "@earendil-works/pi-coding-agent";
+
 import type { ProcessProtocolConfig } from "../../shared/protocol";
+
+export const TOOL_EXPOSURES = [
+  "direct",
+  "model-only",
+  "codemode",
+  "deferred",
+  "hidden",
+] as const satisfies readonly ToolExposure[];
 
 export interface ExecutionConfig {
   /** Absolute shell executable used to run process commands. */
@@ -68,6 +78,7 @@ export interface ProcessConfig {
   follow?: FollowConfig;
   /** Dock and status widget settings. */
   widget?: WidgetConfig;
+  toolExposure?: ToolExposure;
 }
 
 export type { ProcessProtocolConfig };

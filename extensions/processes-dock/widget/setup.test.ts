@@ -54,6 +54,7 @@ function defaultConfig(): ProcessProtocolConfig {
       dockDefaultState: "collapsed",
       dockHeight: 10,
     },
+    toolExposure: "direct",
   };
 }
 

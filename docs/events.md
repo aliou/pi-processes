@@ -230,9 +230,13 @@ cross-extension protocol.
 Beyond the bus protocol, the extensions subscribe to standard Pi extension
 hooks:
 
-- `session_start` — the core extension checks for pending config-migration and
-  import messages and notifies the user; the dock tears down any previous
-  controller and re-creates its widgets for the new session.
+- `session_start` — the core extension first applies project config through
+  `bindProjectConfig` in `extensions/processes/index.ts`, only when Pi trusts
+  the session directory. Untrusted project files are not read or migrated.
+  It then drains config, trust, and import messages and notifies the user;
+  the dock tears down any previous controller and re-creates its widgets
+  for the session. Shell selection, interception, and config requests read
+  the resolved config at runtime.
 - `tool_call` — the core extension's background blocker inspects bash tool
   calls to optionally reject backgrounded commands when interception is
   enabled in config.

@@ -43,13 +43,13 @@
     "CONTRIBUTING.md"
   ],
   "dependencies": {
-    "@aliou/pi-utils-settings": "^0.19.1",
+    "@aliou/pi-utils-settings": "^0.24.0",
     "@aliou/pi-utils-ui": "^0.5.0",
     "@aliou/sh": "^0.2.2"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
-    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-coding-agent": ">=1.4.0",
     "@earendil-works/pi-tui": "*",
     "typebox": "*"
   },

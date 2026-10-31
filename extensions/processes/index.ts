@@ -1,3 +1,4 @@
+import { bindProjectConfig } from "@aliou/pi-utils-settings";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { ProcessManager } from "../../src/manager";
 import { isWindowsPlatform } from "../../src/utils/platform";
@@ -38,6 +39,7 @@ export default async function processesExtension(
   }
 
   await loadProcessConfig();
+  bindProjectConfig(pi, configLoader);
   registerMigrationMessageNotifications(pi);
 
   const manager = new ProcessManager({

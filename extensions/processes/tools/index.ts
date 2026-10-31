@@ -5,10 +5,12 @@ import {
   type ExtensionContext,
   type Theme,
   type ToolDefinition,
+  type ToolExposure,
 } from "@earendil-works/pi-coding-agent";
 import { type Component, Container, Text } from "@earendil-works/pi-tui";
 
 import type { ProcessManager } from "../../../src/manager";
+import { TOOL_EXPOSURES } from "../config";
 import type { NotificationRegistry } from "../notifications/registry";
 import { executeClear, formatClearDetails } from "./clear";
 import * as clearRender from "./clear/render";
@@ -23,7 +25,7 @@ import {
   type OutputDetails,
   ProcessesParams,
   type ProcessesParamsType,
-  ProcessToolOutputSchema,
+  ProcessToolOutputDeclaration,
   type StartDetails,
   type StopDetails,
   type UpdateDetails,
@@ -51,24 +53,24 @@ export function registerProcessTool(
   pi: ExtensionAPI,
   manager: ProcessManager,
   notifications: NotificationRegistry,
+  exposure: ToolExposure,
 ): void {
   pi.registerTool(
     defineTool({
       name: "process",
       label: "Process",
+      exposure: TOOL_EXPOSURES.includes(exposure) ? exposure : "direct",
       description:
         "Start, list, stop, write to stdin, update, clear, and inspect output of long-running background processes.",
       promptSnippet:
         "Manage long-running background processes: start, list, stop, write to stdin, update watches, clear finished entries, and inspect recent output. After starting a process, do not wait - notifications bring you back on exit and on log matches.",
       promptGuidelines: [
-        "process tool: use process start for long-running commands (dev servers, watchers, builds) instead of shell background patterns like &, nohup, or setsid; give each process a specific name and check process list first when a duplicate would be noisy.",
+        "process tool: use process start for long-running commands (dev servers, watchers, builds) instead of shell background patterns like &, nohup, or setsid; give each process a specific name.",
         "process tool: after process start, do not sleep, poll, or hold your turn. End your turn or move on. Exits and notify.logMatches matches bring you back.",
-        "process tool: attention turn wakes or steers you now; context persists immediately without waking or steering you (mid-run, pi appends it after the current tool results). Ignore suppresses successful exits and external kills but retains log matches as context. Failures always notify, with ignore downgraded to context. Keep turn for anything whose result you need immediately.",
         "process tool: use notify.logMatches to get brought back on readiness or error signals instead of polling process output. If a watch is too noisy, use process update (watches.mode append/replace/remove/clear) to fix it without restarting.",
-        "process tool: for the full lifecycle (start, list, output, update, write, stop, clear), notify options, use cases, and noisy-watch handling, read the pi-processes skill.",
       ],
       parameters: ProcessesParams,
-      outputSchema: ProcessToolOutputSchema,
+      outputSchema: ProcessToolOutputDeclaration,
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
         if (params.action === "output") {
           const result = executeOutput(params, manager);

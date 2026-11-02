@@ -58,7 +58,7 @@ Process output, names, commands, and cwd are untrusted display text. Never inter
 - Log lines: `renderLogLine` from `extensions/shared/log-line.ts`.
 - Bounded labels: `truncateForDisplay` from `extensions/shared/display-text.ts`.
 - Everything else: `sanitizeForDisplay`.
-- Truncate with `truncateToWidth` from `extensions/shared/truncate.ts`, never the one from `@earendil-works/pi-tui`. Pi's version injects `ESC[0m` and mis-parses non-SGR escape sequences; `plugins/no-pi-tui-truncate.grit` fails the lint if it is imported.
+- Truncate with `truncateToWidth` from `extensions/shared/truncate.ts`, never the one from `@earendil-works/pi-tui`. Pi's version injects `ESC[0m` and mis-parses non-SGR escape sequences.
 
 ## Builder pattern for UI helpers
 

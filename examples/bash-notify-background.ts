@@ -11,6 +11,7 @@
  * hands the running command to pi-processes and returns the background
  * process id in the result so the agent can keep tracking the long-running job.
  */
+// biome-ignore lint/plugin/@aliou/biome-plugins/pi-no-node-exec: long-lived streaming process that pi.exec() does not support
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import {

@@ -38,12 +38,12 @@ function createFakeRegistry(): NotificationRegistry {
 }
 
 describe("executeStart", () => {
-  it("validates notify before starting the process", () => {
+  it("validates notify before starting the process", async () => {
     const start = vi.fn(() => processInfo);
     const manager = { start } as unknown as ProcessManager;
     const registry = createFakeRegistry();
 
-    expect(() =>
+    await expect(
       executeStart(
         {
           action: "start",
@@ -55,17 +55,17 @@ describe("executeStart", () => {
         ctx,
         registry,
       ),
-    ).toThrow(/not a valid regular expression/);
+    ).rejects.toThrow(/not a valid regular expression/);
 
     expect(start).not.toHaveBeenCalled();
   });
 
-  it("returns normalized notify config in start details", () => {
+  it("returns normalized notify config in start details", async () => {
     const start = vi.fn(() => processInfo);
     const manager = { start } as unknown as ProcessManager;
     const registry = createFakeRegistry();
 
-    const details = executeStart(
+    const details = await executeStart(
       {
         action: "start",
         name: "dev",
@@ -99,13 +99,13 @@ describe("executeStart", () => {
     });
   });
 
-  it("registers notify config with the notification registry after successful start", () => {
+  it("registers notify config with the notification registry after successful start", async () => {
     const start = vi.fn(() => processInfo);
     const manager = { start } as unknown as ProcessManager;
     const registry = createFakeRegistry();
 
     const notify = { logMatches: [{ pattern: "ready" }] };
-    executeStart(
+    await executeStart(
       {
         action: "start",
         name: "dev",
@@ -126,12 +126,12 @@ describe("executeStart", () => {
     expect(registered?.logMatches?.[0]?.pattern).toBe("ready");
   });
 
-  it("does not register notify config when validation fails", () => {
+  it("does not register notify config when validation fails", async () => {
     const start = vi.fn(() => processInfo);
     const manager = { start } as unknown as ProcessManager;
     const registry = createFakeRegistry();
 
-    expect(() =>
+    await expect(
       executeStart(
         {
           action: "start",
@@ -143,17 +143,18 @@ describe("executeStart", () => {
         ctx,
         registry,
       ),
-    ).toThrow(/not a valid regular expression/);
+    ).rejects.toThrow(/not a valid regular expression/);
 
+    expect(start).not.toHaveBeenCalled();
     expect(registry.get("proc_1")).toBeNull();
   });
 
-  it("starts with the explicit cwd when provided", () => {
+  it("starts with the explicit cwd when provided", async () => {
     const start = vi.fn(() => ({ ...processInfo, cwd: "/explicit" }));
     const manager = { start } as unknown as ProcessManager;
     const registry = createFakeRegistry();
 
-    const details = executeStart(
+    const details = await executeStart(
       {
         action: "start",
         name: "dev",
@@ -174,12 +175,12 @@ describe("executeStart", () => {
     expect(details.process.cwd).toBe("/explicit");
   });
 
-  it("falls back to ctx.cwd when cwd is not provided", () => {
+  it("falls back to ctx.cwd when cwd is not provided", async () => {
     const start = vi.fn(() => ({ ...processInfo, cwd: "/repo" }));
     const manager = { start } as unknown as ProcessManager;
     const registry = createFakeRegistry();
 
-    executeStart(
+    await executeStart(
       {
         action: "start",
         name: "dev",
@@ -198,12 +199,12 @@ describe("executeStart", () => {
     );
   });
 
-  it("starts with PI_* session variables injected into the child env", () => {
+  it("starts with PI_* session variables injected into the child env", async () => {
     const start = vi.fn((..._args: unknown[]) => processInfo);
     const manager = { start } as unknown as ProcessManager;
     const registry = createFakeRegistry();
 
-    executeStart(
+    await executeStart(
       {
         action: "start",
         name: "dev",
@@ -218,10 +219,182 @@ describe("executeStart", () => {
     expect(env.PI_SESSION_ID).toBe("session-123");
     expect(env.PI_SESSION_FILE).toBe("/tmp/session-123.jsonl");
   });
+
+  it("returns a successfully exited process in start details", async () => {
+    const exited: ProcessInfo = {
+      ...processInfo,
+      status: "exited",
+      endTime: 1100,
+      exitCode: 0,
+      success: true,
+      endReason: "exit",
+    };
+    const start = vi.fn(() => exited);
+    const manager = { start } as unknown as ProcessManager;
+    const registry = createFakeRegistry();
+
+    const details = await executeStart(
+      {
+        action: "start",
+        name: "dev",
+        command: "pnpm dev",
+      },
+      manager,
+      ctx,
+      registry,
+    );
+
+    expect(details.process.status).toBe("exited");
+    expect(details.process.exitCode).toBe(0);
+    expect(registry.get("proc_1")).not.toBeNull();
+    expect(registry.consumeStartReported("proc_1")).toBe(true);
+  });
+
+  it("fails the tool call when the process exits immediately with failure", async () => {
+    const exited: ProcessInfo = {
+      ...processInfo,
+      status: "exited",
+      endTime: 1100,
+      exitCode: 1,
+      success: false,
+      endReason: "exit",
+    };
+    const manager = {
+      start: vi.fn(() => exited),
+    } as unknown as ProcessManager;
+    const registry = createFakeRegistry();
+
+    await expect(
+      executeStart(
+        {
+          action: "start",
+          name: "dev",
+          command: "exit 1",
+        },
+        manager,
+        ctx,
+        registry,
+      ),
+    ).rejects.toThrow("Process dev (proc_1) exited immediately: exit code 1.");
+
+    expect(registry.consumeStartReported("proc_1")).toBe(true);
+  });
+
+  it("fails the tool call with the spawn error message", async () => {
+    const exited: ProcessInfo = {
+      ...processInfo,
+      status: "exited",
+      endTime: 1050,
+      exitCode: -1,
+      success: false,
+      endReason: "spawn_error",
+      errorMessage: "spawn /bin/bash ENOENT",
+    };
+    const manager = {
+      start: vi.fn(() => exited),
+    } as unknown as ProcessManager;
+    const registry = createFakeRegistry();
+
+    await expect(
+      executeStart(
+        {
+          action: "start",
+          name: "dev",
+          command: "missing",
+        },
+        manager,
+        ctx,
+        registry,
+      ),
+    ).rejects.toThrow(
+      "Process dev (proc_1) exited immediately: failed to spawn (spawn /bin/bash ENOENT).",
+    );
+  });
+
+  it("fails the tool call with the signal for an immediate kill", async () => {
+    const exited: ProcessInfo = {
+      ...processInfo,
+      status: "killed",
+      endTime: 1080,
+      success: false,
+      endReason: "signal",
+      signal: {
+        name: "SIGTERM",
+        number: 15,
+        description: "termination request",
+      },
+    };
+    const manager = {
+      start: vi.fn(() => exited),
+    } as unknown as ProcessManager;
+    const registry = createFakeRegistry();
+
+    await expect(
+      executeStart(
+        {
+          action: "start",
+          name: "dev",
+          command: "sleep 60",
+        },
+        manager,
+        ctx,
+        registry,
+      ),
+    ).rejects.toThrow(
+      "Process dev (proc_1) exited immediately: killed by SIGTERM.",
+    );
+  });
+
+  it("does not mark a running start as start-reported", async () => {
+    const manager = {
+      start: vi.fn(() => processInfo),
+    } as unknown as ProcessManager;
+    const registry = createFakeRegistry();
+
+    await executeStart(
+      {
+        action: "start",
+        name: "dev",
+        command: "pnpm dev",
+      },
+      manager,
+      ctx,
+      registry,
+    );
+
+    expect(registry.consumeStartReported("proc_1")).toBe(false);
+  });
 });
 
 describe("formatStartDetails", () => {
-  it("includes matcher details and watch guidance", () => {
+  it("describes an immediate clean exit with the exit code", () => {
+    const text = formatStartDetails({
+      action: "start",
+      process: {
+        ...processInfo,
+        status: "exited",
+        endTime: 1100,
+        exitCode: 0,
+        success: true,
+        endReason: "exit",
+      },
+      notify: {},
+    });
+
+    expect(text).toBe("Process dev (proc_1) exited immediately: exit code 0.");
+  });
+
+  it("keeps the started wording for a running process", () => {
+    const text = formatStartDetails({
+      action: "start",
+      process: processInfo,
+      notify: {},
+    });
+
+    expect(text).toBe("Started process dev (proc_1) with pid 123.");
+  });
+
+  it("includes matcher details and watch guidance", async () => {
     const text = formatStartDetails({
       action: "start",
       process: processInfo,
@@ -247,7 +420,7 @@ describe("formatStartDetails", () => {
     expect(text).toContain('[both] literal turn "ready"');
   });
 
-  it("keeps matcher control characters on one logical line", () => {
+  it("keeps matcher control characters on one logical line", async () => {
     const text = formatStartDetails({
       action: "start",
       process: processInfo,

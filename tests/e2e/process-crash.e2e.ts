@@ -11,7 +11,7 @@ test("records a real process that fails by itself", async ({
   using manager = new ProcessManager();
   addScript("crash-on-file.sh");
 
-  const info = manager.start(
+  const info = await manager.start(
     "self-failing-worker",
     "bash ./crash-on-file.sh crash-now",
     cwd,

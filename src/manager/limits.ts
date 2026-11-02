@@ -13,3 +13,4 @@ export const TRUNCATION_SUFFIX = " … [line truncated]";
 export const MAX_FINISHED_RECORDS = 50;
 /** Keep recently finished records available to the UI before reaping. */
 export const FINISHED_RECORD_GRACE_MS = 5 * 60 * 1000;
+export const START_EXIT_GRACE_MS = 150;

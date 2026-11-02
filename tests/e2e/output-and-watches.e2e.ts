@@ -14,7 +14,7 @@ test("runs a real process and records logs, events, and output", async ({
   const events = collectEvents(manager);
   addScript("emit-output.sh");
 
-  const info = manager.start("real-output", "./emit-output.sh", cwd);
+  const info = await manager.start("real-output", "./emit-output.sh", cwd);
 
   const ended = await waitForEnd(manager, info.id);
 

@@ -13,7 +13,11 @@ test("kills a real running process and clears finished logs", async ({
   const events = collectEvents(manager);
   addScript("wait-for-file.sh");
 
-  const info = manager.start("kill-target", "./wait-for-file.sh never", cwd);
+  const info = await manager.start(
+    "kill-target",
+    "./wait-for-file.sh never",
+    cwd,
+  );
   const files = manager.getLogFiles(info.id);
   assert(files, "log files should exist");
 

@@ -8,8 +8,16 @@ test("killAll stops real live processes", async ({ cwd, addScript }) => {
   using manager = new ProcessManager();
   addScript("wait-for-file.sh");
 
-  const first = manager.start("first-live", "./wait-for-file.sh never", cwd);
-  const second = manager.start("second-live", "./wait-for-file.sh never", cwd);
+  const first = await manager.start(
+    "first-live",
+    "./wait-for-file.sh never",
+    cwd,
+  );
+  const second = await manager.start(
+    "second-live",
+    "./wait-for-file.sh never",
+    cwd,
+  );
   const allEnded = waitForEndedCount(manager, new Set([first.id, second.id]));
 
   manager.killAll();

@@ -100,6 +100,8 @@ export interface NotificationRegistry {
   get(processId: string): NotifyConfig | null;
   markIntentionalStop(processId: string): void;
   consumeIntentionalStop(processId: string): boolean;
+  markStartReported(processId: string): void;
+  consumeStartReported(processId: string): boolean;
   clear(): void;
   appendWatches(
     processId: string,
@@ -120,6 +122,7 @@ export interface NotificationRegistry {
 export function createNotificationRegistry(): NotificationRegistry {
   const configs = new Map<string, NotifyConfig>();
   const intentionalStops = new Set<string>();
+  const startReportedEnds = new Set<string>();
   const watchMeta = new Map<string, WatchMeta>();
 
   function currentMatches(processId: string): LogMatcherConfig[] {
@@ -153,6 +156,7 @@ export function createNotificationRegistry(): NotificationRegistry {
     unregister(processId: string): void {
       configs.delete(processId);
       intentionalStops.delete(processId);
+      startReportedEnds.delete(processId);
       watchMeta.delete(processId);
     },
 
@@ -168,9 +172,18 @@ export function createNotificationRegistry(): NotificationRegistry {
       return intentionalStops.delete(processId);
     },
 
+    markStartReported(processId: string): void {
+      startReportedEnds.add(processId);
+    },
+
+    consumeStartReported(processId: string): boolean {
+      return startReportedEnds.delete(processId);
+    },
+
     clear(): void {
       configs.clear();
       intentionalStops.clear();
+      startReportedEnds.clear();
       watchMeta.clear();
     },
 

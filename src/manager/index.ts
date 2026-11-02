@@ -1,14 +1,15 @@
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
 
-import type {
-  AdoptProcessOptions,
-  KillResult,
-  ManagerEvent,
-  ProcessInfo,
-  WriteResult,
+import type { AdoptProcessOptions, ManagerEvent } from "../types";
+import {
+  type KillResult,
+  LIVE_STATUSES,
+  type ProcessInfo,
+  type WriteResult,
 } from "../types";
 import { formatProcess } from "./internal-types";
+import { START_EXIT_GRACE_MS } from "./limits";
 import { ProcessLogStore } from "./process-log-store";
 import { ProcessOutput } from "./process-output";
 import { ProcessRegistry } from "./process-registry";
@@ -16,6 +17,7 @@ import { ProcessRuntimeController } from "./process-runtime-controller";
 
 interface ProcessManagerOptions {
   getConfiguredShellPath?: () => string | undefined;
+  startExitGraceMs?: number;
 }
 
 export class ProcessManager {
@@ -25,6 +27,7 @@ export class ProcessManager {
   private logStore: ProcessLogStore;
   private output: ProcessOutput;
   private runtime: ProcessRuntimeController;
+  private startExitGraceMs: number;
 
   constructor(options?: ProcessManagerOptions) {
     const emit = (event: ManagerEvent): void => {
@@ -47,6 +50,8 @@ export class ProcessManager {
       getConfiguredShellPath:
         options?.getConfiguredShellPath ?? (() => undefined),
     });
+
+    this.startExitGraceMs = options?.startExitGraceMs ?? START_EXIT_GRACE_MS;
   }
 
   onEvent(listener: (event: ManagerEvent) => void): () => void {
@@ -54,14 +59,39 @@ export class ProcessManager {
     return () => this.events.off("event", listener);
   }
 
-  start(
+  async start(
     name: string,
     command: string,
     cwd: string,
     env?: NodeJS.ProcessEnv,
-  ): ProcessInfo {
+  ): Promise<ProcessInfo> {
     const managed = this.runtime.start(name, command, cwd, env);
+    await this.waitForImmediateExit(managed.id);
     return formatProcess(managed);
+  }
+
+  private waitForImmediateExit(id: string): Promise<void> {
+    const record = this.registry.getRecord(id);
+    if (!record || !LIVE_STATUSES.has(record.status)) {
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const unsubscribe = this.onEvent((event) => {
+        if (event.type === "process_ended" && event.info.id === id) finish();
+      });
+      const timer = setTimeout(finish, this.startExitGraceMs);
+      timer.unref?.();
+
+      function finish(): void {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        unsubscribe();
+        resolve();
+      }
+    });
   }
 
   /**

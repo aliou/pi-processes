@@ -8,7 +8,7 @@ test("writes to stdin of a real process and then rejects writes after exit", asy
 }) => {
   using manager = new ProcessManager();
 
-  const info = manager.start(
+  const info = await manager.start(
     "stdin",
     "IFS= read -r line; printf 'stdin:%s\\n' \"$line\"; printf 'done\\n' >&2",
     cwd,

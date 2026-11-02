@@ -96,9 +96,33 @@ provider request on — no user prompt required.
 ## Lifecycle notifications
 
 `NotificationService.handleProcessEnded` runs on every `process_ended` event
-(deferred one microtask so the start tool can register the notify config
-first). It classifies the end, resolves attention from the per-process config
-or defaults, and either emits or suppresses.
+(deferred to a macrotask so the start tool can register the notify config
+first — `executeStart` registers after awaiting `manager.start`, and sync
+registration after `start()` returns also precedes a macrotask boundary). It
+classifies the end, resolves attention from the per-process config or defaults,
+and either emits or suppresses.
+
+### Immediate exits at start time
+
+`ProcessManager.start` waits up to `START_EXIT_GRACE_MS` (150ms,
+`src/manager/limits.ts`, overridable through the `startExitGraceMs` manager
+option) for the spawned process to exit before returning. Healthy long-
+running starts pay the full window once and report `running`. A process that
+exits cleanly inside the window is reported with its final state (`Process
+<name> (<id>) exited immediately: exit code 0.`); one that fails inside the
+window fails the tool call instead — the `process start` error reads
+`Process <name> (<id>) exited immediately: exit code N` (or `failed to
+spawn (...)` / `killed by SIG...`), so an immediate failure can no longer
+look like a successful start.
+
+An end reported this way carries no new information for the agent, so it
+does not become a lifecycle notification at all. When the tool that started
+the process sees a non-live return value, it sets a start-reported marker on
+the notification registry (`markStartReported`, mirroring the intentional-
+stop marker). When `handleProcessEnded` consumes the marker it suppresses
+the notification entirely, regardless of resolved attention or the forced-
+display rule. The intentional-stop bypass runs before the marker is read and
+is unchanged.
 
 ### Classification
 
@@ -337,6 +361,7 @@ The summary is always `context`.
 | spawn_error/missing/lost | crash    | turn              | `onFailure`  | forced to context      | yes → context                 |
 | external signal          | killed   | context           | `onKilled`   | suppressed             | yes → context                 |
 | intentional stop         | (classified) | context       | —            | —                      | (this is the bypass)          |
+| early exit reported in start result | — | suppressed (failures fail the tool call) | — | — | — |
 | kill timeout             | —        | —                 | —            | —                      | no emit (tool result only)    |
 | log match                | log_match | turn             | matcher `on` | delivered as context   | n/a                           |
 | log-match overflow       | log_match_suppressed | context | —    | —                      | n/a                           |

@@ -1,3 +1,4 @@
+// biome-ignore lint/plugin/@aliou/biome-plugins/pi-no-node-exec: unit test that mocks child_process and asserts spawn wiring
 import { spawn } from "node:child_process";
 import {
   createEventBus,

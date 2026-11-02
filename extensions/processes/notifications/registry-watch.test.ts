@@ -269,4 +269,53 @@ describe("NotificationRegistry watch methods", () => {
       expect(registry.getWatchState("proc_2")).toBeNull();
     });
   });
+
+  describe("start-reported marker", () => {
+    it("consumes the marker exactly once", () => {
+      const registry = createNotificationRegistry();
+      registry.register("proc_1", makeConfig());
+      registry.markStartReported("proc_1");
+
+      expect(registry.consumeStartReported("proc_1")).toBe(true);
+      expect(registry.consumeStartReported("proc_1")).toBe(false);
+    });
+
+    it("returns false for unmarked and unknown processes", () => {
+      const registry = createNotificationRegistry();
+      registry.register("proc_1", makeConfig());
+
+      expect(registry.consumeStartReported("proc_1")).toBe(false);
+      expect(registry.consumeStartReported("proc_x")).toBe(false);
+    });
+
+    it("does not leak the marker across processes", () => {
+      const registry = createNotificationRegistry();
+      registry.register("proc_1", makeConfig());
+      registry.register("proc_2", makeConfig());
+      registry.markStartReported("proc_1");
+
+      expect(registry.consumeStartReported("proc_2")).toBe(false);
+      expect(registry.consumeStartReported("proc_1")).toBe(true);
+    });
+
+    it("clears the marker on unregister", () => {
+      const registry = createNotificationRegistry();
+      registry.register("proc_1", makeConfig());
+      registry.markStartReported("proc_1");
+
+      registry.unregister("proc_1");
+
+      expect(registry.consumeStartReported("proc_1")).toBe(false);
+    });
+
+    it("clears all markers on clear()", () => {
+      const registry = createNotificationRegistry();
+      registry.register("proc_1", makeConfig());
+      registry.markStartReported("proc_1");
+
+      registry.clear();
+
+      expect(registry.consumeStartReported("proc_1")).toBe(false);
+    });
+  });
 });

@@ -14,7 +14,7 @@ test("emits process_ended once for a process that exits on its own", async ({
   using manager = new ProcessManager();
   const events = collectEvents(manager);
 
-  const info = manager.start("short-lived", "sleep 0.2; echo done", cwd);
+  const info = await manager.start("short-lived", "sleep 0.2; echo done", cwd);
 
   await waitForEnd(manager, info.id);
   // The liveness tick runs every 5s; give it a chance to re-classify a

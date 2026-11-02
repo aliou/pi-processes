@@ -11,7 +11,7 @@ test("drives an interactive stdin repl across multiple lines and quits", async (
 
   using manager = new ProcessManager();
 
-  const info = manager.start("stdin-repl", "./stdin-echo.sh", cwd);
+  const info = await manager.start("stdin-repl", "./stdin-echo.sh", cwd);
 
   expect(
     manager.writeToStdin(info.id, "first line\nsecond line\nquit\n"),
@@ -38,7 +38,7 @@ test("closing stdin with end:true drives the EOF path to a clean exit", async ({
 
   using manager = new ProcessManager();
 
-  const info = manager.start("stdin-repl", "./stdin-echo.sh", cwd);
+  const info = await manager.start("stdin-repl", "./stdin-echo.sh", cwd);
 
   expect(manager.writeToStdin(info.id, "only line\n")).toEqual({ ok: true });
   expect(manager.writeToStdin(info.id, "", { end: true })).toEqual({

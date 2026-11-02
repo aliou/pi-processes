@@ -19,6 +19,7 @@ import {
   FINISHED_RECORD_GRACE_MS,
   MAX_FINISHED_RECORDS,
   MAX_TAIL_READ_BYTES,
+  START_EXIT_GRACE_MS,
 } from "./limits";
 
 const fakeProcesses = new Map<number, FakeChildProcess>();
@@ -63,6 +64,12 @@ function emitCommandOutput(child: FakeChildProcess, command: string): void {
 
   if (command === "exit 1") {
     child.finish(1);
+    return;
+  }
+
+  const exitCode = command.match(/^exit (\d+)$/);
+  if (exitCode) {
+    child.finish(Number(exitCode[1]));
     return;
   }
 
@@ -176,6 +183,11 @@ afterEach(() => {
 });
 
 function waitForEnd(manager: ProcessManager, id: string): Promise<void> {
+  const current = manager.get(id);
+  if (current && !LIVE_STATUSES.has(current.status)) {
+    return Promise.resolve();
+  }
+
   return new Promise((resolve) => {
     const unsub = manager.onEvent((e) => {
       if (e.type === "process_ended" && e.info.id === id) {
@@ -212,15 +224,15 @@ function collectEvents(manager: ProcessManager): ManagerEvent[] {
 // --- Start / List / Get basics ---
 
 describe("start/list/get basics", () => {
-  it("starts a process and returns ProcessInfo", () => {
+  it("starts a process and returns ProcessInfo", async () => {
     using manager = new ProcessManager();
-    const info = manager.start("test", "echo hello", "/tmp");
+    const info = await manager.start("test", "sleep 60", "/tmp");
 
     expect(info.id).toMatch(/^proc_[0-9a-f]{4}$/);
     expect(info).toEqual(
       expect.objectContaining({
         name: "test",
-        command: "echo hello",
+        command: "sleep 60",
         cwd: "/tmp",
         status: "running",
         success: null,
@@ -234,37 +246,79 @@ describe("start/list/get basics", () => {
     expect(info.pid).toBeGreaterThan(0);
   });
 
-  it("lists processes in insertion order", () => {
+  it("lists processes in insertion order", async () => {
     using manager = new ProcessManager();
-    const info1 = manager.start("first", "echo one", "/tmp");
-    const info2 = manager.start("second", "echo two", "/tmp");
+    const info1 = await manager.start("first", "echo one", "/tmp");
+    const info2 = await manager.start("second", "echo two", "/tmp");
 
     const list = manager.list();
     expect(list.map((p) => p.id)).toEqual([info1.id, info2.id]);
   });
 
-  it("gets a process by id", () => {
+  it("gets a process by id", async () => {
     using manager = new ProcessManager();
-    const info = manager.start("test", "echo hello", "/tmp");
+    const info = await manager.start("test", "echo hello", "/tmp");
 
     const got = manager.get(info.id);
     assert(got, "process should exist");
     expect(got).toEqual(expect.objectContaining({ id: info.id, name: "test" }));
   });
 
-  it("returns null for unknown process id", () => {
+  it("returns null for unknown process id", async () => {
     using manager = new ProcessManager();
     expect(manager.get("nonexistent")).toBeNull();
+  });
+});
+
+// Regression: process start reported an already-exited process as running (#150).
+describe("start immediate-exit grace window", () => {
+  it("reports an immediate failure in the start result", async () => {
+    using manager = new ProcessManager();
+    const info = await manager.start("quick-fail", "exit 3", "/tmp");
+
+    expect(info).toEqual(
+      expect.objectContaining({
+        status: "exited",
+        exitCode: 3,
+        success: false,
+        endReason: "exit",
+      }),
+    );
+  });
+
+  it("reports an immediate success in the start result", async () => {
+    using manager = new ProcessManager();
+    const info = await manager.start("quick-ok", "true", "/tmp");
+
+    expect(info).toEqual(
+      expect.objectContaining({
+        status: "exited",
+        exitCode: 0,
+        success: true,
+        endReason: "exit",
+      }),
+    );
+  });
+
+  it("reports a running process once the grace window elapses", async () => {
+    vi.useFakeTimers();
+    using manager = new ProcessManager();
+    const pending = manager.start("long", "sleep 60", "/tmp");
+    await vi.advanceTimersByTimeAsync(START_EXIT_GRACE_MS);
+    const info = await pending;
+
+    expect(info.status).toBe("running");
+    expect(info.endTime).toBeNull();
   });
 });
 
 // --- Process lifecycle events ---
 
 describe("lifecycle events", () => {
-  it("emits process_started on start", () => {
+  it("emits process_started on start", async () => {
     using manager = new ProcessManager();
     const events = collectEvents(manager);
-    manager.start("test", "echo hi", "/tmp");
+    await manager.start("test", "echo hi", "/tmp");
 
     const started = events.filter((e) => e.type === "process_started");
     expect(started).toHaveLength(1);
@@ -278,7 +332,7 @@ describe("lifecycle events", () => {
   it("emits process_ended on exit", async () => {
     using manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "echo hi", "/tmp");
+    const info = await manager.start("test", "echo hi", "/tmp");
     await waitForEnd(manager, info.id);
 
     const ended = events.filter((e) => e.type === "process_ended");
@@ -302,7 +356,7 @@ describe("lifecycle events", () => {
   it("emits process_ended with success=false on failure", async () => {
     using manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "exit 1", "/tmp");
+    const info = await manager.start("test", "exit 1", "/tmp");
     await waitForEnd(manager, info.id);
 
     const ended = events.filter((e) => e.type === "process_ended");
@@ -320,7 +374,7 @@ describe("lifecycle events", () => {
   it("records signal metadata when a child closes from a signal", async () => {
     using manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "sleep 60", "/tmp");
+    const info = await manager.start("test", "sleep 60", "/tmp");
     const child = fakeProcesses.get(info.pid);
     assert(child, "fake child should exist");
 
@@ -347,7 +401,7 @@ describe("lifecycle events", () => {
   it("records spawn errors", async () => {
     using manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "spawn error", "/tmp");
+    const info = await manager.start("test", "spawn error", "/tmp");
     await waitForEnd(manager, info.id);
 
     const ended = events.filter((e) => e.type === "process_ended");
@@ -364,9 +418,9 @@ describe("lifecycle events", () => {
     }
   });
 
-  it("records missing pid", () => {
+  it("records missing pid", async () => {
     using manager = new ProcessManager();
-    const info = manager.start("test", "missing pid", "/tmp");
+    const info = await manager.start("test", "missing pid", "/tmp");
 
     expect(info).toEqual(
       expect.objectContaining({
@@ -384,7 +438,7 @@ describe("lifecycle events", () => {
     const events = collectEvents(manager);
     // The async `error` event must be handled: attaching no listener would
     // crash the host via uncaughtException and fail the whole test run.
-    const info = manager.start("test", "missing pid error", "/tmp");
+    const info = await manager.start("test", "missing pid error", "/tmp");
     await new Promise((r) => setImmediate(r));
 
     const ended = events.filter((e) => e.type === "process_ended");
@@ -407,7 +461,9 @@ describe("lifecycle events", () => {
     vi.useFakeTimers();
     using manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "sleep 60", "/tmp");
+    const pending = manager.start("test", "sleep 60", "/tmp");
+    await vi.advanceTimersByTimeAsync(START_EXIT_GRACE_MS);
+    const info = await pending;
 
     fakeProcesses.delete(info.pid);
     await vi.advanceTimersByTimeAsync(5000);
@@ -429,7 +485,7 @@ describe("lifecycle events", () => {
   it("emits processes_changed on clearFinished", async () => {
     using manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "echo hi", "/tmp");
+    const info = await manager.start("test", "echo hi", "/tmp");
     await waitForEnd(manager, info.id);
 
     manager.clearFinished();
@@ -445,7 +501,7 @@ describe("process_output_changed", () => {
   it("emits process_output_changed on stdout", async () => {
     using manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "echo hello", "/tmp");
+    const info = await manager.start("test", "echo hello", "/tmp");
     await waitForEnd(manager, info.id);
 
     const outputEvents = events.filter(
@@ -457,7 +513,7 @@ describe("process_output_changed", () => {
   it("emits process_output_changed on stderr", async () => {
     using manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "echo err >&2", "/tmp");
+    const info = await manager.start("test", "echo err >&2", "/tmp");
     await waitForEnd(manager, info.id);
 
     const outputEvents = events.filter(
@@ -469,7 +525,7 @@ describe("process_output_changed", () => {
   it("throttles rapid output", async () => {
     using manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "seq 1 200", "/tmp");
+    const info = await manager.start("test", "seq 1 200", "/tmp");
     await waitForEnd(manager, info.id);
 
     const outputEvents = events.filter(
@@ -482,7 +538,7 @@ describe("process_output_changed", () => {
   it("final output event before process_ended", async () => {
     using manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "echo hello", "/tmp");
+    const info = await manager.start("test", "echo hello", "/tmp");
     await waitForEnd(manager, info.id);
 
     let lastOutputIdx = -1;
@@ -502,7 +558,7 @@ describe("process_output_changed", () => {
   it("no output events for silent process", async () => {
     using manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "true", "/tmp");
+    const info = await manager.start("test", "true", "/tmp");
     await waitForEnd(manager, info.id);
 
     const outputEvents = events.filter(
@@ -514,7 +570,7 @@ describe("process_output_changed", () => {
   it("no stale events after clearFinished", async () => {
     vi.useFakeTimers();
     using manager = new ProcessManager();
-    const info = manager.start("test", "seq 1 50", "/tmp");
+    const info = await manager.start("test", "seq 1 50", "/tmp");
     await waitForEnd(manager, info.id);
 
     manager.clearFinished();
@@ -533,7 +589,7 @@ describe("process_output_changed", () => {
   it("output events include appendedText with new lines", async () => {
     using manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "echo hello", "/tmp");
+    const info = await manager.start("test", "echo hello", "/tmp");
     await waitForEnd(manager, info.id);
 
     const withAppended = events.filter(
@@ -554,7 +610,7 @@ describe("process_output_changed", () => {
   it("output events include final partial lines in appendedText", async () => {
     using manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "printf ready", "/tmp");
+    const info = await manager.start("test", "printf ready", "/tmp");
     await waitForEnd(manager, info.id);
 
     const outputEvents = events.filter(
@@ -575,8 +631,8 @@ describe("process_output_changed", () => {
 describe("killAll", () => {
   it("kills all running processes", async () => {
     using manager = new ProcessManager();
-    manager.start("p1", "sleep 60", "/tmp");
-    manager.start("p2", "sleep 60", "/tmp");
+    await manager.start("p1", "sleep 60", "/tmp");
+    await manager.start("p2", "sleep 60", "/tmp");
 
     const ended = waitForEndedCount(manager, 2);
     manager.killAll();
@@ -604,7 +660,9 @@ describe("kill", () => {
   it("kills a running process", async () => {
     vi.useFakeTimers();
     using manager = new ProcessManager();
-    const info = manager.start("test", "sleep 60", "/tmp");
+    const pending = manager.start("test", "sleep 60", "/tmp");
+    await vi.advanceTimersByTimeAsync(START_EXIT_GRACE_MS);
+    const info = await pending;
     const resultPromise = manager.kill(info.id);
 
     await vi.advanceTimersByTimeAsync(3000);
@@ -626,7 +684,9 @@ describe("kill", () => {
   it("records kill timeout", async () => {
     vi.useFakeTimers();
     using manager = new ProcessManager();
-    const info = manager.start("test", "sleep 60", "/tmp");
+    const pending = manager.start("test", "sleep 60", "/tmp");
+    await vi.advanceTimersByTimeAsync(START_EXIT_GRACE_MS);
+    const info = await pending;
     const child = fakeProcesses.get(info.pid);
     assert(child, "fake child should exist");
     child.kill = () => {
@@ -655,7 +715,9 @@ describe("kill", () => {
     vi.useFakeTimers();
     using manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "sleep 60", "/tmp");
+    const pending = manager.start("test", "sleep 60", "/tmp");
+    await vi.advanceTimersByTimeAsync(START_EXIT_GRACE_MS);
+    const info = await pending;
     const child = fakeProcesses.get(info.pid);
     assert(child, "fake child should exist");
     // Make kill() a no-op so the process appears unkillable -> timeout.
@@ -691,7 +753,7 @@ describe("kill", () => {
 
   it("returns ok for already-exited process", async () => {
     using manager = new ProcessManager();
-    const info = manager.start("test", "echo hi", "/tmp");
+    const info = await manager.start("test", "echo hi", "/tmp");
     await waitForEnd(manager, info.id);
 
     const result = await manager.kill(info.id);
@@ -702,7 +764,7 @@ describe("kill", () => {
 // --- Write to stdin ---
 
 describe("writeToStdin", () => {
-  it("returns not_found for unknown id", () => {
+  it("returns not_found for unknown id", async () => {
     using manager = new ProcessManager();
     expect(manager.writeToStdin("nonexistent", "hello")).toEqual({
       ok: false,
@@ -712,7 +774,7 @@ describe("writeToStdin", () => {
 
   it("returns process_exited for finished process", async () => {
     using manager = new ProcessManager();
-    const info = manager.start("test", "echo hi", "/tmp");
+    const info = await manager.start("test", "echo hi", "/tmp");
     await waitForEnd(manager, info.id);
 
     expect(manager.writeToStdin(info.id, "hello")).toEqual({
@@ -721,9 +783,9 @@ describe("writeToStdin", () => {
     });
   });
 
-  it("writes to stdin of running process", () => {
+  it("writes to stdin of running process", async () => {
     using manager = new ProcessManager();
-    const info = manager.start(
+    const info = await manager.start(
       "test",
       "bash -c 'cat > /dev/null; sleep 60'",
       "/tmp",
@@ -732,9 +794,9 @@ describe("writeToStdin", () => {
     expect(manager.writeToStdin(info.id, "hello\n")).toEqual({ ok: true });
   });
 
-  it("returns stdin_closed after end()", () => {
+  it("returns stdin_closed after end()", async () => {
     using manager = new ProcessManager();
-    const info = manager.start(
+    const info = await manager.start(
       "test",
       "bash -c 'cat > /dev/null; sleep 60'",
       "/tmp",
@@ -755,16 +817,16 @@ describe("writeToStdin", () => {
 describe("clearFinished", () => {
   it("clears finished processes and returns count", async () => {
     using manager = new ProcessManager();
-    const info = manager.start("test", "echo hi", "/tmp");
+    const info = await manager.start("test", "echo hi", "/tmp");
     await waitForEnd(manager, info.id);
 
     expect(manager.clearFinished()).toBe(1);
     expect(manager.get(info.id)).toBeNull();
   });
 
-  it("does not clear running processes", () => {
+  it("does not clear running processes", async () => {
     using manager = new ProcessManager();
-    manager.start("test", "sleep 60", "/tmp");
+    await manager.start("test", "sleep 60", "/tmp");
 
     expect(manager.clearFinished()).toBe(0);
   });
@@ -772,7 +834,7 @@ describe("clearFinished", () => {
   it("emits processes_changed when clearing", async () => {
     using manager = new ProcessManager();
     const events = collectEvents(manager);
-    const info = manager.start("test", "echo hi", "/tmp");
+    const info = await manager.start("test", "echo hi", "/tmp");
     await waitForEnd(manager, info.id);
 
     manager.clearFinished();
@@ -791,7 +853,7 @@ describe("finished record reaping", () => {
     const stdoutFiles: string[] = [];
 
     for (let index = 0; index < MAX_FINISHED_RECORDS + 10; index++) {
-      const info = manager.start(`task-${index}`, "true", "/tmp");
+      const info = await manager.start(`task-${index}`, "true", "/tmp");
       const ended = waitForEnd(manager, info.id);
       await ended;
       infos.push(info);
@@ -816,9 +878,12 @@ describe("finished record reaping", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
     using manager = new ProcessManager();
-    const infos = Array.from({ length: MAX_FINISHED_RECORDS + 2 }, (_, index) =>
-      manager.start(`task-${index}`, "sleep 60", "/tmp"),
+    const pending = Array.from(
+      { length: MAX_FINISHED_RECORDS + 2 },
+      (_, index) => manager.start(`task-${index}`, "sleep 60", "/tmp"),
     );
+    await vi.advanceTimersByTimeAsync(START_EXIT_GRACE_MS);
+    const infos = await Promise.all(pending);
     const ended = waitForEndedCount(manager, infos.length);
 
     for (const info of [...infos].reverse()) {
@@ -840,7 +905,7 @@ describe("finished record reaping", () => {
 describe("output retrieval", () => {
   it("getOutput returns stdout/stderr lines", async () => {
     using manager = new ProcessManager();
-    const info = manager.start("test", "echo hello", "/tmp");
+    const info = await manager.start("test", "echo hello", "/tmp");
     await waitForEnd(manager, info.id);
 
     const output = manager.getOutput(info.id);
@@ -848,14 +913,14 @@ describe("output retrieval", () => {
     expect(output.stdout).toContain("hello");
   });
 
-  it("getOutput returns null for unknown id", () => {
+  it("getOutput returns null for unknown id", async () => {
     using manager = new ProcessManager();
     expect(manager.getOutput("nonexistent")).toBeNull();
   });
 
   it("getCombinedOutput returns tagged lines", async () => {
     using manager = new ProcessManager();
-    const info = manager.start(
+    const info = await manager.start(
       "test",
       "bash -c 'echo out; echo err >&2'",
       "/tmp",
@@ -875,7 +940,7 @@ describe("output retrieval", () => {
 
   it("getLogFiles returns file paths", async () => {
     using manager = new ProcessManager();
-    const info = manager.start("test", "echo hi", "/tmp");
+    const info = await manager.start("test", "echo hi", "/tmp");
     await waitForEnd(manager, info.id);
 
     const files = manager.getLogFiles(info.id);
@@ -891,7 +956,7 @@ describe("output retrieval", () => {
 
   it("getFileSize returns sizes", async () => {
     using manager = new ProcessManager();
-    const info = manager.start("test", "echo hello world", "/tmp");
+    const info = await manager.start("test", "echo hello world", "/tmp");
     await waitForEnd(manager, info.id);
 
     const sizes = manager.getFileSize(info.id);
@@ -913,7 +978,7 @@ describe("adopt", () => {
     return child as unknown as ChildProcess;
   }
 
-  it("adopts a running child and returns running ProcessInfo", () => {
+  it("adopts a running child and returns running ProcessInfo", async () => {
     using manager = new ProcessManager();
     const child = makeAdoptableChild();
 
@@ -931,7 +996,7 @@ describe("adopt", () => {
     );
   });
 
-  it("backdates startTime when provided", () => {
+  it("backdates startTime when provided", async () => {
     using manager = new ProcessManager();
     const child = makeAdoptableChild();
     const startTime = Date.now() - 30_000;
@@ -949,7 +1014,7 @@ describe("adopt", () => {
     expect(info.startTime).toBe(startTime);
   });
 
-  it("emits process_started on adoption", () => {
+  it("emits process_started on adoption", async () => {
     using manager = new ProcessManager();
     const events = collectEvents(manager);
     const child = makeAdoptableChild();
@@ -1109,7 +1174,7 @@ describe("adopt", () => {
     expect(child.killed).toBe(true);
   });
 
-  it("records a spawn-error process when the child has no pid", () => {
+  it("records a spawn-error process when the child has no pid", async () => {
     using manager = new ProcessManager();
     const child = new FakeChildProcess();
     child.pid = undefined;

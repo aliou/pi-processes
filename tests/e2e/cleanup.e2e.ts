@@ -12,7 +12,7 @@ test("cleanup stops a real live process and removes logs", async ({
   using manager = new ProcessManager();
   addScript("wait-for-file.sh");
 
-  const cleanupTarget = manager.start(
+  const cleanupTarget = await manager.start(
     "cleanup-live",
     "./wait-for-file.sh never",
     cwd,

@@ -17,7 +17,7 @@ test("captures async spawn error for a non-existent cwd without crashing", async
   // this crashes the process via uncaughtException (which would fail the
   // whole test run).
   const missingCwd = join(cwd, "does-not-exist");
-  const info = manager.start("missing-cwd", "true", missingCwd);
+  const info = await manager.start("missing-cwd", "true", missingCwd);
 
   // The record is transitioned to exited synchronously; give the async
   // spawn error a turn to arrive and enrich the record with the real reason.

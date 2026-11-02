@@ -1,7 +1,7 @@
 import { createEventBus } from "@earendil-works/pi-coding-agent";
 import { assert, describe, expect, it } from "vitest";
 import type { ProcessInfo } from "../../../src/types";
-import { flushQueuedMicrotasks } from "../../../tests/utils/async";
+import { flushQueuedMacrotasks } from "../../../tests/utils/async";
 import type { ProcessProtocolNotificationPayload } from "../../shared/protocol";
 import { CHANNELS } from "../../shared/protocol";
 
@@ -94,7 +94,7 @@ describe("NotificationService", () => {
         endReason: "exit",
       }),
     });
-    await flushQueuedMicrotasks();
+    await flushQueuedMacrotasks();
 
     expect(spy.emitted).toHaveLength(1);
     expect(spy.emitted[0].attention).toBe("turn");
@@ -126,7 +126,7 @@ describe("NotificationService", () => {
         endReason: "exit",
       }),
     });
-    await flushQueuedMicrotasks();
+    await flushQueuedMacrotasks();
 
     expect(spy.emitted).toHaveLength(1);
     expect(spy.emitted[0].attention).toBe("turn");
@@ -159,7 +159,7 @@ describe("NotificationService", () => {
         exitCode: null,
       }),
     });
-    await flushQueuedMicrotasks();
+    await flushQueuedMacrotasks();
 
     expect(spy.emitted).toHaveLength(1);
     expect(spy.emitted[0].attention).toBe("context");
@@ -199,7 +199,7 @@ describe("NotificationService", () => {
           endReason: "exit",
         }),
       });
-      await flushQueuedMicrotasks();
+      await flushQueuedMacrotasks();
 
       expect(spy.emitted).toHaveLength(1);
       expect(spy.emitted[0].attention).toBe("context");
@@ -235,7 +235,7 @@ describe("NotificationService", () => {
         exitCode: null,
       }),
     });
-    await flushQueuedMicrotasks();
+    await flushQueuedMacrotasks();
 
     expect(spy.emitted).toHaveLength(1);
     expect(spy.emitted[0].attention).toBe("context");
@@ -267,7 +267,7 @@ describe("NotificationService", () => {
         endReason: "exit",
       }),
     });
-    await flushQueuedMicrotasks();
+    await flushQueuedMacrotasks();
 
     expect(spy.emitted).toHaveLength(1);
     expect(spy.emitted[0].kind).toBe("crash");
@@ -294,7 +294,7 @@ describe("NotificationService", () => {
       type: "process_ended",
       info: makeInfo({ id: "proc_1", success: true, exitCode: 0 }),
     });
-    await flushQueuedMicrotasks();
+    await flushQueuedMacrotasks();
 
     expect(spy.emitted).toHaveLength(0);
     expect(registry.get("proc_1")).toBeNull();
@@ -326,7 +326,7 @@ describe("NotificationService", () => {
         endReason: "signal",
       }),
     });
-    await flushQueuedMicrotasks();
+    await flushQueuedMacrotasks();
 
     expect(spy.emitted).toHaveLength(0);
     expect(registry.get("proc_1")).toBeNull();
@@ -539,7 +539,7 @@ describe("NotificationService", () => {
           endReason: "exit",
         }),
       });
-      await flushQueuedMicrotasks();
+      await flushQueuedMacrotasks();
 
       fakeManager.emit({
         type: "process_output_changed",
@@ -575,7 +575,7 @@ describe("NotificationService", () => {
           endReason: "exit",
         }),
       });
-      await flushQueuedMicrotasks();
+      await flushQueuedMacrotasks();
 
       expect(spy.emitted).toHaveLength(0);
     });
@@ -620,7 +620,7 @@ describe("NotificationService", () => {
         endReason: "exit",
       }),
     });
-    await flushQueuedMicrotasks();
+    await flushQueuedMacrotasks();
 
     // No config registered, but defaults resolve by kind: failure -> turn
     expect(spy.emitted).toHaveLength(1);
@@ -650,7 +650,7 @@ describe("NotificationService", () => {
         endReason: "exit",
       }),
     });
-    await flushQueuedMicrotasks();
+    await flushQueuedMacrotasks();
 
     expect(spy.emitted).toHaveLength(1);
     expect(spy.emitted[0].attention).toBe("turn");
@@ -681,7 +681,7 @@ describe("NotificationService", () => {
         endReason: "exit",
       }),
     });
-    await flushQueuedMicrotasks();
+    await flushQueuedMacrotasks();
 
     expect(spy.emitted).toHaveLength(1);
     expect(registry.get("proc_1")).toBeNull();
@@ -722,7 +722,7 @@ describe("NotificationService", () => {
     });
     expect(spy.emitted).toHaveLength(1);
 
-    // Process finishes. handleProcessEnded is deferred via microtask.
+    // Process finishes. handleProcessEnded is deferred to a macrotask.
     processes.set(
       "proc_1",
       makeInfo({
@@ -739,7 +739,7 @@ describe("NotificationService", () => {
       type: "process_ended",
       info: endedInfo,
     });
-    await flushQueuedMicrotasks();
+    await flushQueuedMacrotasks();
 
     // process_ended emits a lifecycle notification and unregisters watches.
     const lifecycleEmits = spy.emitted.filter((e) => e.kind !== "log_match");
@@ -827,7 +827,7 @@ describe("NotificationService", () => {
         endReason: "exit",
       }),
     });
-    await flushQueuedMicrotasks();
+    await flushQueuedMacrotasks();
 
     expect(spy.emitted).toHaveLength(1);
     expect(spy.emitted[0].attention).toBe("context");
@@ -858,7 +858,7 @@ describe("NotificationService", () => {
   });
 
   describe("deferred process_ended and config registration race", () => {
-    it("downgrades forced failure display to context when onFailure:ignore is registered before microtask", async () => {
+    it("downgrades forced failure display to context when onFailure:ignore is registered before the deferred handler", async () => {
       const fakeManager = createFakeManager();
       const spy = createNotificationSpy();
       const registry = createNotificationRegistry();
@@ -880,10 +880,10 @@ describe("NotificationService", () => {
         }),
       });
 
-      // Config registered after emit but before microtask runs
+      // Config registered after emit but before the deferred handler runs
       registry.register("proc_1", { onFailure: "ignore" });
 
-      await flushQueuedMicrotasks();
+      await flushQueuedMacrotasks();
 
       expect(spy.emitted).toHaveLength(1);
       expect(spy.emitted[0].kind).toBe("crash");
@@ -918,7 +918,7 @@ describe("NotificationService", () => {
       // killed is not forced display, so onKilled:context takes effect
       registry.register("proc_1", { onKilled: "context" });
 
-      await flushQueuedMicrotasks();
+      await flushQueuedMacrotasks();
 
       expect(spy.emitted).toHaveLength(1);
       expect(spy.emitted[0].attention).toBe("context");
@@ -926,7 +926,7 @@ describe("NotificationService", () => {
       service.dispose();
     });
 
-    it("does not emit if disposed before microtask fires", async () => {
+    it("does not emit if disposed before the deferred handler fires", async () => {
       const fakeManager = createFakeManager();
       const spy = createNotificationSpy();
       const registry = createNotificationRegistry();
@@ -950,12 +950,153 @@ describe("NotificationService", () => {
         }),
       });
 
-      // Dispose before microtask fires
+      // Dispose before the deferred handler fires
       service.dispose();
 
-      await flushQueuedMicrotasks();
+      await flushQueuedMacrotasks();
 
       expect(spy.emitted).toHaveLength(0);
+    });
+  });
+
+  describe("start-reported early exits", () => {
+    function startReportedService() {
+      const fakeManager = createFakeManager();
+      const spy = createNotificationSpy();
+      const registry = createNotificationRegistry();
+      const service = createNotificationService({
+        events: spy.events,
+        manager: fakeManager as never,
+        registry,
+        getProcess: (id) => processes.get(id) ?? null,
+      });
+      return { fakeManager, spy, registry, service };
+    }
+
+    function emitCrash(fakeManager: ReturnType<typeof createFakeManager>) {
+      fakeManager.emit({
+        type: "process_ended",
+        info: makeInfo({
+          id: "proc_1",
+          success: false,
+          exitCode: 1,
+          endReason: "exit",
+        }),
+      });
+    }
+
+    it("suppresses the lifecycle notification when the start result reported the end", async () => {
+      const { fakeManager, spy, registry, service } = startReportedService();
+      registry.register("proc_1", {});
+
+      emitCrash(fakeManager);
+      registry.markStartReported("proc_1");
+
+      await flushQueuedMacrotasks();
+
+      expect(spy.emitted).toHaveLength(0);
+      expect(registry.get("proc_1")).toBeNull();
+
+      service.dispose();
+    });
+
+    it("emits normally when the start result did not report the end", async () => {
+      const { fakeManager, spy, registry, service } = startReportedService();
+      registry.register("proc_1", {});
+
+      emitCrash(fakeManager);
+
+      await flushQueuedMacrotasks();
+
+      expect(spy.emitted).toHaveLength(1);
+      expect(spy.emitted[0].attention).toBe("turn");
+
+      service.dispose();
+    });
+
+    it("suppresses regardless of configured attention", async () => {
+      const { fakeManager, spy, registry, service } = startReportedService();
+      registry.register("proc_1", { onFailure: "context" });
+
+      emitCrash(fakeManager);
+      registry.markStartReported("proc_1");
+
+      await flushQueuedMacrotasks();
+
+      expect(spy.emitted).toHaveLength(0);
+
+      service.dispose();
+    });
+
+    it("suppresses before the forced ignore-to-context downgrade applies", async () => {
+      const { fakeManager, spy, registry, service } = startReportedService();
+      registry.register("proc_1", { onFailure: "ignore" });
+
+      emitCrash(fakeManager);
+      registry.markStartReported("proc_1");
+
+      await flushQueuedMacrotasks();
+
+      expect(spy.emitted).toHaveLength(0);
+
+      service.dispose();
+    });
+
+    it("suppresses a start-reported killed notification", async () => {
+      const { fakeManager, spy, registry, service } = startReportedService();
+      registry.register("proc_1", { onKilled: "turn" });
+
+      fakeManager.emit({
+        type: "process_ended",
+        info: makeInfo({
+          id: "proc_1",
+          status: "killed",
+          success: false,
+          endReason: "signal",
+          exitCode: null,
+        }),
+      });
+      registry.markStartReported("proc_1");
+
+      await flushQueuedMacrotasks();
+
+      expect(spy.emitted).toHaveLength(0);
+
+      service.dispose();
+    });
+
+    it("suppresses ignored successes even when start-reported", async () => {
+      const { fakeManager, spy, registry, service } = startReportedService();
+      registry.register("proc_1", { onSuccess: "ignore" });
+
+      fakeManager.emit({
+        type: "process_ended",
+        info: makeInfo({ id: "proc_1" }),
+      });
+      registry.markStartReported("proc_1");
+
+      await flushQueuedMacrotasks();
+
+      expect(spy.emitted).toHaveLength(0);
+
+      service.dispose();
+    });
+
+    it("keeps the intentional-stop bypass unchanged when a start-reported marker is present", async () => {
+      const { fakeManager, spy, registry, service } = startReportedService();
+      registry.register("proc_1", { onFailure: "turn" });
+      registry.markIntentionalStop("proc_1");
+
+      emitCrash(fakeManager);
+      registry.markStartReported("proc_1");
+
+      await flushQueuedMacrotasks();
+
+      expect(spy.emitted).toHaveLength(1);
+      expect(spy.emitted[0].kind).toBe("crash");
+      expect(spy.emitted[0].attention).toBe("context");
+
+      service.dispose();
     });
   });
 });

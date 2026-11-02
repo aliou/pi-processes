@@ -2,6 +2,7 @@ import type { EventBus } from "@earendil-works/pi-coding-agent";
 
 import type { ProcessManager } from "../../../src/manager";
 import type { KillResult } from "../../../src/types";
+import { LIVE_STATUSES } from "../../../src/types";
 import {
   CHANNELS,
   type CommandAdoptPayload,
@@ -21,20 +22,25 @@ export function registerCommandHandlers(
     events.on(CHANNELS.COMMAND_START, (payload) => {
       const command = payload as CommandStartPayload;
 
-      try {
-        const info = manager.start(
-          command.name,
-          command.command,
-          command.cwd ?? process.cwd(),
-        );
-        notifications.register(info.id, {});
-        safeReply(command.reply, { ok: true, process: info });
-      } catch (err) {
-        safeReply(command.reply, {
-          ok: false,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
+      void (async () => {
+        try {
+          const info = await manager.start(
+            command.name,
+            command.command,
+            command.cwd ?? process.cwd(),
+          );
+          notifications.register(info.id, {});
+          if (!LIVE_STATUSES.has(info.status)) {
+            notifications.markStartReported(info.id);
+          }
+          safeReply(command.reply, { ok: true, process: info });
+        } catch (err) {
+          safeReply(command.reply, {
+            ok: false,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      })();
     }),
     events.on(CHANNELS.COMMAND_KILL, (payload) => {
       const command = payload as CommandKillPayload;

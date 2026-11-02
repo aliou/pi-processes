@@ -8,6 +8,7 @@
  * - A tool timeout moves the command instead of stopping it.
  * - A command with no timeout moves after AUTO_BACKGROUND_MS.
  */
+// biome-ignore lint/plugin/@aliou/biome-plugins/pi-no-node-exec: long-lived streaming process that pi.exec() does not support
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import {

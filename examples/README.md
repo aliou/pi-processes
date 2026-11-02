@@ -2,6 +2,8 @@
 
 Extension snippets you can copy to `~/.pi/agent/extensions/` and adapt. Each file is self-contained.
 
+- `codex-exec.ts`: registers Codex's unified-exec tool pair (`exec_command` / `write_stdin`) on top of pi-processes and disables the built-in bash tool. Short commands return output and exit code directly; longer ones are adopted as managed processes and driven through a numeric session id. Requires the core extension.
+- `claude-processes.ts`: registers Claude-oriented `Bash` and `Monitor` tools over the protocol channels, so every process they start is visible and controllable in /ps. Requires the core extension.
 - `bash-background.ts`: overrides the bash tool so a running command can move to pi-processes with a shortcut, a timeout, or after an idle period. Requires a pi-processes version that provides the `processes:command:adopt` channel.
 - `bash-to-process.ts`: intercepts bash calls that use `&`, `nohup`, `setsid`, or `disown`, and starts them as managed processes instead of blocking them outright.
 - `bash-notify-background.ts`: overrides the bash tool so a command that hits its timeout is handed to pi-processes and keeps running in the background instead of being killed.

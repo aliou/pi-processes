@@ -39,6 +39,7 @@
     "!extensions/**/*.test.ts",
     "skills",
     "schema.json",
+    "CHANGELOG.md",
     "README.md",
     "CONTRIBUTING.md"
   ],

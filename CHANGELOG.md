@@ -1,5 +1,14 @@
 # @aliou/pi-processes
 
+## 0.13.5
+
+### Patch Changes
+
+- ce3a0ae: Ship `CHANGELOG.md` in the npm tarball so pi can show the changelog when the extension updates.
+- f498c6e: Add a `toolExposure` setting that controls how the `process` tool is registered, using pi's full `ToolExposure` set (`direct`, `model-only`, `codemode`, `deferred`, or `hidden`; default `direct`). `deferred` leaves the always-on tool list, so sessions that never manage processes stop paying its declaration cost; the model then reaches the tool only through `tool_search` or codemode, so enable one of them before choosing it. Unknown stored values fall back to `direct`. It is a global setting, offered only in the Global tab of `/ps:settings`, and a change applies on the next session start.
+- 9d70b37: Cut the `process` tool's declaration cost. Parameter descriptions are shorter, update watch items no longer repeat the log-watch field descriptions, the attention guideline lives only in the `notify` description, the skill-pointer guideline and the process list hint are gone, and the codemode output type is declared without descriptions or constraints. The structured output payload is unchanged.
+- 455a221: Surface processes that exit immediately at `process start` time. `ProcessManager.start` now waits up to a short grace window (150ms) for an immediate exit: a process that fails inside the window fails the tool call with its outcome (`exited immediately: exit code N` / `failed to spawn (...)` / `killed by SIG...`) instead of being reported as a plain successful start, a clean `exit 0` is reported in the start result, and healthy long-running starts still report running. Because the start result already carries the outcome, no lifecycle notification is emitted for an end reported at start time.
+
 ## 0.13.4
 
 ### Patch Changes

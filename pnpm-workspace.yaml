@@ -17,4 +17,4 @@ minimumReleaseAgeExclude:
   - '@earendil-works/pi-tui@1.0.0'
   - '@earendil-works/pi-codemode@1.0.0'
   - '@earendil-works/pi-mcp@1.0.0'
-  - '@aliou/biome-plugins@0.16.0'
+  - '@aliou/biome-plugins'

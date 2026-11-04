@@ -2,11 +2,15 @@ import type {
   EventBus,
   ExtensionAPI,
   ExtensionCommandContext,
+  ExtensionContext,
   Theme,
 } from "@earendil-works/pi-coding-agent";
 import type { ProcessInfo } from "../../../src/types";
 import { sanitizeForDisplay } from "../../shared/display-text";
-import type { ProcessProtocolConfig } from "../../shared/protocol";
+import type {
+  CommandOpenLogsResult,
+  ProcessProtocolConfig,
+} from "../../shared/protocol";
 import { requestConfig, requestProcess, requestProcessList } from "../client";
 import { allProcessCompletions } from "../completions";
 import { LogOverlayComponent } from "../components/log-overlay-component";
@@ -56,6 +60,33 @@ async function openLogs(
     return;
   }
 
+  await openLogsOverlay(ctx, options, initialProcessId);
+}
+
+export async function handleOpenLogsCommand(
+  ctx: ExtensionContext,
+  options: OpenLogsOptions,
+  processId: string,
+  reply: (result: CommandOpenLogsResult) => void,
+): Promise<void> {
+  if (ctx.mode !== "tui") {
+    reply({ ok: false, error: "Process logs require interactive mode" });
+    return;
+  }
+  const initialProcessId = requestProcess(options.events, processId)?.id;
+  if (!initialProcessId) {
+    reply({ ok: false, error: `Process not found: ${processId}` });
+    return;
+  }
+  reply({ ok: true });
+  await openLogsOverlay(ctx, options, initialProcessId);
+}
+
+async function openLogsOverlay(
+  ctx: ExtensionContext,
+  options: OpenLogsOptions,
+  initialProcessId?: string,
+): Promise<void> {
   let config: ProcessProtocolConfig;
   try {
     config = requestConfig(options.events);

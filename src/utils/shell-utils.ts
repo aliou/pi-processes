@@ -40,6 +40,12 @@ function partToString(part: WordPart): string {
       return `{${part.elems.map(wordToString).join(",")}}`;
     case "ExtGlob":
       return `${part.op}${part.pattern})`;
+    case "AnsiC":
+      return part.value;
+    case "LocaleStr":
+      return part.parts.map(partToString).join("");
+    default:
+      throw new Error(`Cannot stringify word part: ${JSON.stringify(part)}`);
   }
 }
 

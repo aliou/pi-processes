@@ -21,10 +21,9 @@
  * they do not go through the untrusted-text sanitizers.
  */
 
+import { truncateToWidth } from "@aliou/pi-utils-ui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { type Component, visibleWidth } from "@earendil-works/pi-tui";
-
-import { truncateToWidth } from "./truncate";
 
 /** Style applied to a label segment. */
 export type ShortcutLabelStyle = "plain" | "dim" | "accent";

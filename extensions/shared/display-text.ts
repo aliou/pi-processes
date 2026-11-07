@@ -5,9 +5,8 @@
  * Pi TUI width measurement to stay in sync with what the renderer computes.
  */
 
+import { truncateToWidth } from "@aliou/pi-utils-ui";
 import { visibleWidth } from "@earendil-works/pi-tui";
-
-import { truncateToWidth } from "./truncate";
 
 const ESC = String.fromCodePoint(0x001b);
 const BEL = String.fromCodePoint(0x0007);

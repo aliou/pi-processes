@@ -7,16 +7,16 @@
  * stops the three views from drifting apart again.
  */
 
+import { truncateToWidth } from "@aliou/pi-utils-ui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
-
 import {
   closeSgr,
   plainTextForDisplay,
   sanitizeForDisplay,
   stripSgr,
 } from "./display-text";
-import { truncateToWidth, wrapToWidth } from "./truncate";
+import { wrapToWidth } from "./wrap";
 
 export interface DisplayLogLine {
   type: "stdout" | "stderr";

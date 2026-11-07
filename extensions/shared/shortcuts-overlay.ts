@@ -15,6 +15,7 @@
  * caller. Any of `?`, `esc`, `enter`, `q`, or `ctrl+c` dismisses it.
  */
 
+import { truncateToWidth } from "@aliou/pi-utils-ui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import {
   type Component,
@@ -24,8 +25,6 @@ import {
   type TUI,
   visibleWidth,
 } from "@earendil-works/pi-tui";
-
-import { truncateToWidth } from "./truncate";
 
 /** One shortcut row: keys (already display-formatted) + description. */
 export interface ShortcutRow {

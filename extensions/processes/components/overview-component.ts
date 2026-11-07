@@ -1,4 +1,4 @@
-import { Stack } from "@aliou/pi-utils-ui";
+import { Stack, truncateToWidth } from "@aliou/pi-utils-ui";
 import type { EventBus, Theme } from "@earendil-works/pi-coding-agent";
 import {
   type Component,
@@ -30,7 +30,6 @@ import {
   type ShortcutGroup,
   showShortcutsOverlay,
 } from "../../shared/shortcuts-overlay";
-import { truncateToWidth } from "../../shared/truncate";
 import { LineComponent, LinesComponent, statusColor } from "../../shared/ui";
 import {
   type ProcessLogLine,

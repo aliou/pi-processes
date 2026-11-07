@@ -1,6 +1,6 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
-  "extends": ["@aliou/biome-plugins/configs/pi"],
+  "extends": ["@aliou/biome-plugins/configs/pi-coding-agent-extension"],
   "files": {
     "includes": ["**/*.ts", "**/*.json", "!schema.json"],
     "ignoreUnknown": true

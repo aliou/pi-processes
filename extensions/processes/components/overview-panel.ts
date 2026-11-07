@@ -1,6 +1,6 @@
+import { truncateToWidth } from "@aliou/pi-utils-ui";
 import type { Component } from "@earendil-works/pi-tui";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import { truncateToWidth } from "../../shared/truncate";
 
 export interface OverviewPanelOptions {
   title?: string;

@@ -1,3 +1,4 @@
+import { truncateToWidth } from "@aliou/pi-utils-ui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import {
@@ -11,7 +12,6 @@ import {
   renderLogLine,
   renderLogLineWrap,
 } from "../../shared/log-line";
-import { truncateToWidth } from "../../shared/truncate";
 import type { ProcessLogLine } from "../logs-client";
 
 interface DisplayRow {

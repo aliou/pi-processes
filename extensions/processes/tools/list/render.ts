@@ -1,8 +1,8 @@
+import { truncateToWidth } from "@aliou/pi-utils-ui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Text, visibleWidth } from "@earendil-works/pi-tui";
 import { formatTimestamp, shortenPath } from "../../../../src/utils";
 import { sanitizeForDisplay } from "../../../shared/display-text";
-import { truncateToWidth } from "../../../shared/truncate";
 import { LinesComponent } from "../../../shared/ui";
 import { formatPatternForDisplay, ProcessActionTitle } from "../components";
 import type {

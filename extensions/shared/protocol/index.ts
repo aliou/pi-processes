@@ -10,6 +10,8 @@ export type {
   CommandAdoptResult,
   CommandClearPayload,
   CommandKillPayload,
+  CommandOpenLogsPayload,
+  CommandOpenLogsResult,
   CommandPinPayload,
   CommandPinResult,
   CommandStartPayload,

@@ -26,4 +26,7 @@ export const DEFAULT_CONFIG: ProcessProtocolConfig = {
     dockHeight: 12,
   },
   toolExposure: "direct",
+  shortcuts: {
+    focusKey: "down",
+  },
 };

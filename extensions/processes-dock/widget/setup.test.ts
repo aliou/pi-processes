@@ -55,6 +55,7 @@ function defaultConfig(): ProcessProtocolConfig {
       dockHeight: 10,
     },
     toolExposure: "direct",
+    shortcuts: { focusKey: "down" },
   };
 }
 

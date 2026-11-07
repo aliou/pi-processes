@@ -1,8 +1,8 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { type Static, type TSchema, Type } from "typebox";
 import { KILL_FAILURE_REASONS, ProcessInfoSchema } from "../../../src/types";
 import { LINE_MATCH_MODES } from "../../../src/utils/match-line";
 import { PROCESS_PROTOCOL_ATTENTIONS } from "../../shared/protocol";
+import { StringEnum } from "../../shared/string-enum";
 import {
   LOG_MATCH_STREAMS,
   LogMatcherConfigSchema,

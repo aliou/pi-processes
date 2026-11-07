@@ -2,6 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { isWindowsPlatform } from "../../src/utils/platform";
 import { registerDockCommand } from "./commands/dock";
 import { registerPinCommand } from "./commands/pin";
+import { setupProcessShortcuts } from "./shortcuts/setup";
 import { type DockController, setupDockWidgets } from "./widget/setup";
 
 export default async function processesDockExtension(
@@ -12,6 +13,7 @@ export default async function processesDockExtension(
   if (isWindowsPlatform()) return;
 
   let controller: DockController | null = null;
+  let shortcutsDispose: (() => void) | null = null;
 
   registerDockCommand(pi, () => controller);
   registerPinCommand(pi, pi.events, () => controller);
@@ -19,10 +21,14 @@ export default async function processesDockExtension(
   pi.on("session_start", async (_event, ctx) => {
     controller?.dispose();
     controller = setupDockWidgets(ctx, pi.events);
+    shortcutsDispose?.();
+    shortcutsDispose = setupProcessShortcuts(ctx, pi.events, () => controller);
   });
 
   pi.on("session_shutdown", () => {
     controller?.dispose();
     controller = null;
+    shortcutsDispose?.();
+    shortcutsDispose = null;
   });
 }

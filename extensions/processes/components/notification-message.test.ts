@@ -43,7 +43,13 @@ function renderEntry(
 ): Component {
   const component = renderProcessNotificationMessage(
     { details },
-    { expanded: false, outputPad: 0, ...options },
+    {
+      expanded: false,
+      outputPad: 0,
+      keyText: (keybinding) => keybinding,
+      keyHint: (keybinding, description) => `${keybinding} ${description}`,
+      ...options,
+    },
     makeTheme(),
   );
   if (!component) throw new Error("renderer returned no component");

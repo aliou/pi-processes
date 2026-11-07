@@ -59,6 +59,10 @@ export interface WidgetConfig {
   dockHeight?: number;
 }
 
+export interface ShortcutsConfig {
+  focusKey?: string;
+}
+
 /**
  * User-facing pi-processes settings stored on disk.
  *
@@ -79,6 +83,7 @@ export interface ProcessConfig {
   /** Dock and status widget settings. */
   widget?: WidgetConfig;
   toolExposure?: ToolExposure;
+  shortcuts?: ShortcutsConfig;
 }
 
 export type { ProcessProtocolConfig };

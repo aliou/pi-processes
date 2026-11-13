@@ -12,7 +12,7 @@ import {
   it,
   vi,
 } from "vitest";
-import type { ManagerEvent } from "../types";
+import type { ManagerEvent, ProcessInfo } from "../types";
 import { LIVE_STATUSES } from "../types";
 import { ProcessManager } from ".";
 import {
@@ -272,6 +272,35 @@ describe("start/list/get basics", () => {
 
 // Regression: process start reported an already-exited process as running (#150).
 describe("start immediate-exit grace window", () => {
+  it("invokes onSpawn synchronously with public process info", async () => {
+    vi.useFakeTimers();
+    using manager = new ProcessManager();
+    const onSpawn = vi.fn();
+
+    const pending = manager.start(
+      "long",
+      "sleep 60",
+      "/tmp",
+      undefined,
+      onSpawn,
+    );
+
+    expect(onSpawn).toHaveBeenCalledOnce();
+    const spawned = onSpawn.mock.calls[0]?.[0] as ProcessInfo;
+    expect(spawned).toEqual(
+      expect.objectContaining({
+        id: expect.stringMatching(/^proc_[0-9a-f]{4}$/),
+        pid: expect.any(Number),
+        name: "long",
+        status: "running",
+      }),
+    );
+
+    await vi.advanceTimersByTimeAsync(START_EXIT_GRACE_MS);
+    const info = await pending;
+    expect(spawned).toEqual(info);
+  });
+
   it("reports an immediate failure in the start result", async () => {
     using manager = new ProcessManager();
     const info = await manager.start("quick-fail", "exit 3", "/tmp");

@@ -53,6 +53,25 @@ Good:
 
 `onSuccess: "context"` here because a dev server exiting cleanly needs no immediate reaction; the result becomes context without waking you. Keep the default `turn` for builds, tests, and other one-shot commands whose result you need immediately.
 
+A process that exits during the startup grace window is reported only by its `process start` result, with no later lifecycle notification. A clean exit returns the final process state; a failed exit rejects the start call.
+
+Codemode scripts that start several processes in parallel and need every outcome should use `Promise.allSettled()`. `Promise.all()` rejects when one start fails and does not return the other outcomes, but it does not cancel the sibling processes.
+
+```js
+const results = await Promise.allSettled([
+  tools.process({ action: "start", name: "quick-a", command: "exit 0" }),
+  tools.process({ action: "start", name: "quick-b", command: "exit 7" }),
+]);
+
+for (const result of results) {
+  if (result.status === "fulfilled") {
+    console.log(result.value.process.name, result.value.process.status);
+  } else {
+    console.error(result.reason);
+  }
+}
+```
+
 Optional `cwd` sets the working directory for the spawned command. Omit it to inherit the agent's current working directory.
 
 Empty `logMatches` patterns (literal or regex) are rejected at start and update time. Use `mode: "regex"` only when literal matching is not enough, scope by `stream` to cut noise, and use `repeat: true` when a matcher should fire more than once.

@@ -75,9 +75,9 @@ export function createNotificationService(deps: NotificationServiceDeps): {
     if (disposed) return;
 
     if (event.type === "process_ended") {
-      // Defer to a macrotask so that tool code (e.g. executeStart) can
-      // register the notify config in the registry before we read it.
-      // manager.start() may synchronously emit process_ended for missing_pid.
+      // Defer to a macrotask so that executeStart can mark immediate exits as
+      // start-reported before we read the registry. manager.start() may
+      // synchronously emit process_ended for missing_pid.
       setImmediate(() => {
         if (disposed) return;
         handleProcessEnded(event.info);

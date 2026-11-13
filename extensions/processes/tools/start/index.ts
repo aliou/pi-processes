@@ -30,8 +30,8 @@ export async function executeStart(
     params.command,
     cwd,
     buildSessionEnv(ctx),
+    (process) => notifications.register(process.id, notify),
   );
-  notifications.register(process.id, notify);
   if (!LIVE_STATUSES.has(process.status)) {
     notifications.markStartReported(process.id);
     if (process.success === false) {

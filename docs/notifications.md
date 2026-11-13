@@ -96,11 +96,12 @@ provider request on — no user prompt required.
 ## Lifecycle notifications
 
 `NotificationService.handleProcessEnded` runs on every `process_ended` event
-(deferred to a macrotask so the start tool can register the notify config
-first — `executeStart` registers after awaiting `manager.start`, and sync
-registration after `start()` returns also precedes a macrotask boundary). It
-classifies the end, resolves attention from the per-process config or defaults,
-and either emits or suppresses.
+(deferred to a macrotask so the start tool can mark immediate exits as
+start-reported first). `executeStart` supplies an `onSpawn` callback to
+`ProcessManager.start`, which registers the notify config after process creation
+and before the startup grace wait. The service then classifies the end, resolves
+attention from the per-process config or defaults, and either emits or
+suppresses.
 
 ### Immediate exits at start time
 
@@ -300,9 +301,12 @@ No notification. The timeout is reported through the tool/command result only.
 ## Log-watch notifications
 
 `NotificationService.handleOutputChanged` runs on every
-`process_output_changed` event. It syncs the compiled matcher set for the
-process, evaluates matchers against the appended text, and emits one
-`log_match` payload per match with the matcher's `on` attention.
+`process_output_changed` event. Watches supplied to `process start` are
+registered on spawn, so they also cover output emitted during the startup grace
+window, including output before an immediate exit. The service syncs the
+compiled matcher set for the process, evaluates matchers against the appended
+text, and emits one `log_match` payload per match with the matcher's `on`
+attention.
 
 ```
 process emits output

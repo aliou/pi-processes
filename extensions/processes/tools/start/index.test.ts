@@ -37,9 +37,24 @@ function createFakeRegistry(): NotificationRegistry {
   return createNotificationRegistry();
 }
 
+function createStartMock(info: ProcessInfo = processInfo) {
+  return vi.fn(
+    async (
+      _name: string,
+      _command: string,
+      _cwd: string,
+      _env?: NodeJS.ProcessEnv,
+      onSpawn?: (process: ProcessInfo) => void,
+    ) => {
+      onSpawn?.(info);
+      return info;
+    },
+  );
+}
+
 describe("executeStart", () => {
   it("validates notify before starting the process", async () => {
-    const start = vi.fn(() => processInfo);
+    const start = createStartMock();
     const manager = { start } as unknown as ProcessManager;
     const registry = createFakeRegistry();
 
@@ -61,7 +76,7 @@ describe("executeStart", () => {
   });
 
   it("returns normalized notify config in start details", async () => {
-    const start = vi.fn(() => processInfo);
+    const start = createStartMock();
     const manager = { start } as unknown as ProcessManager;
     const registry = createFakeRegistry();
 
@@ -82,6 +97,7 @@ describe("executeStart", () => {
       "pnpm dev",
       "/repo",
       expect.anything(),
+      expect.any(Function),
     );
     expect(details.notify).toEqual({
       onSuccess: "turn",
@@ -99,8 +115,8 @@ describe("executeStart", () => {
     });
   });
 
-  it("registers notify config with the notification registry after successful start", async () => {
-    const start = vi.fn(() => processInfo);
+  it("registers notify config with the notification registry during start", async () => {
+    const start = createStartMock();
     const manager = { start } as unknown as ProcessManager;
     const registry = createFakeRegistry();
 
@@ -127,7 +143,7 @@ describe("executeStart", () => {
   });
 
   it("does not register notify config when validation fails", async () => {
-    const start = vi.fn(() => processInfo);
+    const start = createStartMock();
     const manager = { start } as unknown as ProcessManager;
     const registry = createFakeRegistry();
 
@@ -150,7 +166,7 @@ describe("executeStart", () => {
   });
 
   it("starts with the explicit cwd when provided", async () => {
-    const start = vi.fn(() => ({ ...processInfo, cwd: "/explicit" }));
+    const start = createStartMock({ ...processInfo, cwd: "/explicit" });
     const manager = { start } as unknown as ProcessManager;
     const registry = createFakeRegistry();
 
@@ -171,12 +187,13 @@ describe("executeStart", () => {
       "pnpm dev",
       "/explicit",
       expect.anything(),
+      expect.any(Function),
     );
     expect(details.process.cwd).toBe("/explicit");
   });
 
   it("falls back to ctx.cwd when cwd is not provided", async () => {
-    const start = vi.fn(() => ({ ...processInfo, cwd: "/repo" }));
+    const start = createStartMock({ ...processInfo, cwd: "/repo" });
     const manager = { start } as unknown as ProcessManager;
     const registry = createFakeRegistry();
 
@@ -196,11 +213,12 @@ describe("executeStart", () => {
       "pnpm dev",
       "/repo",
       expect.anything(),
+      expect.any(Function),
     );
   });
 
   it("starts with PI_* session variables injected into the child env", async () => {
-    const start = vi.fn((..._args: unknown[]) => processInfo);
+    const start = createStartMock();
     const manager = { start } as unknown as ProcessManager;
     const registry = createFakeRegistry();
 
@@ -229,7 +247,7 @@ describe("executeStart", () => {
       success: true,
       endReason: "exit",
     };
-    const start = vi.fn(() => exited);
+    const start = createStartMock(exited);
     const manager = { start } as unknown as ProcessManager;
     const registry = createFakeRegistry();
 
@@ -260,7 +278,7 @@ describe("executeStart", () => {
       endReason: "exit",
     };
     const manager = {
-      start: vi.fn(() => exited),
+      start: createStartMock(exited),
     } as unknown as ProcessManager;
     const registry = createFakeRegistry();
 
@@ -291,7 +309,7 @@ describe("executeStart", () => {
       errorMessage: "spawn /bin/bash ENOENT",
     };
     const manager = {
-      start: vi.fn(() => exited),
+      start: createStartMock(exited),
     } as unknown as ProcessManager;
     const registry = createFakeRegistry();
 
@@ -325,7 +343,7 @@ describe("executeStart", () => {
       },
     };
     const manager = {
-      start: vi.fn(() => exited),
+      start: createStartMock(exited),
     } as unknown as ProcessManager;
     const registry = createFakeRegistry();
 
@@ -347,7 +365,7 @@ describe("executeStart", () => {
 
   it("does not mark a running start as start-reported", async () => {
     const manager = {
-      start: vi.fn(() => processInfo),
+      start: createStartMock(),
     } as unknown as ProcessManager;
     const registry = createFakeRegistry();
 

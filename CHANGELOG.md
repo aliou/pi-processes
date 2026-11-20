@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.13.8
+
+### Patch Changes
+
+- a1efe65: Document immediate-exit start results and using `Promise.allSettled()` to retain every outcome when Codemode starts processes in parallel.
+
 ## 0.13.7
 
 ### Patch Changes

@@ -87,6 +87,22 @@ describe("renderProcessNotificationMessage", () => {
     expect(component.render(80)).toHaveLength(2);
   });
 
+  it("mutes log-match summaries while keeping the prefix accented", () => {
+    const theme = {
+      fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
+      bold: (text: string) => text,
+    } as Theme;
+    const component = renderProcessNotificationMessage(
+      { details: logMatchDetails() },
+      { expanded: false, outputPad: 0 },
+      theme,
+    );
+
+    expect(component?.render(120).map((line) => line.trimEnd())).toEqual([
+      '<accent>[process]</accent> <muted>"api-server"</muted> <muted>matched stdout: server ready on port 3000</muted>',
+    ]);
+  });
+
   it("ignores non-click mouse events", () => {
     const component = renderEntry(logMatchDetails());
     expect(

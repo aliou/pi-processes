@@ -82,7 +82,11 @@ function formatSummary(
     // Matched text is raw process output: sanitize before it reaches the
     // transcript, or an escape sequence in a log line hits the terminal.
     const line = truncateForDisplay(details.logMatch.line, 160);
-    return `${prefix} ${name} matched ${details.logMatch.stream}: ${line}`;
+    const match = theme.fg(
+      "muted",
+      `matched ${details.logMatch.stream}: ${line}`,
+    );
+    return `${prefix} ${name} ${match}`;
   }
 
   if (details.kind === "killed" && details.signal) {

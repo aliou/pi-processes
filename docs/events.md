@@ -234,12 +234,22 @@ hooks:
   `bindProjectConfig` in `extensions/processes/index.ts`, only when Pi trusts
   the session directory. Untrusted project files are not read or migrated.
   It then drains config, trust, and import messages and notifies the user;
+  the stopped-notice hook (`extensions/processes/hooks/stopped-notice.ts`)
+  scans the active branch (`ctx.sessionManager.getBranch()`) for an
+  `ad-process:stopped` custom entry written by the last shutdown and, when
+  no later `ad-process:stopped` custom message has consumed it, sends a
+  displayed custom message with the stopped processes — it never triggers a
+  turn; the registered renderer
+  (`extensions/processes/components/stopped-notice-message.ts`) shows the
+  count when collapsed and each process name with command when expanded;
   the dock tears down any previous controller and re-creates its widgets
   for the session. Shell selection, interception, and config requests read
   the resolved config at runtime.
 - `tool_call` — the core extension's background blocker inspects bash tool
   calls to optionally reject backgrounded commands when interception is
   enabled in config.
-- `session_shutdown` — the core extension kills managed processes and disposes
-  listeners, notification state, and overlays; the logs extension disposes
-  open overlays; the dock disposes its controller.
+- `session_shutdown` — the core extension records the processes still live
+  (`LIVE_STATUSES` from `src/types.ts`) in an `ad-process:stopped` custom
+  entry via `appendStoppedProcessesEntry`, then kills managed processes and
+  disposes listeners, notification state, and overlays; the logs extension
+  disposes open overlays; the dock disposes its controller.

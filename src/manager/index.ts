@@ -64,8 +64,10 @@ export class ProcessManager {
     command: string,
     cwd: string,
     env?: NodeJS.ProcessEnv,
+    onSpawn?: (process: ProcessInfo) => void,
   ): Promise<ProcessInfo> {
     const managed = this.runtime.start(name, command, cwd, env);
+    onSpawn?.(formatProcess(managed));
     await this.waitForImmediateExit(managed.id);
     return formatProcess(managed);
   }

@@ -1,5 +1,11 @@
 # @aliou/pi-processes
 
+## 0.13.7
+
+### Patch Changes
+
+- ad2143f: Use muted text for log-match notification summaries so matched output is visually distinct from agent responses while retaining the accented process prefix.
+
 ## 0.13.6
 
 ### Patch Changes

@@ -643,7 +643,10 @@ export class OverviewComponent implements Component {
     // Leading marker: ◆ for the pinned process, a space otherwise, so every
     // row aligns with no offset when nothing is pinned.
     const marker = this.pinnedId === process.id ? t.fg("accent", "◆") : " ";
-    const left = `${marker} ${name}${sep}${dim(id)}${sep}${status}${sep}${runtime}`;
+    // Cursor arrow + accent name: selectedBg alone is too faint in many themes.
+    const cursor = selected ? t.fg("accent", "▸") : " ";
+    const shownName = selected ? t.bold(t.fg("accent", name)) : name;
+    const left = `${cursor}${marker} ${shownName}${sep}${dim(id)}${sep}${status}${sep}${runtime}`;
     const remaining = Math.max(0, width - visibleWidth(left) - 2);
     const command = dim(truncateForDisplay(process.command, remaining));
     const line = `${left}${sep}${command}`;

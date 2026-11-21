@@ -359,6 +359,37 @@ describe("overview panel render width safety", () => {
     expect(row).toContain("◆");
   });
 
+  it("marks only the selected row with a cursor, following j", () => {
+    const processes = [
+      makeProcess({ id: "proc_1", name: "dev", startTime: 200 }),
+      makeProcess({ id: "proc_2", name: "api", startTime: 100 }),
+    ];
+    const events = makeEvents(processes);
+    const tui = {
+      requestRender: () => {},
+      terminal: { rows: 24, columns: 112 },
+    } as unknown;
+    const component = new OverviewComponent({
+      events: events as never,
+      tui: tui as never,
+      theme: theme as never,
+      config: makeConfig() as never,
+      onClose: () => {},
+    });
+    const rowsWithCursor = () =>
+      component
+        .render(112)
+        .map(stripAnsi)
+        .filter((l) => l.includes("proc_") && l.includes("▸"));
+
+    const before = rowsWithCursor();
+    expect(before).toHaveLength(1);
+    component.handleInput("j");
+    const after = rowsWithCursor();
+    expect(after).toHaveLength(1);
+    expect(after[0]).not.toBe(before[0]);
+  });
+
   it("does not pin finished processes", async () => {
     const processes = [
       makeProcess({

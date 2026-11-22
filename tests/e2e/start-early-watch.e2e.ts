@@ -2,7 +2,7 @@ import {
   createEventBus,
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { expect, vi } from "vitest";
+import { assert, expect, vi } from "vitest";
 
 import { createNotificationRegistry } from "../../extensions/processes/notifications/registry";
 import { createNotificationService } from "../../extensions/processes/notifications/service";
@@ -12,6 +12,7 @@ import { CHANNELS } from "../../extensions/shared/protocol";
 import { ProcessManager } from "../../src/manager";
 import { flushQueuedMacrotasks } from "../utils/async";
 import { test } from "./fixtures";
+import { waitForEnd } from "./utils";
 
 function createContext(cwd: string): ExtensionContext {
   return {
@@ -40,6 +41,12 @@ function createNotifications(manager: ProcessManager) {
 }
 
 const notify = { logMatches: [{ pattern: "ready" }] };
+
+function countLogMatches(
+  emitted: ProcessProtocolNotificationPayload[],
+): number {
+  return emitted.filter((event) => event.kind === "log_match").length;
+}
 
 test("matches early output from a running process exactly once", async ({
   cwd,
@@ -79,7 +86,7 @@ test("matches early output from a running process exactly once", async ({
 });
 
 test("matches early output before an immediate clean exit", async ({ cwd }) => {
-  using manager = new ProcessManager({ startExitGraceMs: 8_000 });
+  using manager = new ProcessManager();
   const { emitted, registry, service } = createNotifications(manager);
 
   try {
@@ -95,45 +102,61 @@ test("matches early output before an immediate clean exit", async ({ cwd }) => {
       registry,
     );
 
-    expect(details.process).toEqual(
+    await vi.waitFor(() => expect(countLogMatches(emitted)).toBe(1), {
+      timeout: 5000,
+    });
+
+    const ended = await waitForEnd(manager, details.process.id);
+    expect(ended).toEqual(
       expect.objectContaining({ status: "exited", exitCode: 0, success: true }),
     );
-    expect(emitted).toHaveLength(1);
-    expect(emitted[0]?.kind).toBe("log_match");
 
     await flushQueuedMacrotasks();
 
-    expect(emitted).toHaveLength(1);
+    expect(countLogMatches(emitted)).toBe(1);
   } finally {
     service.dispose();
   }
 });
 
 test("matches early output before an immediate failure", async ({ cwd }) => {
-  using manager = new ProcessManager({ startExitGraceMs: 8_000 });
+  using manager = new ProcessManager();
   const { emitted, registry, service } = createNotifications(manager);
 
   try {
-    await expect(
-      executeStart(
-        {
-          action: "start",
-          name: "early-failure",
-          command: "printf 'ready\\n'; exit 7",
-          notify,
-        },
-        manager,
-        createContext(cwd),
-        registry,
-      ),
-    ).rejects.toThrow(/exited immediately: exit code 7/);
+    await executeStart(
+      {
+        action: "start",
+        name: "early-failure",
+        command: "printf 'ready\\n'; exit 7",
+        notify,
+      },
+      manager,
+      createContext(cwd),
+      registry,
+    ).catch((error: Error) => {
+      expect(error.message).toMatch(/exited immediately: exit code 7/);
+    });
 
-    expect(emitted).toHaveLength(1);
-    expect(emitted[0]?.kind).toBe("log_match");
+    const process = manager.list().find(({ name }) => name === "early-failure");
+    assert(process);
+
+    await vi.waitFor(() => expect(countLogMatches(emitted)).toBe(1), {
+      timeout: 5000,
+    });
+
+    const ended = await waitForEnd(manager, process.id);
+    expect(ended).toEqual(
+      expect.objectContaining({
+        status: "exited",
+        exitCode: 7,
+        success: false,
+      }),
+    );
 
     await flushQueuedMacrotasks();
 
-    expect(emitted).toHaveLength(1);
+    expect(countLogMatches(emitted)).toBe(1);
   } finally {
     service.dispose();
   }

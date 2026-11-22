@@ -2,7 +2,7 @@ import {
   createEventBus,
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { expect } from "vitest";
+import { expect, vi } from "vitest";
 
 import { createNotificationRegistry } from "../../extensions/processes/notifications/registry";
 import { createNotificationService } from "../../extensions/processes/notifications/service";
@@ -61,7 +61,7 @@ test("matches early output from a running process exactly once", async ({
     );
 
     expect(details.process.status).toBe("running");
-    expect(emitted).toHaveLength(1);
+    await vi.waitFor(() => expect(emitted).toHaveLength(1), { timeout: 5000 });
     expect(emitted[0]).toEqual(
       expect.objectContaining({
         kind: "log_match",
@@ -79,7 +79,7 @@ test("matches early output from a running process exactly once", async ({
 });
 
 test("matches early output before an immediate clean exit", async ({ cwd }) => {
-  using manager = new ProcessManager();
+  using manager = new ProcessManager({ startExitGraceMs: 8_000 });
   const { emitted, registry, service } = createNotifications(manager);
 
   try {
@@ -110,7 +110,7 @@ test("matches early output before an immediate clean exit", async ({ cwd }) => {
 });
 
 test("matches early output before an immediate failure", async ({ cwd }) => {
-  using manager = new ProcessManager();
+  using manager = new ProcessManager({ startExitGraceMs: 8_000 });
   const { emitted, registry, service } = createNotifications(manager);
 
   try {

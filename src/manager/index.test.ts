@@ -511,6 +511,16 @@ describe("lifecycle events", () => {
     }
   });
 
+  it("emits processes_changed with updated reason on rename", async () => {
+    using manager = new ProcessManager();
+    const info = await manager.start("before", "sleep 60", "/tmp");
+    const events = collectEvents(manager);
+
+    expect(manager.rename(info.id, "after")?.name).toBe("after");
+
+    expect(events).toEqual([{ type: "processes_changed", reason: "updated" }]);
+  });
+
   it("emits processes_changed on clearFinished", async () => {
     using manager = new ProcessManager();
     const events = collectEvents(manager);
@@ -520,7 +530,7 @@ describe("lifecycle events", () => {
     manager.clearFinished();
 
     const changed = events.filter((e) => e.type === "processes_changed");
-    expect(changed).toHaveLength(1);
+    expect(changed).toEqual([{ type: "processes_changed", reason: "cleared" }]);
   });
 });
 
@@ -930,7 +940,7 @@ describe("clearFinished", () => {
     manager.clearFinished();
 
     const changed = events.filter((e) => e.type === "processes_changed");
-    expect(changed).toHaveLength(1);
+    expect(changed).toEqual([{ type: "processes_changed", reason: "cleared" }]);
   });
 });
 
@@ -953,9 +963,17 @@ describe("finished record reaping", () => {
 
     expect(manager.list()).toHaveLength(MAX_FINISHED_RECORDS + 10);
     expect(fs.existsSync(stdoutFiles[0] ?? "")).toBe(true);
+    const events = collectEvents(manager);
 
     await vi.advanceTimersByTimeAsync(FINISHED_RECORD_GRACE_MS + 10);
 
+    const changed = events.filter(
+      (event) => event.type === "processes_changed",
+    );
+    expect(changed).not.toHaveLength(0);
+    for (const event of changed) {
+      expect(event).toEqual({ type: "processes_changed", reason: "cleared" });
+    }
     const survivors = manager.list();
     expect(survivors).toHaveLength(MAX_FINISHED_RECORDS);
     expect(survivors.map((info) => info.id)).toEqual(

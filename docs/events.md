@@ -131,11 +131,12 @@ following a process; the dock updates preview lines for pinned widgets.
 
 #### processes:changed
 
-Fired whenever the set of processes changes: `reason` is `"started"`,
-`"ended"`, or `"cleared"`. It is a coarse refresh signal — subscribers re-query
-process state rather than reconstructing it from the event alone. Emitted
-alongside every other broadcast, and with `reason: "cleared"` after
-`/ps:clear` removes finished processes from the registry.
+Fired whenever process state changes: `reason` is `"started"`, `"ended"`,
+`"updated"`, or `"cleared"`. It is a coarse refresh signal — subscribers
+re-query process state rather than reconstructing it from the event alone.
+Emitted alongside start and end broadcasts, with `reason: "updated"` after a
+rename, and with `reason: "cleared"` after `/ps:clear` or automatic reaping
+removes finished processes from the registry.
 
 ## Requests
 
@@ -274,7 +275,9 @@ cross-extension protocol.
   kill result instead.
 - `process_output_changed` — new output accumulated, carrying appended lines
   and any dropped-line count. Also drives log subscriptions.
-- `processes_changed` — the registry list changed (used by `/ps:clear`).
+- `processes_changed` — a registry record changed. `reason` is `"updated"`
+  after a rename or `"cleared"` after finished records are removed by
+  `/ps:clear` or automatic reaping.
 
 ## Pi Lifecycle Events
 

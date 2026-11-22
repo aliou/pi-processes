@@ -64,6 +64,8 @@ export const ProcessInfoSchema = Type.Object({
 
 export type ProcessInfo = Static<typeof ProcessInfoSchema>;
 
+export type ProcessRegistryChangeReason = "cleared" | "updated";
+
 export type ManagerEvent =
   | { type: "process_started"; info: ProcessInfo }
   | { type: "process_ended"; info: ProcessInfo }
@@ -73,7 +75,7 @@ export type ManagerEvent =
       appendedText?: Array<{ type: "stdout" | "stderr"; text: string }>;
       droppedLines?: number;
     }
-  | { type: "processes_changed" };
+  | { type: "processes_changed"; reason: ProcessRegistryChangeReason };
 
 /** Options for adopting an externally spawned child process. */
 export interface AdoptProcessOptions {

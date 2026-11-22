@@ -187,7 +187,7 @@ describe("registerLogSubscriptions", () => {
       reply: vi.fn(),
     });
     vi.mocked(fake.manager.get).mockReturnValue(null);
-    fake.emit({ type: "processes_changed" });
+    fake.emit({ type: "processes_changed", reason: "cleared" });
     fake.emit({ type: "process_output_changed", id: "proc_1", appendedText });
 
     expect(chunk).not.toHaveBeenCalled();

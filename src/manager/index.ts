@@ -125,6 +125,7 @@ export class ProcessManager {
     if (info) {
       this.events.emit("event", {
         type: "processes_changed",
+        reason: "updated",
       } satisfies ManagerEvent);
     }
     return info;

@@ -92,7 +92,7 @@ describe("registerEventBridge", () => {
     });
   });
 
-  it("bridges processes changed events", () => {
+  it("bridges processes changed events with their reasons", () => {
     const events = createEventBus();
     const fake = createFakeManager();
     const changed = vi.fn();
@@ -100,9 +100,11 @@ describe("registerEventBridge", () => {
     events.on(CHANNELS.CHANGED, changed);
     registerEventBridge(events, fake.manager);
 
-    fake.emit({ type: "processes_changed" });
+    fake.emit({ type: "processes_changed", reason: "updated" });
+    fake.emit({ type: "processes_changed", reason: "cleared" });
 
-    expect(changed).toHaveBeenCalledWith({ reason: "cleared" });
+    expect(changed).toHaveBeenNthCalledWith(1, { reason: "updated" });
+    expect(changed).toHaveBeenNthCalledWith(2, { reason: "cleared" });
   });
 
   it("disposes manager listener", () => {

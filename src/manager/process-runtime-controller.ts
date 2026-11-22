@@ -431,7 +431,7 @@ export class ProcessRuntimeController {
     }
 
     if (cleared > 0) {
-      this.emit({ type: "processes_changed" });
+      this.emit({ type: "processes_changed", reason: "cleared" });
     }
 
     this.scheduleFinishedReap();
@@ -612,7 +612,9 @@ export class ProcessRuntimeController {
       reaped++;
     }
 
-    if (reaped > 0) this.emit({ type: "processes_changed" });
+    if (reaped > 0) {
+      this.emit({ type: "processes_changed", reason: "cleared" });
+    }
   }
 
   private scheduleFinishedReap(): void {

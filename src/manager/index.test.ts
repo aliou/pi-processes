@@ -730,6 +730,7 @@ describe("kill", () => {
     await vi.advanceTimersByTimeAsync(3000);
     const result = await resultPromise;
     assert(!result.ok && result.reason === "timeout", "expected timeout");
+    expect(events.at(-1)).toEqual({ type: "processes_changed" });
 
     // Now the process dies for real (the OS reaps it). The liveness tick must
     // NOT reclassify it to killed/lost, clobber endReason, or emit a second

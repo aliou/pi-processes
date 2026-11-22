@@ -302,6 +302,8 @@ export class ProcessRuntimeController {
       // to "signal", and emits a second (reclassified) process_ended.
       managed.endTime = Date.now();
       this.transition(managed, "terminate_timeout");
+      // terminate_timeout emits no process_ended; tell listeners the state changed.
+      this.emit({ type: "processes_changed" });
       return {
         ok: false,
         info: formatProcess(managed),

@@ -11,6 +11,7 @@ import { type Component, Container, Text } from "@earendil-works/pi-tui";
 
 import type { ProcessManager } from "../../../src/manager";
 import { TOOL_EXPOSURES } from "../config";
+import type { SessionHolds } from "../hooks/session-holds";
 import type { NotificationRegistry } from "../notifications/registry";
 import { executeClear, formatClearDetails } from "./clear";
 import * as clearRender from "./clear/render";
@@ -54,6 +55,7 @@ export function registerProcessTool(
   manager: ProcessManager,
   notifications: NotificationRegistry,
   exposure: ToolExposure,
+  holds?: SessionHolds,
 ): void {
   pi.registerTool(
     defineTool({
@@ -84,7 +86,13 @@ export function registerProcessTool(
           };
         }
 
-        const details = await execute(params, manager, ctx, notifications);
+        const details = await execute(
+          params,
+          manager,
+          ctx,
+          notifications,
+          holds,
+        );
         return {
           content: [{ type: "text", text: formatDetails(details) }],
           details,
@@ -102,10 +110,11 @@ async function execute(
   manager: ProcessManager,
   ctx: ExtensionContext,
   notifications: NotificationRegistry,
+  holds?: SessionHolds,
 ): Promise<Exclude<ProcessDetails, OutputDetails>> {
   switch (params.action) {
     case "start":
-      return executeStart(params, manager, ctx, notifications);
+      return executeStart(params, manager, ctx, notifications, holds);
     case "list":
       return executeList(manager, params, notifications);
     case "stop":

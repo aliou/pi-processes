@@ -38,6 +38,37 @@ function createFakeRegistry(): NotificationRegistry {
 }
 
 describe("executeStart", () => {
+  it("holds the session only when holdSession is true", async () => {
+    const manager = {
+      start: vi.fn(() => processInfo),
+    } as unknown as ProcessManager;
+    const holds = { hold: vi.fn(), dispose: vi.fn() };
+    const registry = createFakeRegistry();
+
+    await executeStart(
+      { action: "start", name: "dev", command: "pnpm dev" },
+      manager,
+      ctx,
+      registry,
+      holds,
+    );
+    expect(holds.hold).not.toHaveBeenCalled();
+
+    await executeStart(
+      {
+        action: "start",
+        name: "build",
+        command: "pnpm build",
+        holdSession: true,
+      },
+      manager,
+      ctx,
+      registry,
+      holds,
+    );
+    expect(holds.hold).toHaveBeenCalledWith(processInfo);
+  });
+
   it("validates notify before starting the process", async () => {
     const start = vi.fn(() => processInfo);
     const manager = { start } as unknown as ProcessManager;

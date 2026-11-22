@@ -139,7 +139,8 @@ is unchanged.
 `terminate_timeout` never reaches `process_ended`: `ProcessManager.kill` sets
 `endTime` and transitions to `terminate_timeout` without emitting, and the
 `close` handler bails on the `endTime` guard. The timeout is carried by the
-tool result (`KillResult.reason: "timeout"`) instead.
+tool result (`KillResult.reason: "timeout"`) instead. `kill` then emits a
+`processes_changed` so listeners (session holds, UI) see the new status.
 
 ### Attention resolution
 
@@ -291,6 +292,7 @@ manager.kill SIGTERM grace period expires, process still alive
   ProcessRuntimeController.kill                     src/manager/process-runtime-controller.ts
     endReason = "kill_timeout"; endTime = Date.now()
     transition(managed, "terminate_timeout")       (no process_ended emit — not exited/killed)
+    emit processes_changed                         (releases a session hold; refreshes UI)
       returns KillResult { ok: false, reason: "timeout" }
   child.on("close") later → bails on endTime guard, no second process_ended
 ```

@@ -1,6 +1,8 @@
 export type {
   ProcessesChangedPayload,
   ProcessesEndedPayload,
+  ProcessesHoldEndedPayload,
+  ProcessesHoldStartedPayload,
   ProcessesOutputChangedPayload,
   ProcessesStartedPayload,
 } from "./broadcasts";

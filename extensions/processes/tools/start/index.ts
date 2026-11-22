@@ -2,6 +2,7 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import type { ProcessManager } from "../../../../src/manager";
 import { LIVE_STATUSES, type ProcessInfo } from "../../../../src/types";
+import type { SessionHolds } from "../../hooks/session-holds";
 import type { NotificationRegistry } from "../../notifications/registry";
 import { normalizeNotifyConfig } from "../notify";
 import type { ProcessesParamsType, StartDetails } from "../schema";
@@ -13,6 +14,7 @@ export async function executeStart(
   manager: ProcessManager,
   ctx: ExtensionContext,
   notifications: NotificationRegistry,
+  holds?: SessionHolds,
 ): Promise<StartDetails> {
   if (!params.name) {
     throw new Error("process start requires name");
@@ -32,6 +34,7 @@ export async function executeStart(
     buildSessionEnv(ctx),
   );
   notifications.register(process.id, notify);
+  if (params.holdSession) holds?.hold(process);
   if (!LIVE_STATUSES.has(process.status)) {
     notifications.markStartReported(process.id);
     if (process.success === false) {

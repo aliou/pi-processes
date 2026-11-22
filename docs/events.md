@@ -40,7 +40,8 @@ manager ──internal events──► core extension
   │                            ├─► processes:started ────────► UI extensions
   │                            ├─► processes:ended ──────────► UI extensions
   │                            ├─► processes:output_changed ► UI extensions
-  │                            └─► processes:changed ────────► UI extensions
+  │                            ├─► processes:changed ────────► UI extensions
+  │                            └─► processes:hold_* ─────────► host status extensions
   │
   any extension (UI extensions use these; adopt is for any emitter)
   ├─► processes:request:* ─────► core replies synchronously
@@ -85,6 +86,19 @@ Fired whenever the set of processes changes: `reason` is `"started"`,
 process state rather than reconstructing it from the event alone. Emitted
 alongside every other broadcast, and with `reason: "cleared"` after
 `/ps:clear` removes finished processes from the registry.
+
+#### processes:hold_started / processes:hold_ended
+
+Fired only for processes started with `process start` and `holdSession: true`.
+Hosts that show whether a session is busy (for example a terminal multiplexer
+status extension) can listen and keep the session marked as working until the
+job ends. `hold_started` carries `{ id, name, command }` and fires once, after
+start, if the process is still live. `hold_ended` carries `{ id, success }`
+and fires exactly once per hold, on the first of: process end, kill timeout
+(`terminate_timeout`), removal from the registry, or session shutdown
+(`success: false`). Holds live in `createSessionHolds`
+(`extensions/processes/hooks/session-holds.ts`). Processes without the flag
+emit neither event.
 
 ## Requests
 

@@ -4,6 +4,10 @@ export const CHANNELS = {
   ENDED: "processes:ended",
   OUTPUT_CHANGED: "processes:output_changed",
   CHANGED: "processes:changed",
+  // Session holds for `process start` with holdSession: true. Hosts that
+  // track busy state listen to keep the session working until the job ends.
+  HOLD_STARTED: "processes:hold_started",
+  HOLD_ENDED: "processes:hold_ended",
 
   // Request channels (UI -> core, sync callback)
   REQUEST_LIST: "processes:request:list",

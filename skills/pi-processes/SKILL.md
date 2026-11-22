@@ -24,6 +24,8 @@ A started process runs in the background and the manager brings you back when so
 
 The only reason to wait after `process start` is when the next step literally cannot proceed until the process is ready, and even then prefer a `logMatches` watch over polling.
 
+Set `holdSession: true` on a finite job whose result you are waiting for (build, test, one-off script). It keeps the session shown as busy to the host until the job ends. Never set it on dev servers, watchers, or log tails: they do not end, so the session would stay busy.
+
 ## Actions
 
 ### `process start`

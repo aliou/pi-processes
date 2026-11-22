@@ -13,6 +13,7 @@ import { registerLogSubscriptions } from "./handlers/subscriptions";
 import { registerBackgroundBlocker } from "./hooks/background-blocker";
 import { registerCleanupHook } from "./hooks/cleanup";
 import { registerEventBridge } from "./hooks/event-bridge";
+import { createSessionHolds } from "./hooks/session-holds";
 import { registerProcessNotificationRenderer } from "./message-renderer";
 import {
   createNotificationRegistry,
@@ -61,8 +62,11 @@ export default async function processesExtension(
     return () => openOverlays.delete(overlay);
   };
 
+  const holds = createSessionHolds(pi.events, manager);
+
   const disposers = [
     registerEventBridge(pi.events, manager),
+    () => holds.dispose(),
     registerRequestHandlers(pi.events, manager, getConfig, (id) =>
       notificationService.getWakeConditions(id),
     ),
@@ -77,7 +81,13 @@ export default async function processesExtension(
   );
 
   registerProcessNotificationRenderer(pi);
-  registerProcessTool(pi, manager, notifications, getConfig().toolExposure);
+  registerProcessTool(
+    pi,
+    manager,
+    notifications,
+    getConfig().toolExposure,
+    holds,
+  );
   registerProcessSettings(pi);
   registerOverviewCommand(pi, { events: pi.events, registerOverlay });
   registerKillCommand(pi);

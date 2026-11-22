@@ -9,6 +9,15 @@ export type ProcessesOutputChangedPayload = {
   appendedText?: Array<{ type: "stdout" | "stderr"; text: string }>;
   droppedLines?: number;
 };
+export type ProcessesHoldStartedPayload = {
+  id: string;
+  name: string;
+  command: string;
+};
+export type ProcessesHoldEndedPayload = {
+  id: string;
+  success: boolean;
+};
 export type ProcessesChangedPayload = {
   reason: "started" | "ended" | "cleared";
 };

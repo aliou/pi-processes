@@ -90,6 +90,12 @@ export const ProcessesParams = Type.Object({
     }),
   ),
   notify: Type.Optional(NotifyParams),
+  holdSession: Type.Optional(
+    Type.Boolean({
+      description:
+        "Keep the session marked busy until this process ends. Default false. Set it for finite jobs whose result you wait for (build, test, script). Never set it for dev servers, watchers, or log tails. Only for start.",
+    }),
+  ),
   id: Type.Optional(
     Type.String({
       description:

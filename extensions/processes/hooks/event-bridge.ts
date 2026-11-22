@@ -25,7 +25,7 @@ export function registerEventBridge(
         });
         break;
       case "processes_changed":
-        events.emit(CHANNELS.CHANGED, { reason: "cleared" });
+        events.emit(CHANNELS.CHANGED, { reason: event.reason });
         break;
     }
   });

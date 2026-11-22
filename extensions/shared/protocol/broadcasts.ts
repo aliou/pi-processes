@@ -1,4 +1,7 @@
-import type { ProcessInfo } from "../../../src/types";
+import type {
+  ProcessInfo,
+  ProcessRegistryChangeReason,
+} from "../../../src/types";
 
 // Core emits, UI listens.
 
@@ -10,5 +13,5 @@ export type ProcessesOutputChangedPayload = {
   droppedLines?: number;
 };
 export type ProcessesChangedPayload = {
-  reason: "started" | "ended" | "cleared";
+  reason: "started" | "ended" | ProcessRegistryChangeReason;
 };

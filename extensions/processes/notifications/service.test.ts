@@ -796,7 +796,7 @@ describe("NotificationService", () => {
       getProcess: (id) => processes.get(id) ?? null,
     });
 
-    fakeManager.emit({ type: "processes_changed" });
+    fakeManager.emit({ type: "processes_changed", reason: "updated" });
 
     expect(spy.emitted).toHaveLength(0);
 

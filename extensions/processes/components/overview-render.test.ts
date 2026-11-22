@@ -359,6 +359,85 @@ describe("overview panel render width safety", () => {
     expect(row).toContain("◆");
   });
 
+  it("marks only the selected row with a cursor, following j", () => {
+    const processes = [
+      makeProcess({ id: "proc_1", name: "dev", startTime: 200 }),
+      makeProcess({ id: "proc_2", name: "api", startTime: 100 }),
+    ];
+    const events = makeEvents(processes);
+    const tui = {
+      requestRender: () => {},
+      terminal: { rows: 24, columns: 112 },
+    } as unknown;
+    const component = new OverviewComponent({
+      events: events as never,
+      tui: tui as never,
+      theme: theme as never,
+      config: makeConfig() as never,
+      onClose: () => {},
+    });
+    const rowsWithCursor = () =>
+      component
+        .render(112)
+        .map(stripAnsi)
+        .filter((l) => l.includes("proc_") && l.includes("›"));
+
+    const before = rowsWithCursor();
+    expect(before).toHaveLength(1);
+    expect(before[0]).toContain("›   dev");
+    component.handleInput("j");
+    const after = rowsWithCursor();
+    expect(after).toHaveLength(1);
+    expect(after[0]).toContain("›   api");
+  });
+
+  it("separates the cursor and pin marker on a selected pinned row", async () => {
+    const component = new OverviewComponent({
+      events: makeEvents([makeProcess()]) as never,
+      tui: { requestRender: () => {} } as never,
+      theme: theme as never,
+      config: makeConfig() as never,
+      onClose: () => {},
+    });
+
+    component.handleInput("\r");
+    await Promise.resolve();
+    await Promise.resolve();
+    const row = component
+      .render(112)
+      .map(stripAnsi)
+      .find((line) => line.includes("proc_1"));
+    expect(row).toContain("› ◆ dev");
+  });
+
+  it("styles only the selected process name with bold accent", () => {
+    const styledTheme = {
+      fg: (color: string, text: string) =>
+        color === "accent" ? `<accent>${text}</accent>` : text,
+      bg: (_color: string, text: string) => text,
+      bold: (text: string) => `<bold>${text}</bold>`,
+    };
+    const processes = [
+      makeProcess({ id: "proc_1", name: "dev", startTime: 200 }),
+      makeProcess({ id: "proc_2", name: "api", startTime: 100 }),
+    ];
+    const component = new OverviewComponent({
+      events: makeEvents(processes) as never,
+      tui: { requestRender: () => {} } as never,
+      theme: styledTheme as never,
+      config: makeConfig() as never,
+      onClose: () => {},
+    });
+    const row = (id: string) =>
+      component.render(112).find((line) => line.includes(id)) ?? "";
+
+    expect(row("proc_1")).toContain("<bold><accent>dev");
+    expect(row("proc_2")).not.toContain("<bold><accent>api");
+    component.handleInput("j");
+    expect(row("proc_1")).not.toContain("<bold><accent>dev");
+    expect(row("proc_2")).toContain("<bold><accent>api");
+  });
+
   it("does not pin finished processes", async () => {
     const processes = [
       makeProcess({

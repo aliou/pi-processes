@@ -283,7 +283,9 @@ Default: a context message (no turn). `onKilled: "turn` promotes to a turn.
                     delivery listener → sendProcessNotificationMessage(triggerTurn=false)
 ```
 
-Always a context message. Config is ignored. The agent is not woken.
+Always a context message. Config is ignored. The agent is not woken. If the
+process group is gone when the child closes, the stop returns immediately with
+the recorded exit status.
 
 #### Kill timeout (terminate_timeout)
 

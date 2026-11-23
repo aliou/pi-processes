@@ -39,6 +39,10 @@ export class ProcessRuntimeController {
 
   private watcher: ReturnType<typeof setInterval> | null = null;
   private finishedReapTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly terminationWaiters = new WeakMap<
+    ManagedProcessRecord,
+    Set<() => void>
+  >();
   private completionSequence = 0;
   private shuttingDown = false;
 
@@ -227,12 +231,38 @@ export class ProcessRuntimeController {
     if (next === "exited" || next === "killed") {
       managed.completionSequence ??= ++this.completionSequence;
       this.emit({ type: "process_ended", info: formatProcess(managed) });
+
+      // The child can close before the rest of its process group has stopped.
+      const waiters = this.terminationWaiters.get(managed);
+      if (waiters?.size && !isProcessGroupAlive(managed.pid)) {
+        for (const finish of waiters) finish();
+      }
+
       this.reapOldestFinished();
       this.scheduleFinishedReap();
     }
 
     this.ensureWatcherRunning();
     this.stopWatcherIfIdle();
+  }
+
+  private waitForTermination(
+    managed: ManagedProcessRecord,
+    graceMs: number,
+  ): Promise<void> {
+    const waiters =
+      this.terminationWaiters.get(managed) ?? new Set<() => void>();
+    this.terminationWaiters.set(managed, waiters);
+    return new Promise((resolve) => {
+      const timer = setTimeout(finish, graceMs);
+      waiters.add(finish);
+
+      function finish(): void {
+        clearTimeout(timer);
+        waiters.delete(finish);
+        resolve();
+      }
+    });
   }
 
   async kill(
@@ -288,7 +318,9 @@ export class ProcessRuntimeController {
     }
 
     const graceMs = signal === "SIGKILL" ? 200 : timeoutMs;
-    await new Promise((r) => setTimeout(r, graceMs));
+    if (LIVE_STATUSES.has(managed.status) || isProcessGroupAlive(managed.pid)) {
+      await this.waitForTermination(managed, graceMs);
+    }
 
     const alive = isProcessGroupAlive(managed.pid);
 
@@ -307,6 +339,10 @@ export class ProcessRuntimeController {
         info: formatProcess(managed),
         reason: "timeout",
       };
+    }
+
+    if (!LIVE_STATUSES.has(managed.status)) {
+      return { ok: true, info: formatProcess(managed) };
     }
 
     if (!managed.endTime) {

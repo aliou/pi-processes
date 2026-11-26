@@ -23,9 +23,9 @@ import {
   type ClearDetails,
   type ListDetails,
   type OutputDetails,
-  ProcessesParams,
   type ProcessesParamsType,
   ProcessToolOutputDeclaration,
+  ProcessToolParameters,
   type StartDetails,
   type StopDetails,
   type UpdateDetails,
@@ -69,9 +69,15 @@ export function registerProcessTool(
         "process tool: after process start, do not sleep, poll, or hold your turn. End your turn or move on. Exits and notify.logMatches matches bring you back.",
         "process tool: use notify.logMatches to get brought back on readiness or error signals instead of polling process output. If a watch is too noisy, use process update (watches.mode append/replace/remove/clear) to fix it without restarting.",
       ],
-      parameters: ProcessesParams,
+      parameters: ProcessToolParameters,
       outputSchema: ProcessToolOutputDeclaration,
-      async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      async execute(
+        _toolCallId,
+        params: ProcessesParamsType,
+        _signal,
+        _onUpdate,
+        ctx,
+      ) {
         if (params.action === "output") {
           const result = executeOutput(params, manager);
           return {
@@ -141,10 +147,11 @@ function isThemeLike(value: unknown): value is Theme {
 }
 
 function renderProcessCall(
-  args: ProcessesParamsType,
+  rawArgs: unknown,
   second: Theme | RenderCallFnContext,
   third?: RenderCallFnContext | Theme,
 ): Component {
+  const args = rawArgs as ProcessesParamsType;
   const usesPiOrder = isThemeLike(second);
   const theme = usesPiOrder ? second : (third as Theme);
   const context = (usesPiOrder ? third : second) as
@@ -185,7 +192,7 @@ function renderProcessResult(
   result: AgentToolResult<ProcessDetails>,
   options: { expanded?: boolean; isPartial?: boolean },
   theme: Theme,
-  context?: { isError?: boolean },
+  context?: { isError?: boolean } | undefined,
 ): Component {
   if (options.isPartial) {
     return fallbackContainer(theme, "process running...");

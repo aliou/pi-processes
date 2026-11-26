@@ -17,19 +17,23 @@ import { existsSync } from "node:fs";
 import {
   type ExtensionAPI,
   getShellConfig,
+  type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
+import { num, obj, opt, str } from "@earendil-works/pi-schema";
 
 const ADOPT_CHANNEL = "processes:command:adopt";
 const MAX_CAPTURED_BYTES = 8 * 1024 * 1024;
 const RESULT_TAIL_CHARS = 4_000;
 
-const parameters = Type.Object({
-  command: Type.String({ description: "Shell command to execute" }),
-  timeout: Type.Optional(
-    Type.Number({
-      description: "Timeout in seconds (optional, no default timeout)",
-    }),
+interface BashArgs {
+  command: string;
+  timeout?: number;
+}
+
+const parameters = obj({
+  command: str({ description: "Shell command to execute" }),
+  timeout: opt(
+    num({ description: "Timeout in seconds (optional, no default timeout)" }),
   ),
 });
 
@@ -115,8 +119,8 @@ export default function bashNotifyBackground(pi: ExtensionAPI) {
     label: "bash",
     description:
       "Execute a bash command in the current working directory. Returns stdout and stderr. Optionally provide a timeout in seconds; when the timeout fires the command keeps running in pi-processes instead of being killed.",
-    parameters,
-    async execute(_toolCallId, params, signal, onUpdate, ctx) {
+    parameters: parameters as unknown as ToolDefinition["parameters"],
+    async execute(_toolCallId, params: BashArgs, signal, onUpdate, ctx) {
       const { command, timeout } = params;
       const cwd = ctx.cwd;
       if (!existsSync(cwd)) {

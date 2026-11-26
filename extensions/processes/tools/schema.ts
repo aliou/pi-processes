@@ -1,12 +1,31 @@
-import { StringEnum } from "@earendil-works/pi-ai";
-import { type Static, type TSchema, Type } from "typebox";
-import { KILL_FAILURE_REASONS, ProcessInfoSchema } from "../../../src/types";
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+import {
+  arr,
+  bool,
+  int,
+  nullable,
+  num,
+  obj,
+  oneOf,
+  opt,
+  type Schema,
+  type Static,
+  str,
+  union,
+  unsafe,
+} from "@earendil-works/pi-schema";
+import {
+  KILL_FAILURE_REASONS,
+  ProcessInfoSchema,
+  processInfoProperties,
+} from "../../../src/types";
 import { LINE_MATCH_MODES } from "../../../src/utils/match-line";
 import { PROCESS_PROTOCOL_ATTENTIONS } from "../../shared/protocol";
 import {
   LOG_MATCH_STREAMS,
   LogMatcherConfigSchema,
   NotifyConfigSchema,
+  notifyConfigProperties,
 } from "../notifications/registry";
 import { MAX_NOTIFY_LOG_MATCHERS, MAX_NOTIFY_PATTERN_LENGTH } from "./notify";
 
@@ -47,107 +66,99 @@ export const PROCESS_LIST_SORTS = [
   "status_asc",
 ] as const;
 
-const WatchUpdateItemParams = Type.Object({
-  mode: Type.Optional(StringEnum(LINE_MATCH_MODES)),
-  stream: Type.Optional(StringEnum(LOG_MATCH_STREAMS)),
-  repeat: Type.Optional(Type.Boolean()),
-  on: Type.Optional(StringEnum(PROCESS_PROTOCOL_ATTENTIONS)),
-  index: Type.Optional(
-    Type.Integer({
+const WatchUpdateItemParams = obj({
+  mode: opt(oneOf(LINE_MATCH_MODES)),
+  stream: opt(oneOf(LOG_MATCH_STREAMS)),
+  repeat: opt(bool()),
+  on: opt(oneOf(PROCESS_PROTOCOL_ATTENTIONS)),
+  index: opt(
+    int({
       minimum: 0,
       description: "Matcher to remove; takes precedence over pattern.",
     }),
   ),
-  pattern: Type.Optional(
-    Type.String({
+  pattern: opt(
+    str({
       maxLength: MAX_NOTIFY_PATTERN_LENGTH,
       description: "Required for append and replace.",
     }),
   ),
 });
 
-export const NotifyParams = Type.Object(NotifyConfigSchema.properties, {
+export const NotifyParams = obj(notifyConfigProperties, {
   description:
     "Notify settings. Attention: turn wakes or steers the agent; context persists immediately without waking or steering the agent (mid-run, pi appends it after the current tool results); ignore suppresses successful exits and external kills but retains log matches as context. Failures always notify, with ignore downgraded to context. Keep turn for anything whose result you need immediately.",
 });
 
-export const ProcessesParams = Type.Object({
-  action: StringEnum(
+export const ProcessesParams = obj({
+  action: oneOf(
     ["start", "list", "stop", "output", "write", "update", "clear"] as const,
     {
       description: "Action to perform.",
     },
   ),
-  name: Type.Optional(
-    Type.String({ description: "Process name. Required for start." }),
+  name: opt(str({ description: "Process name. Required for start." })),
+  command: opt(
+    str({ description: "Shell command to run. Required for start." }),
   ),
-  command: Type.Optional(
-    Type.String({ description: "Shell command to run. Required for start." }),
-  ),
-  cwd: Type.Optional(
-    Type.String({
+  cwd: opt(
+    str({
       description: "Defaults to the agent's working directory. Only for start.",
     }),
   ),
-  notify: Type.Optional(NotifyParams),
-  id: Type.Optional(
-    Type.String({
+  notify: opt(NotifyParams),
+  id: opt(
+    str({
       description:
         "ID from start or list, not the name. Required for stop, output, write, and update.",
     }),
   ),
-  limit: Type.Optional(Type.Number({ description: "Only for list." })),
-  sortBy: Type.Optional(
-    StringEnum(PROCESS_LIST_SORTS, {
+  limit: opt(num({ description: "Only for list." })),
+  sortBy: opt(
+    oneOf(PROCESS_LIST_SORTS, {
       description: "Only for list.",
     }),
   ),
-  statuses: Type.Optional(
-    Type.Array(StringEnum(PROCESS_LIST_STATUS_FILTERS), {
+  statuses: opt(
+    arr(oneOf(PROCESS_LIST_STATUS_FILTERS), {
       description:
         "Only for list. finished: exited successfully; failed: exited unsuccessfully or terminate_timeout.",
     }),
   ),
-  stream: Type.Optional(
-    StringEnum(PROCESS_OUTPUT_STREAMS, {
+  stream: opt(
+    oneOf(PROCESS_OUTPUT_STREAMS, {
       description: "Defaults to both. Only for output.",
     }),
   ),
-  tailLines: Type.Optional(
-    Type.Integer({
+  tailLines: opt(
+    int({
       minimum: 1,
       maximum: MAX_OUTPUT_TAIL_LINES,
       description: "Lines per stream. Defaults to 100. Only for output.",
     }),
   ),
-  pattern: Type.Optional(
-    Type.String({
+  pattern: opt(
+    str({
       maxLength: MAX_OUTPUT_PATTERN_LENGTH,
       description:
         "Line filter, literal unless mode is regex. Only for output.",
     }),
   ),
-  input: Type.Optional(
-    Type.String({
-      description: "Text for stdin. Only for write.",
-    }),
+  input: opt(str({ description: "Text for stdin. Only for write." })),
+  end: opt(
+    bool({ description: "Close stdin after writing (EOF). Only for write." }),
   ),
-  end: Type.Optional(
-    Type.Boolean({
-      description: "Close stdin after writing (EOF). Only for write.",
-    }),
-  ),
-  mode: Type.Optional(
-    StringEnum(PROCESS_OUTPUT_MATCH_MODES, {
+  mode: opt(
+    oneOf(PROCESS_OUTPUT_MATCH_MODES, {
       description: "Defaults to literal. Only for output.",
     }),
   ),
-  watches: Type.Optional(
-    Type.Object(
+  watches: opt(
+    obj(
       {
-        mode: StringEnum(PROCESS_WATCH_UPDATE_MODES),
-        items: Type.Optional(
-          Type.Array(WatchUpdateItemParams, {
+        mode: oneOf(PROCESS_WATCH_UPDATE_MODES),
+        items: opt(
+          arr(WatchUpdateItemParams, {
             maxItems: MAX_NOTIFY_LOG_MATCHERS,
             description:
               "Same fields as notify.logMatches. Full matchers for append and replace; index or pattern for remove.",
@@ -178,131 +189,127 @@ export type ProcessWatchUpdateMode =
 
 // --- Structured output ---
 
-const KillResultSchema = Type.Union([
-  Type.Object({
-    ok: Type.Literal(true),
+const KillResultSchema = union([
+  obj({
+    ok: oneOf([true]),
     info: ProcessInfoSchema,
   }),
-  Type.Object({
-    ok: Type.Literal(false),
+  obj({
+    ok: oneOf([false]),
     info: ProcessInfoSchema,
-    reason: StringEnum(KILL_FAILURE_REASONS),
+    reason: oneOf(KILL_FAILURE_REASONS),
   }),
 ]);
 
-const OutputTruncationSchema = Type.Object({
-  truncated: Type.Boolean(),
-  truncatedBy: Type.Union([
-    Type.Literal("lines"),
-    Type.Literal("bytes"),
-    Type.Null(),
-  ]),
-  totalLines: Type.Integer(),
-  totalBytes: Type.Integer(),
-  outputLines: Type.Integer(),
-  outputBytes: Type.Integer(),
-  lastLinePartial: Type.Boolean(),
-  firstLineExceedsLimit: Type.Boolean(),
-  maxLines: Type.Integer(),
-  maxBytes: Type.Integer(),
+const OutputTruncationSchema = obj({
+  truncated: bool(),
+  truncatedBy: nullable(oneOf(["lines", "bytes"])),
+  totalLines: int(),
+  totalBytes: int(),
+  outputLines: int(),
+  outputBytes: int(),
+  lastLinePartial: bool(),
+  firstLineExceedsLimit: bool(),
+  maxLines: int(),
+  maxBytes: int(),
 });
 
-const ProcessStartOutputSchema = Type.Object({
-  action: Type.Literal("start"),
+const ProcessStartOutputSchema = obj({
+  action: oneOf(["start"]),
   process: ProcessInfoSchema,
   notify: NotifyConfigSchema,
 });
 export type StartDetails = Static<typeof ProcessStartOutputSchema>;
 
-const ListProcessSchema = Type.Object({
-  ...ProcessInfoSchema.properties,
-  duration: Type.String(),
-  watches: Type.Array(LogMatcherConfigSchema),
+const ListProcessSchema = obj({
+  ...processInfoProperties,
+  duration: str(),
+  watches: arr(LogMatcherConfigSchema),
 });
 export type ListProcess = Static<typeof ListProcessSchema>;
 
-const ListCountsSchema = Type.Object({
-  running: Type.Integer(),
-  exited: Type.Integer(),
-  failed: Type.Integer(),
-  killed: Type.Integer(),
-  total: Type.Integer(),
+const ListCountsSchema = obj({
+  running: int(),
+  exited: int(),
+  failed: int(),
+  killed: int(),
+  total: int(),
 });
 export type ProcessListCounts = Static<typeof ListCountsSchema>;
 
-const ProcessListOutputSchema = Type.Object({
-  action: Type.Literal("list"),
-  processes: Type.Array(ListProcessSchema),
-  filters: Type.Object({
-    limit: Type.Union([Type.Number(), Type.Null()]),
-    sortBy: StringEnum(PROCESS_LIST_SORTS),
-    statuses: Type.Array(StringEnum(PROCESS_LIST_STATUS_FILTERS)),
+const ProcessListOutputSchema = obj({
+  action: oneOf(["list"]),
+  processes: arr(ListProcessSchema),
+  filters: obj({
+    limit: nullable(num()),
+    sortBy: oneOf(PROCESS_LIST_SORTS),
+    statuses: arr(oneOf(PROCESS_LIST_STATUS_FILTERS)),
   }),
   counts: ListCountsSchema,
 });
 export type ListDetails = Static<typeof ProcessListOutputSchema>;
 
-const ProcessStopOutputSchema = Type.Object({
-  action: Type.Literal("stop"),
+const ProcessStopOutputSchema = obj({
+  action: oneOf(["stop"]),
   result: KillResultSchema,
 });
 export type StopDetails = Static<typeof ProcessStopOutputSchema>;
 
-const ProcessWriteOutputSchema = Type.Object({
-  action: Type.Literal("write"),
-  id: Type.String(),
-  processName: Type.String(),
-  process: Type.Union([ProcessInfoSchema, Type.Null()]),
-  bytes: Type.Integer(),
-  end: Type.Boolean(),
-  ok: Type.Boolean(),
-  reason: Type.Union([Type.String(), Type.Null()]),
+const ProcessWriteOutputSchema = obj({
+  action: oneOf(["write"]),
+  id: str(),
+  processName: str(),
+  process: nullable(ProcessInfoSchema),
+  bytes: int(),
+  end: bool(),
+  ok: bool(),
+  reason: nullable(str()),
 });
 export type WriteDetails = Static<typeof ProcessWriteOutputSchema>;
 
-const ProcessUpdateOutputSchema = Type.Object({
-  action: Type.Literal("update"),
-  ok: Type.Boolean(),
-  error: Type.Optional(Type.String()),
-  process: Type.Optional(ProcessInfoSchema),
-  renamed: Type.Boolean(),
-  previousName: Type.Union([Type.String(), Type.Null()]),
-  watches: Type.Object({
-    mode: Type.Union([StringEnum(PROCESS_WATCH_UPDATE_MODES), Type.Null()]),
-    before: Type.Array(LogMatcherConfigSchema),
-    applied: Type.Array(LogMatcherConfigSchema),
-    count: Type.Integer(),
-    items: Type.Array(LogMatcherConfigSchema),
+const ProcessUpdateOutputSchema = obj({
+  action: oneOf(["update"]),
+  ok: bool(),
+  error: opt(str()),
+  process: opt(ProcessInfoSchema),
+  renamed: bool(),
+  previousName: nullable(str()),
+  watches: obj({
+    mode: nullable(oneOf(PROCESS_WATCH_UPDATE_MODES)),
+    before: arr(LogMatcherConfigSchema),
+    applied: arr(LogMatcherConfigSchema),
+    count: int(),
+    items: arr(LogMatcherConfigSchema),
   }),
 });
 export type UpdateDetails = Static<typeof ProcessUpdateOutputSchema>;
 
-const ProcessClearOutputSchema = Type.Object({
-  action: Type.Literal("clear"),
-  cleared: Type.Integer(),
+const ProcessClearOutputSchema = obj({
+  action: oneOf(["clear"]),
+  cleared: int(),
 });
 export type ClearDetails = Static<typeof ProcessClearOutputSchema>;
 
-const ProcessOutputSchema = Type.Object({
-  action: Type.Literal("output"),
-  id: Type.String(),
-  processName: Type.String(),
-  processStatus: Type.String(),
-  stream: StringEnum(PROCESS_OUTPUT_STREAMS),
-  tailLines: Type.Integer(),
-  pattern: Type.Union([Type.String(), Type.Null()]),
-  mode: StringEnum(PROCESS_OUTPUT_MATCH_MODES),
-  stdoutFile: Type.String(),
-  stderrFile: Type.String(),
-  stdout: Type.Array(Type.String(), {
+const ProcessOutputSchema = obj({
+  action: oneOf(["output"]),
+  id: str(),
+  processName: str(),
+  processStatus: str(),
+  stream: oneOf(PROCESS_OUTPUT_STREAMS),
+  tailLines: int(),
+  pattern: nullable(str()),
+  mode: oneOf(PROCESS_OUTPUT_MATCH_MODES),
+  stdoutFile: str(),
+  stderrFile: str(),
+  stdout: arr(str(), {
     description:
       "Raw filtered stdout lines behind the model-facing preview. Bounded by tailLines and the 5000-line scan window, not by the preview byte limit.",
   }),
-  stderr: Type.Array(Type.String(), {
+  stderr: arr(str(), {
     description:
       "Raw filtered stderr lines behind the model-facing preview. Bounded by tailLines and the 5000-line scan window, not by the preview byte limit.",
   }),
-  truncation: Type.Optional(OutputTruncationSchema),
+  truncation: opt(OutputTruncationSchema),
 });
 
 export type OutputDetails = Omit<
@@ -311,7 +318,7 @@ export type OutputDetails = Omit<
 >;
 export type ProcessOutput = Static<typeof ProcessOutputSchema>;
 
-export const ProcessToolOutputSchema = Type.Union(
+export const ProcessToolOutputSchema = union(
   [
     ProcessStartOutputSchema,
     ProcessListOutputSchema,
@@ -334,7 +341,7 @@ const DECLARATION_OMITTED_KEYWORDS = new Set([
   "maxLength",
 ]);
 
-function toDeclaration(schema: TSchema): TSchema {
+function toDeclaration(schema: Schema): Schema {
   return JSON.parse(JSON.stringify(schema), (keyword, value) => {
     if (DECLARATION_OMITTED_KEYWORDS.has(keyword) && typeof value !== "object")
       return undefined;
@@ -342,6 +349,8 @@ function toDeclaration(schema: TSchema): TSchema {
   });
 }
 
-export const ProcessToolOutputDeclaration = Type.Unsafe<ProcessToolOutput>(
+export const ProcessToolParameters =
+  ProcessesParams as unknown as ToolDefinition["parameters"];
+export const ProcessToolOutputDeclaration = unsafe<ProcessToolOutput>(
   toDeclaration(ProcessToolOutputSchema),
-);
+) as unknown as NonNullable<ToolDefinition["outputSchema"]>;

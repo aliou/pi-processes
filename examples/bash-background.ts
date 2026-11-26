@@ -14,18 +14,24 @@ import { existsSync } from "node:fs";
 import {
   type ExtensionAPI,
   getShellConfig,
+  type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
+import { num, obj, opt, str } from "@earendil-works/pi-schema";
 
 const ADOPT_CHANNEL = "processes:command:adopt";
 const AUTO_BACKGROUND_MS = 120_000;
 const MAX_CAPTURED_BYTES = 8 * 1024 * 1024;
 const RESULT_TAIL_CHARS = 4_000;
 
-const parameters = Type.Object({
-  command: Type.String({ description: "Bash command to execute" }),
-  timeout: Type.Optional(
-    Type.Number({
+interface BashArgs {
+  command: string;
+  timeout?: number;
+}
+
+const parameters = obj({
+  command: str({ description: "Bash command to execute" }),
+  timeout: opt(
+    num({
       description:
         "Time limit in seconds. At the limit, the command moves to the background.",
     }),
@@ -108,8 +114,8 @@ export default function bashBackground(pi: ExtensionAPI) {
     label: "bash",
     description:
       "Execute a Bash command. A long command can move to pi-processes when the user presses ctrl+shift+b, when its timeout expires, or after two minutes without a timeout.",
-    parameters,
-    async execute(_toolCallId, params, signal, onUpdate, ctx) {
+    parameters: parameters as unknown as ToolDefinition["parameters"],
+    async execute(_toolCallId, params: BashArgs, signal, onUpdate, ctx) {
       const { command, timeout } = params;
       const cwd = ctx.cwd;
       if (!existsSync(cwd)) {

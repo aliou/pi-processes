@@ -1,13 +1,13 @@
-import { type Static, type TSchema, type TUnsafe, Type } from "typebox";
-
-function StringEnum<const T extends readonly string[]>(
-  values: T,
-): TUnsafe<T[number]> {
-  return Type.Unsafe<T[number]>({
-    type: "string",
-    enum: [...values],
-  } as TSchema);
-}
+import {
+  bool,
+  int,
+  nullable,
+  num,
+  obj,
+  oneOf,
+  type Static,
+  str,
+} from "@earendil-works/pi-schema";
 
 export const PROCESS_STATUSES = [
   "running",
@@ -36,31 +36,33 @@ export const PROCESS_END_REASONS = [
 
 export type ProcessEndReason = (typeof PROCESS_END_REASONS)[number];
 
-export const ProcessSignalInfoSchema = Type.Object({
-  name: Type.String(),
-  number: Type.Union([Type.Integer(), Type.Null()]),
-  description: Type.String(),
+export const ProcessSignalInfoSchema = obj({
+  name: str(),
+  number: nullable(int()),
+  description: str(),
 });
 
 export type ProcessSignalInfo = Static<typeof ProcessSignalInfoSchema>;
 
-export const ProcessInfoSchema = Type.Object({
-  id: Type.String(),
-  name: Type.String(),
-  pid: Type.Integer(), // On Unix, this is also the PGID (process group leader)
-  command: Type.String(),
-  cwd: Type.String(),
-  startTime: Type.Number(),
-  endTime: Type.Union([Type.Number(), Type.Null()]),
-  status: StringEnum(PROCESS_STATUSES),
-  exitCode: Type.Union([Type.Integer(), Type.Null()]),
-  success: Type.Union([Type.Boolean(), Type.Null()]), // null if running, true if exit code 0, false otherwise
-  stdoutFile: Type.String(),
-  stderrFile: Type.String(),
-  endReason: Type.Union([StringEnum(PROCESS_END_REASONS), Type.Null()]),
-  signal: Type.Union([ProcessSignalInfoSchema, Type.Null()]),
-  errorMessage: Type.Union([Type.String(), Type.Null()]),
-});
+export const processInfoProperties = {
+  id: str(),
+  name: str(),
+  pid: int(), // On Unix, this is also the PGID (process group leader)
+  command: str(),
+  cwd: str(),
+  startTime: num(),
+  endTime: nullable(num()),
+  status: oneOf(PROCESS_STATUSES),
+  exitCode: nullable(int()),
+  success: nullable(bool()), // null if running, true if exit code 0, false otherwise
+  stdoutFile: str(),
+  stderrFile: str(),
+  endReason: nullable(oneOf(PROCESS_END_REASONS)),
+  signal: nullable(ProcessSignalInfoSchema),
+  errorMessage: nullable(str()),
+} as const;
+
+export const ProcessInfoSchema = obj(processInfoProperties);
 
 export type ProcessInfo = Static<typeof ProcessInfoSchema>;
 

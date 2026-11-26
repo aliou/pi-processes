@@ -1,9 +1,45 @@
 import { existsSync } from "node:fs";
 
-import { assert, expect } from "vitest";
+import { assert, expect, vi } from "vitest";
 import { ProcessManager } from "../../src/manager";
 import { test } from "./fixtures";
 import { collectEvents } from "./utils";
+
+test("reports one clean exit when a process handles SIGTERM", async ({
+  cwd,
+  addFile,
+}) => {
+  using manager = new ProcessManager();
+  const events = collectEvents(manager);
+  addFile(
+    "clean-stop.sh",
+    '#!/bin/sh\ntrap "exit 0" TERM\necho ready\nwhile true; do sleep 0.1; done\n',
+  );
+  const info = await manager.start("clean-stop", "sh ./clean-stop.sh", cwd);
+  await vi.waitFor(() => {
+    expect(manager.getOutput(info.id)?.stdout).toContain("ready");
+  });
+
+  const startedAt = Date.now();
+  const result = await manager.kill(info.id);
+  const elapsed = Date.now() - startedAt;
+
+  expect(result).toEqual({
+    ok: true,
+    info: expect.objectContaining({
+      status: "exited",
+      success: true,
+      exitCode: 0,
+      endReason: "exit",
+    }),
+  });
+  expect(
+    events.filter(
+      (event) => event.type === "process_ended" && event.info.id === info.id,
+    ),
+  ).toHaveLength(1);
+  expect(elapsed).toBeLessThan(2000);
+});
 
 test("kills a real running process and clears finished logs", async ({
   cwd,

@@ -710,6 +710,67 @@ describe("kill", () => {
     }
   });
 
+  it("preserves a clean exit and completes the stop before the grace period", async () => {
+    vi.useFakeTimers();
+    using manager = new ProcessManager();
+    const pending = manager.start("test", "sleep 60", "/tmp");
+    await vi.advanceTimersByTimeAsync(START_EXIT_GRACE_MS);
+    const info = await pending;
+    const child = fakeProcesses.get(info.pid);
+    assert(child, "fake child should exist");
+    child.kill = () => {
+      child.finish(0);
+      return true;
+    };
+
+    const events = collectEvents(manager);
+    let settled = false;
+    const stopping = manager.kill(info.id).then((result) => {
+      settled = true;
+      return result;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    const settledBeforeGrace = settled;
+    await vi.advanceTimersByTimeAsync(3000);
+
+    const result = await stopping;
+    expect(result).toMatchObject({
+      ok: true,
+      info: { status: "exited", endReason: "exit", exitCode: 0, success: true },
+    });
+    expect(events.filter((event) => event.type === "process_ended")).toEqual([
+      { type: "process_ended", info: manager.get(info.id) },
+    ]);
+    expect(settledBeforeGrace).toBe(true);
+  });
+
+  it("reports a timeout when the child closes but its process group survives", async () => {
+    vi.useFakeTimers();
+    using manager = new ProcessManager();
+    const pending = manager.start("test", "sleep 60", "/tmp");
+    await vi.advanceTimersByTimeAsync(START_EXIT_GRACE_MS);
+    const info = await pending;
+    const child = fakeProcesses.get(info.pid);
+    assert(child, "fake child should exist");
+    child.kill = () => {
+      child.finish(0);
+      fakeProcesses.set(info.pid, child);
+      return true;
+    };
+
+    const stopping = manager.kill(info.id);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(manager.get(info.id)?.status).toBe("exited");
+    await vi.advanceTimersByTimeAsync(3000);
+
+    const result = await stopping;
+    expect(result).toMatchObject({
+      ok: false,
+      reason: "timeout",
+      info: { status: "terminate_timeout" },
+    });
+  });
+
   it("records kill timeout", async () => {
     vi.useFakeTimers();
     using manager = new ProcessManager();

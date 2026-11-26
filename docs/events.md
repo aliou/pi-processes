@@ -53,6 +53,57 @@ manager ──internal events──► core extension
 notification service ──► processes:notification ──► delivery listener, UI extensions
 ```
 
+## Process lifecycle
+
+A process starts once, can emit output any number of times, and reaches one
+terminal outcome. The manager events are synchronous; lifecycle notification
+classification is deferred so the start and stop handlers can register their
+markers first.
+
+```
+process start | processes:command:start | processes:command:adopt
+  → manager registers the child
+    → process_started { info }
+      → processes:started info
+      → processes:changed { reason: "started" }
+
+  → child writes stdout or stderr (zero or more times)
+    → process_output_changed { id, appendedText, droppedLines }
+      → processes:output_changed { id, appendedText, droppedLines }
+      → processes:logs:chunk to active log subscribers
+      → processes:notification { kind: "log_match" } for each match
+
+  → child closes naturally, from an external signal, or after process stop
+    → process_ended { info: final status, exitCode, endReason, signal }
+      → processes:ended info
+      → processes:changed { reason: "ended" }
+      → notification service classifies the end on a deferred callback
+        → immediate exit already reported by process start
+          → no processes:notification
+        → intentional stop
+          → processes:notification { kind: classified kind, attention: "context" }
+        → any other end
+          → processes:notification when the resolved attention is not suppressed
+            → kind: success | failure | crash | killed
+            → attention: turn | context
+
+  → process stop times out with a surviving process group
+    → transition to terminate_timeout
+    → return KillResult { ok: false, reason: "timeout" }
+    → no process_ended
+    → no processes:ended
+    → no processes:notification
+
+  → /ps:clear removes finished processes
+    → processes_changed
+      → processes:changed { reason: "cleared" }
+```
+
+A clean exit after an intentional SIGTERM follows the ordinary `process_ended`
+path with `status: "exited"` and `endReason: "exit"`; it is not reclassified
+as `killed`. If the child closes but its process group survives, the stop waits
+for the grace period and follows the timeout path instead.
+
 ## Core Broadcasts
 
 Core emits, UI extensions listen.

@@ -100,7 +100,7 @@ describe("renderProcessNotificationMessage", () => {
     } as Theme;
     const component = renderProcessNotificationMessage(
       { details: logMatchDetails() },
-      { expanded: false, outputPad: 0 },
+      { expanded: false, outputPad: 0, keyText: () => "", keyHint: () => "" },
       theme,
     );
 

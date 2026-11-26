@@ -1,8 +1,8 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { type Static, Type } from "typebox";
 
 import { LINE_MATCH_MODES } from "../../../src/utils/match-line";
 import { PROCESS_PROTOCOL_ATTENTIONS } from "../../shared/protocol";
+import { StringEnum } from "../../shared/string-enum";
 import {
   MAX_LOG_MATCH_PATTERN_LENGTH,
   MAX_LOG_MATCHERS_PER_PROCESS,

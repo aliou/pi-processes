@@ -95,6 +95,9 @@ export interface ProcessProtocolConfig {
     dockHeight: number;
   };
   toolExposure: ToolExposure;
+  shortcuts: {
+    focusKey: string;
+  };
 }
 
 export interface RequestConfigPayload {

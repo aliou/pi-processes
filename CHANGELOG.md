@@ -1,5 +1,14 @@
 # @aliou/pi-processes
 
+## 0.13.9
+
+### Patch Changes
+
+- 87e980d: Mark the selected row in the `/ps` overview with a `›` cursor and an accent-colored name, so the selection stays visible in themes whose `selectedBg` is close to the background.
+- c43e764: Report renames through `processes:changed` with reason `"updated"` instead of `"cleared"`, while retaining `"cleared"` for explicit clears and automatic reaping.
+- bbb211b: Return promptly when a stopped process exits cleanly and report its actual exit once.
+- 8cd1db5: Ensure `process start` log watches receive output emitted during the startup grace window, including output preceding an immediate exit.
+
 ## 0.13.8
 
 ### Patch Changes

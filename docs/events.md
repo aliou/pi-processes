@@ -284,16 +284,19 @@ cross-extension protocol.
 Beyond the bus protocol, the extensions subscribe to standard Pi extension
 hooks:
 
-- `session_start` — the core extension first applies project config through
-  `bindProjectConfig` in `extensions/processes/index.ts`, only when Pi trusts
-  the session directory. Untrusted project files are not read or migrated.
-  It then drains config, trust, and import messages and notifies the user;
-  the dock tears down any previous controller and re-creates its widgets
-  for the session. Shell selection, interception, and config requests read
-  the resolved config at runtime.
+- `session_start` — the core extension applies project config only when Pi
+  trusts the session directory, drains config, trust, and import messages, and
+  re-creates the dock widgets. Shell selection, interception, and config
+  requests read the resolved config at runtime. The stopped-process notice
+  reads the active session branch for an unconsumed `ad-process:stopped` entry
+  and sends a displayed custom message without triggering a turn. The message
+  shows the process count when collapsed and process names and commands when
+  expanded.
 - `tool_call` — the core extension's background blocker inspects bash tool
   calls to optionally reject backgrounded commands when interception is
   enabled in config.
-- `session_shutdown` — the core extension kills managed processes and disposes
-  listeners, notification state, and overlays; the logs extension disposes
-  open overlays; the dock disposes its controller.
+- `session_shutdown` — the core extension records the name and command of
+  each live managed process in an `ad-process:stopped` custom entry, then
+  kills managed processes and disposes listeners, notification state, and
+  overlays; the logs extension disposes open overlays; the dock disposes its
+  controller.

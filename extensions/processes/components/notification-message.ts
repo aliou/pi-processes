@@ -1,7 +1,6 @@
 import type {
   MessageRenderOptions,
   Theme,
-  ThemeColor,
 } from "@earendil-works/pi-coding-agent";
 import {
   type Component,
@@ -11,11 +10,7 @@ import {
   type TuiMouseEventResult,
 } from "@earendil-works/pi-tui";
 import { truncateForDisplay } from "../../shared/display-text";
-import type {
-  Attention,
-  ProcessNotificationDetails,
-  ProcessNotificationKind,
-} from "../notifications/types";
+import type { ProcessNotificationDetails } from "../notifications/types";
 import { formatPatternForDisplay, quoteFilter } from "../tools/components";
 
 export function renderProcessNotificationMessage(
@@ -28,8 +23,6 @@ export function renderProcessNotificationMessage(
     return undefined;
   }
 
-  // outputPad is only populated on Pi 0.82.1+ (see MessageRenderOptions);
-  // fall back to 0 so this renderer doesn't break on older Pi builds.
   return new ProcessNotificationComponent(
     details,
     theme,
@@ -38,33 +31,52 @@ export function renderProcessNotificationMessage(
   );
 }
 
-class ProcessNotificationComponent implements Component {
+class ProcessNotificationComponent extends Container {
+  private readonly detailList = new Container();
+  private expanded: boolean;
+
   constructor(
-    private readonly details: ProcessNotificationDetails,
-    private readonly theme: Theme,
-    private readonly outputPad: number,
-    private expanded: boolean,
-  ) {}
-
-  invalidate(): void {}
-
-  handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
-    if (event.type !== "click" || !this.details.logMatch) return undefined;
-    this.expanded = !this.expanded;
-    return { handled: true };
+    details: ProcessNotificationDetails,
+    theme: Theme,
+    outputPad: number,
+    expanded: boolean,
+  ) {
+    super();
+    this.expanded = expanded;
+    this.addChild(
+      new ProcessNotificationSummary(details, theme, outputPad, () =>
+        this.setExpanded(!this.expanded),
+      ),
+    );
+    this.detailList.addChild(buildDetails(details, theme, outputPad));
+    if (expanded) this.addChild(this.detailList);
   }
 
-  render(width: number): string[] {
-    const container = new Container();
-    container.addChild(
-      new Text(formatSummary(this.details, this.theme), this.outputPad, 0),
-    );
-    if (this.expanded) {
-      container.addChild(
-        new Text(formatDetailLine(this.details, this.theme), this.outputPad, 0),
-      );
+  private setExpanded(expanded: boolean): void {
+    this.expanded = expanded;
+    if (expanded) {
+      this.addChild(this.detailList);
+    } else {
+      this.removeChild(this.detailList);
     }
-    return container.render(width);
+    this.invalidate();
+  }
+}
+
+class ProcessNotificationSummary extends Text {
+  constructor(
+    details: ProcessNotificationDetails,
+    theme: Theme,
+    outputPad: number,
+    private readonly toggle: () => void,
+  ) {
+    super(formatSummary(details, theme), outputPad, 0);
+  }
+
+  handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
+    if (event.type !== "click") return undefined;
+    this.toggle();
+    return { handled: true };
   }
 }
 
@@ -73,135 +85,84 @@ function formatSummary(
   theme: Theme,
 ): string {
   const prefix = theme.fg("accent", "[process]");
-  const name = theme.fg(
-    "muted",
-    `"${truncateForDisplay(details.processName, 60)}"`,
-  );
+  const attention =
+    details.attention === "turn"
+      ? theme.fg("warning", "alerted")
+      : theme.fg("dim", "info");
+  const name = theme.bold(`\`${truncateForDisplay(details.processName, 60)}\``);
 
   if (details.logMatch) {
-    // Matched text is raw process output: sanitize before it reaches the
-    // transcript, or an escape sequence in a log line hits the terminal.
     const line = truncateForDisplay(details.logMatch.line, 160);
-    const match = theme.fg(
-      "muted",
-      `matched ${details.logMatch.stream}: ${line}`,
-    );
-    return `${prefix} ${name} ${match}`;
+    return `${prefix} ${attention} ${name} ${attentionText(details, `matched ${details.logMatch.stream}: ${line}`, theme)}`;
   }
 
   if (details.kind === "killed" && details.signal) {
     const number =
       details.signal.number === null ? "" : ` (${details.signal.number})`;
-    return `${prefix} ${name} killed by ${details.signal.name}${number}`;
+    return `${prefix} ${attention} ${name} killed by ${details.signal.name}${number}`;
   }
 
   const severity = colorKind(details.kind, theme, summaryVerb(details));
-  return `${prefix} ${name} ${severity}`;
+  return `${prefix} ${attention} ${name} ${severity}`;
 }
 
-function formatDetailLine(
+function detailRows(
   details: ProcessNotificationDetails,
-  theme: Theme,
-): string {
-  const parts: string[] = [
-    field("id", details.processId, theme),
-    field("notify", formatAttention(details.attention, theme), theme),
-  ];
+): Array<[string, string]> {
+  const rows: Array<[string, string]> = [["id", details.processId]];
 
   if (details.logMatch) {
     const pattern = quoteFilter(
       formatPatternForDisplay(details.logMatch.pattern),
       details.logMatch.mode,
     );
-    parts.push(
-      field("pattern", theme.fg("accent", pattern), theme),
-      field("stream", theme.fg("muted", `[${details.logMatch.stream}]`), theme),
-    );
-  } else {
-    if (details.status) {
-      parts.push(
-        field(
-          "status",
-          theme.fg(statusTone(details.kind), details.status),
-          theme,
-        ),
-      );
-    }
-
-    if (details.exitCode !== undefined && details.exitCode !== null) {
-      parts.push(
-        field(
-          "exit",
-          theme.fg(statusTone(details.kind), String(details.exitCode)),
-          theme,
-        ),
-      );
-    }
-
-    if (details.endReason) {
-      parts.push(field("reason", theme.fg("muted", details.endReason), theme));
-    }
-
-    if (details.signal) {
-      const number =
-        details.signal.number === null
-          ? ""
-          : ` (${details.signal.number}, ${details.signal.description})`;
-      parts.push(
-        field(
-          "signal",
-          theme.fg("muted", `${details.signal.name}${number}`),
-          theme,
-        ),
-      );
-    }
+    rows.push(["pattern", pattern], ["stream", `[${details.logMatch.stream}]`]);
+    return rows;
   }
 
-  return parts.join("  ");
-}
-
-/** `label:` in muted, matching `buildField` in tools/utils.ts. */
-function field(label: string, value: string, theme: Theme): string {
-  return `${theme.fg("muted", `${label}:`)} ${value}`;
-}
-
-/**
- * Plain-language attention level, reusing the tone mapping from
- * `attentionTone` in tools/components/watch.ts (turn/context keep their
- * color; ignore switches from muted to dim to read as "quieter").
- */
-function formatAttention(attention: Attention, theme: Theme): string {
-  switch (attention) {
-    case "turn":
-      return theme.bold(theme.fg("warning", "now"));
-    case "context":
-      return theme.bold(theme.fg("success", "passive"));
-    default:
-      return theme.bold(theme.fg("dim", "silent"));
+  if (details.status) rows.push(["status", details.status]);
+  if (details.exitCode !== undefined && details.exitCode !== null) {
+    rows.push(["exit", String(details.exitCode)]);
   }
+  if (details.endReason) rows.push(["reason", details.endReason]);
+  if (details.signal) {
+    const number =
+      details.signal.number === null
+        ? ""
+        : ` (${details.signal.number}, ${details.signal.description})`;
+    rows.push(["signal", `${details.signal.name}${number}`]);
+  }
+  return rows;
 }
 
-/**
- * Same tone family as `statusColor` in shared/ui.ts: success for a clean
- * exit, error for failure/crash, dim for killed.
- */
-function statusTone(kind: ProcessNotificationKind): ThemeColor {
-  switch (kind) {
-    case "success":
-      return "success";
-    case "failure":
-    case "crash":
-      return "error";
-    case "killed":
-      return "dim";
-    default:
-      return "muted";
-  }
+function buildDetails(
+  details: ProcessNotificationDetails,
+  theme: Theme,
+  outputPad: number,
+): Component {
+  const text = detailRows(details)
+    .map(
+      ([label, value]) =>
+        `${theme.fg("muted", `${label}:`)} ${attentionText(details, value, theme)}`,
+    )
+    .join("  ");
+  return new Text(`  ${text}`, outputPad, 0);
+}
+
+function attentionText(
+  details: ProcessNotificationDetails,
+  text: string,
+  theme: Theme,
+): string {
+  return details.attention === "turn" ? text : theme.fg("dim", text);
 }
 
 function summaryVerb(details: ProcessNotificationDetails): string {
   if (details.summary) {
-    return details.summary;
+    const prefix = `Process "${details.processName}" `;
+    return details.summary.startsWith(prefix)
+      ? details.summary.slice(prefix.length)
+      : details.summary;
   }
 
   switch (details.kind) {

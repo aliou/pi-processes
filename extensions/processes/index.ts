@@ -13,7 +13,8 @@ import { registerLogSubscriptions } from "./handlers/subscriptions";
 import { registerBackgroundBlocker } from "./hooks/background-blocker";
 import { registerCleanupHook } from "./hooks/cleanup";
 import { registerEventBridge } from "./hooks/event-bridge";
-import { registerProcessNotificationRenderer } from "./message-renderer";
+import { registerStoppedNoticeHook } from "./hooks/stopped-notice";
+import { registerProcessMessageRenderers } from "./message-renderer";
 import {
   createNotificationRegistry,
   createNotificationService,
@@ -76,7 +77,9 @@ export default async function processesExtension(
     () => getConfig().interception.blockBackgroundCommands,
   );
 
-  registerProcessNotificationRenderer(pi);
+  registerStoppedNoticeHook(pi);
+
+  registerProcessMessageRenderers(pi);
   registerProcessTool(pi, manager, notifications, getConfig().toolExposure);
   registerProcessSettings(pi);
   registerOverviewCommand(pi, { events: pi.events, registerOverlay });

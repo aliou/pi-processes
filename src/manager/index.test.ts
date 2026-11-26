@@ -710,7 +710,7 @@ describe("kill", () => {
     }
   });
 
-  it("preserves a clean exit and completes the stop before the grace period (#173)", async () => {
+  it("preserves a clean exit and completes the stop before the grace period", async () => {
     vi.useFakeTimers();
     using manager = new ProcessManager();
     const pending = manager.start("test", "sleep 60", "/tmp");

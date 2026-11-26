@@ -232,7 +232,6 @@ export class ProcessRuntimeController {
       managed.completionSequence ??= ++this.completionSequence;
       this.emit({ type: "process_ended", info: formatProcess(managed) });
 
-      // The child can close before the rest of its process group has stopped.
       const waiters = this.terminationWaiters.get(managed);
       if (waiters?.size && !isProcessGroupAlive(managed.pid)) {
         for (const finish of waiters) finish();

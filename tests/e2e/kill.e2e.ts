@@ -5,6 +5,42 @@ import { ProcessManager } from "../../src/manager";
 import { test } from "./fixtures";
 import { collectEvents } from "./utils";
 
+test("reports one clean exit when a process handles SIGTERM", async ({
+  cwd,
+  addFile,
+}) => {
+  using manager = new ProcessManager();
+  const events = collectEvents(manager);
+  addFile(
+    "clean-stop.sh",
+    '#!/bin/sh\ntrap "exit 0" TERM\necho ready\nwhile true; do sleep 0.1; done\n',
+  );
+  const info = await manager.start("clean-stop", "sh ./clean-stop.sh", cwd);
+  await vi.waitFor(() => {
+    expect(manager.getOutput(info.id)?.stdout).toContain("ready");
+  });
+
+  const startedAt = Date.now();
+  const result = await manager.kill(info.id);
+  const elapsed = Date.now() - startedAt;
+
+  expect(result).toEqual({
+    ok: true,
+    info: expect.objectContaining({
+      status: "exited",
+      success: true,
+      exitCode: 0,
+      endReason: "exit",
+    }),
+  });
+  expect(
+    events.filter(
+      (event) => event.type === "process_ended" && event.info.id === info.id,
+    ),
+  ).toHaveLength(1);
+  expect(elapsed).toBeLessThan(2000);
+});
+
 test("kills a real running process and clears finished logs", async ({
   cwd,
   addScript,
@@ -36,37 +72,4 @@ test("kills a real running process and clears finished logs", async ({
   expect(existsSync(files.stdoutFile)).toBe(false);
   expect(existsSync(files.stderrFile)).toBe(false);
   expect(existsSync(files.combinedFile)).toBe(false);
-});
-
-test("reports a single clean exit when a process handles SIGTERM (#173)", async ({
-  cwd,
-  addFile,
-}) => {
-  using manager = new ProcessManager();
-  addFile(
-    "stop-cleanly.cjs",
-    `process.on("SIGTERM", () => process.exit(0));
-console.log("ready");
-setInterval(() => {}, 1000);
-`,
-  );
-  const events = collectEvents(manager);
-  const info = await manager.start(
-    "clean-exit",
-    "exec node stop-cleanly.cjs",
-    cwd,
-  );
-  await vi.waitFor(() => {
-    expect(manager.getOutput(info.id)?.stdout).toContain("ready");
-  });
-
-  const result = await manager.kill(info.id, { timeoutMs: 2000 });
-
-  expect(result).toMatchObject({
-    ok: true,
-    info: { status: "exited", endReason: "exit", exitCode: 0, success: true },
-  });
-  expect(events.filter((event) => event.type === "process_ended")).toEqual([
-    { type: "process_ended", info: manager.get(info.id) },
-  ]);
 });

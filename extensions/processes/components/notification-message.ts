@@ -64,7 +64,7 @@ class ProcessNotificationComponent implements Component {
         new Text(formatDetailLine(this.details, this.theme), this.outputPad, 0),
       );
     }
-    return container.render(width);
+    return [...container.render(width)];
   }
 }
 

@@ -1,0 +1,15 @@
+diff --git a/src/components/sectioned-settings.ts b/src/components/sectioned-settings.ts
+index 2027aadb6a1cacce70ce229d6825afb5011f7662..f344a8b5110bef2ac2db5b8546b0d97982788776 100644
+--- a/src/components/sectioned-settings.ts
++++ b/src/components/sectioned-settings.ts
+@@ -231,8 +231,8 @@ export class SectionedSettings implements Component {
+   }
+ 
+   render(width: number): string[] {
+-    const lines = this.submenuComponent
+-      ? this.submenuComponent.render(width)
++    const lines: string[] = this.submenuComponent
++      ? [...this.submenuComponent.render(width)]
+       : this.renderMainList(width);
+     // The main list manages its own height via the flex layout when
+     // contentHeight is set; this pads what does not (submenus, empty

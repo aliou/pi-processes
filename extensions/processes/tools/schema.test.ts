@@ -1,4 +1,7 @@
-import { Value } from "typebox/value";
+import { compile } from "@earendil-works/pi-schema";
+
+const checkProcessesParams = compile(ProcessesParams);
+
 import { describe, expect, it } from "vitest";
 
 import type { ProcessInfo } from "../../../src/types";
@@ -67,10 +70,13 @@ describe("ProcessToolOutputSchema", () => {
     const members = (
       ProcessToolOutputSchema as {
         anyOf: Array<{
-          properties: { action: { const: string } };
+          properties: { action: { const?: string; enum?: string[] } };
         }>;
       }
-    ).anyOf.map((member) => member.properties.action.const);
+    ).anyOf.map(
+      (member) =>
+        member.properties.action.const ?? member.properties.action.enum?.[0],
+    );
 
     expect([...members].sort()).toEqual(
       ["start", "list", "stop", "output", "write", "update", "clear"].sort(),
@@ -148,17 +154,14 @@ describe("ProcessesParams", () => {
   });
 
   it("keeps update watch fields optional and validated", () => {
-    expect(Value.Check(ProcessesParams, update([{ index: 0 }]))).toBe(true);
+    expect(checkProcessesParams.check(update([{ index: 0 }]))).toBe(true);
     expect(
-      Value.Check(
-        ProcessesParams,
+      checkProcessesParams.check(
         update([{ pattern: "FATAL", mode: "literal", on: "turn" }]),
       ),
     ).toBe(true);
-    expect(Value.Check(ProcessesParams, update([{ mode: "glob" }]))).toBe(
-      false,
-    );
-    expect(Value.Check(ProcessesParams, update([{ on: "later" }]))).toBe(false);
+    expect(checkProcessesParams.check(update([{ mode: "glob" }]))).toBe(false);
+    expect(checkProcessesParams.check(update([{ on: "later" }]))).toBe(false);
   });
 
   it("describes update watch fields once, under notify.logMatches", () => {

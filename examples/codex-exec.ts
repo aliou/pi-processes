@@ -42,8 +42,9 @@ import { existsSync } from "node:fs";
 import {
   type ExtensionAPI,
   getShellConfig,
+  type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
+import { bool, num, obj, opt, str } from "@earendil-works/pi-schema";
 
 const ADOPT_CHANNEL = "processes:command:adopt";
 const KILL_CHANNEL = "processes:command:kill";
@@ -386,62 +387,79 @@ function killProcess(
   });
 }
 
-const execCommandParameters = Type.Object({
-  cmd: Type.String({ description: "Shell command to execute." }),
-  workdir: Type.Optional(
-    Type.String({
+interface ExecCommandArgs {
+  cmd: string;
+  workdir?: string;
+  tty?: boolean;
+  shell?: string;
+  login?: boolean;
+  yield_time_ms?: number;
+  max_output_tokens?: number;
+}
+
+const execCommandParameters = obj({
+  cmd: str({ description: "Shell command to execute." }),
+  workdir: opt(
+    str({
       description:
         "Working directory for the command. Defaults to the turn cwd.",
     }),
   ),
-  tty: Type.Optional(
-    Type.Boolean({
+  tty: opt(
+    bool({
       description:
         "True allocates a PTY for the command; false or omitted uses plain pipes. PTY is not supported here and always errors.",
     }),
   ),
-  shell: Type.Optional(
-    Type.String({
+  shell: opt(
+    str({
       description:
         "Shell binary to launch. Defaults to the user's default shell.",
     }),
   ),
-  login: Type.Optional(
-    Type.Boolean({
+  login: opt(
+    bool({
       description:
         "True runs the shell with -l/-i semantics; false disables them. Defaults to true.",
     }),
   ),
-  yield_time_ms: Type.Optional(
-    Type.Number({
+  yield_time_ms: opt(
+    num({
       description:
         "Block for at most this many milliseconds (250–30000, default 10000). Still running after that returns a session id.",
     }),
   ),
-  max_output_tokens: Type.Optional(
-    Type.Number({
+  max_output_tokens: opt(
+    num({
       description:
         "Output token budget. Defaults to 10000 tokens (~4 bytes/token).",
     }),
   ),
 });
 
-const writeStdinParameters = Type.Object({
-  session_id: Type.Number({
+interface WriteStdinArgs {
+  session_id: number;
+  chars: string;
+  yield_time_ms?: number;
+  max_output_tokens?: number;
+}
+
+const writeStdinParameters = obj({
+  session_id: num({
     description: "Identifier of the running unified exec session.",
   }),
-  chars: Type.String({
+  chars: str({
     description:
       "Bytes to write to stdin. Defaults to empty, which polls without writing. \\x03 sends Ctrl-C.",
   }),
-  yield_time_ms: Type.Optional(
-    Type.Number({
+  yield_time_ms: opt(
+    num({
       description:
         "Wait before yielding output. Non-empty writes default to 250 ms and cap at 30000 ms; empty polls wait 5000-300000 ms by default.",
     }),
   ),
-  max_output_tokens: Type.Optional(
-    Type.Number({
+  max_output_tokens: opt(
+    num({
       description: "Output budget in tokens (~4 bytes/token, default 10000).",
     }),
   ),
@@ -479,8 +497,15 @@ export default function codexExec(pi: ExtensionAPI) {
     label: "exec_command",
     description:
       "Run a shell command. Blocks briefly and returns the output and exit code; long-running commands return a numeric session id that write_stdin uses to send input and read further output.",
-    parameters: execCommandParameters,
-    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+    parameters:
+      execCommandParameters as unknown as ToolDefinition["parameters"],
+    async execute(
+      _toolCallId,
+      params: ExecCommandArgs,
+      signal,
+      _onUpdate,
+      ctx,
+    ) {
       if (params.tty) {
         throw new Error(
           "tty: true is not supported (pipe-spawned processes have no PTY). Omit tty or pass false.",
@@ -604,8 +629,8 @@ export default function codexExec(pi: ExtensionAPI) {
     label: "write_stdin",
     description:
       "Send input to a running exec_command session. Empty chars polls for new output; \\x03 sends Ctrl-C. Returns only the output produced since the previous call.",
-    parameters: writeStdinParameters,
-    async execute(_toolCallId, params) {
+    parameters: writeStdinParameters as unknown as ToolDefinition["parameters"],
+    async execute(_toolCallId, params: WriteStdinArgs) {
       const managed = sessions.get(params.session_id);
       if (!managed) {
         throw new Error(

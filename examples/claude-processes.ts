@@ -25,8 +25,11 @@
  * ended" message. The issue proposes an optional `notify` field on the start
  * payload to suppress it; pass it through here once the core supports it.
  */
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
+import type {
+  ExtensionAPI,
+  ToolDefinition,
+} from "@earendil-works/pi-coding-agent";
+import { bool, num, obj, opt, str } from "@earendil-works/pi-schema";
 
 const START_CHANNEL = "processes:command:start";
 const KILL_CHANNEL = "processes:command:kill";
@@ -235,29 +238,40 @@ function waitForEnd(
   });
 }
 
-const bashParameters = Type.Object({
-  command: Type.String({ description: "Bash command to execute" }),
-  timeout: Type.Optional(
-    Type.Number({
+interface BashArgs {
+  command: string;
+  timeout?: number;
+  run_in_background?: boolean;
+}
+
+const bashParameters = obj({
+  command: str({ description: "Bash command to execute" }),
+  timeout: opt(
+    num({
       description:
         "Time limit in milliseconds (max 600000). The command is stopped at the limit.",
     }),
   ),
-  run_in_background: Type.Optional(
-    Type.Boolean({
+  run_in_background: opt(
+    bool({
       description:
         "Start the command in the background instead of blocking. Returns the process id and log paths immediately.",
     }),
   ),
 });
 
-const monitorParameters = Type.Object({
-  command: Type.String({
+interface MonitorArgs {
+  command: string;
+  timeout?: number;
+}
+
+const monitorParameters = obj({
+  command: str({
     description:
       "Long-running command to monitor, e.g. a dev server or a watcher.",
   }),
-  timeout: Type.Optional(
-    Type.Number({
+  timeout: opt(
+    num({
       description:
         "Time limit in milliseconds (max 600000). The monitor is stopped at the limit. Omit to run until stopped.",
     }),
@@ -358,8 +372,8 @@ export default function claudeProcesses(pi: ExtensionAPI) {
     label: "Bash",
     description:
       "Execute a Bash command, foreground or background. Background commands run as pi-processes processes: visible in /ps, logged, and stopped at session shutdown.",
-    parameters: bashParameters,
-    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+    parameters: bashParameters as unknown as ToolDefinition["parameters"],
+    async execute(_toolCallId, params: BashArgs, signal, _onUpdate, ctx) {
       if (signal?.aborted) throw new Error("Command aborted");
       const started = await requestStart(pi.events, {
         name: processName(params.command, "bash"),
@@ -429,8 +443,8 @@ export default function claudeProcesses(pi: ExtensionAPI) {
     label: "Monitor",
     description:
       "Start a long-running command and stream its output as context-level messages. Runs as a pi-processes process: visible in /ps and stopped at session shutdown. Use for dev servers and watchers; use Bash for commands that finish.",
-    parameters: monitorParameters,
-    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+    parameters: monitorParameters as unknown as ToolDefinition["parameters"],
+    async execute(_toolCallId, params: MonitorArgs, signal, _onUpdate, ctx) {
       if (signal?.aborted) throw new Error("Command aborted");
       const started = await requestStart(pi.events, {
         name: processName(params.command, "monitor"),

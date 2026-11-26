@@ -73,24 +73,34 @@ describe("renderProcessNotificationMessage", () => {
     const collapsed = component.render(80);
     expect(collapsed).toHaveLength(1);
 
-    expect(component.handleMouse?.(clickEvent())).toEqual({ handled: true });
+    expect(component.handleMouse?.(clickEvent())).toMatchObject({
+      handled: true,
+    });
     const expanded = component.render(80);
     expect(expanded).toHaveLength(2);
+    expect(expanded[1]).toMatch(/^ {2}/);
+    expect(expanded[1]).toContain("id:");
     expect(expanded[1]).toContain("pattern:");
+    expect(expanded[1]).toContain("stream:");
+    expect(expanded[1]).not.toContain("notify:");
 
-    expect(component.handleMouse?.(clickEvent())).toEqual({ handled: true });
+    expect(component.handleMouse?.(clickEvent())).toMatchObject({
+      handled: true,
+    });
     expect(component.render(80)).toHaveLength(1);
   });
 
   it("starts expanded when Pi passes expanded options", () => {
     const component = renderEntry(logMatchDetails(), { expanded: true });
-    expect(component.render(80)).toHaveLength(2);
+    const lines = component.render(80);
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toMatch(/^ {2}/);
   });
 
-  it("mutes log-match summaries while keeping the prefix accented", () => {
+  it("keeps turn-triggered text normal and process names bold", () => {
     const theme = {
       fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
-      bold: (text: string) => text,
+      bold: (text: string) => `<bold>${text}</bold>`,
     } as Theme;
     const component = renderProcessNotificationMessage(
       { details: logMatchDetails() },
@@ -98,9 +108,93 @@ describe("renderProcessNotificationMessage", () => {
       theme,
     );
 
-    expect(component?.render(120).map((line) => line.trimEnd())).toEqual([
-      '<accent>[process]</accent> <muted>"api-server"</muted> <muted>matched stdout: server ready on port 3000</muted>',
+    expect(component?.render(200).map((line) => line.trimEnd())).toEqual([
+      "<accent>[process]</accent> <warning>alerted</warning> <bold>`api-server`</bold> matched stdout: server ready on port 3000",
     ]);
+  });
+
+  it.each([
+    {
+      kind: "success",
+      summary: 'Process "api-server" succeeded after 13s.',
+      expected: "<success>succeeded after 13s.</success>",
+    },
+    {
+      kind: "crash",
+      summary: 'Process "api-server" failed with exit code 42 after 13s.',
+      expected: "<error>failed with exit code 42 after 13s.</error>",
+    },
+  ] as const)(
+    "colors $kind outcomes and preserves their duration",
+    (fixture) => {
+      const theme = {
+        fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
+        bold: (text: string) => text,
+      } as Theme;
+      const component = renderProcessNotificationMessage(
+        {
+          details: logMatchDetails({
+            kind: fixture.kind,
+            summary: fixture.summary,
+            logMatch: undefined,
+          }),
+        },
+        { expanded: false, outputPad: 0 },
+        theme,
+      );
+
+      expect(component?.render(200).join("\n")).toContain(fixture.expected);
+    },
+  );
+
+  it("dims context text in the summary and joined detail line", () => {
+    const theme = {
+      fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
+      bold: (text: string) => text,
+    } as Theme;
+    const component = renderProcessNotificationMessage(
+      { details: logMatchDetails({ attention: "context" }) },
+      { expanded: true, outputPad: 0 },
+      theme,
+    );
+
+    const lines = component?.render(200).map((line) => line.trimEnd()) ?? [];
+    expect(lines[0]).toContain(
+      "<dim>matched stdout: server ready on port 3000</dim>",
+    );
+    expect(lines[0]).toContain("<dim>info</dim>");
+    expect(lines[1]).toContain("  <muted>id:</muted> <dim>proc_1</dim>");
+    expect(lines[1]).toContain('<muted>pattern:</muted> <dim>"ready"</dim>');
+    expect(lines[1]).not.toContain("notify:");
+  });
+
+  it("keeps killed text regular while its info label stays dim", () => {
+    const theme = {
+      fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
+      bold: (text: string) => text,
+    } as Theme;
+    const component = renderProcessNotificationMessage(
+      {
+        details: logMatchDetails({
+          kind: "killed",
+          attention: "context",
+          logMatch: undefined,
+          signal: {
+            name: "SIGTERM",
+            number: 15,
+            description: "termination request",
+          },
+        }),
+      },
+      { expanded: false, outputPad: 0 },
+      theme,
+    );
+
+    const summary = component?.render(200).join("\n") ?? "";
+    expect(summary).toContain(
+      "<dim>info</dim> `api-server` killed by SIGTERM (15)",
+    );
+    expect(summary).not.toContain("<dim>killed by");
   });
 
   it("ignores non-click mouse events", () => {
@@ -111,11 +205,20 @@ describe("renderProcessNotificationMessage", () => {
     expect(component.render(80)).toHaveLength(1);
   });
 
-  it("does not toggle other notification kinds on click", () => {
+  it("clicking a lifecycle notification toggles its detail line", () => {
     const component = renderEntry(
       logMatchDetails({ kind: "success", logMatch: undefined }),
     );
-    expect(component.handleMouse?.(clickEvent())).toBeUndefined();
+    expect(component.render(80)).toHaveLength(1);
+
+    expect(component.handleMouse?.(clickEvent())).toMatchObject({
+      handled: true,
+    });
+    expect(component.render(80)).toHaveLength(2);
+
+    expect(component.handleMouse?.(clickEvent())).toMatchObject({
+      handled: true,
+    });
     expect(component.render(80)).toHaveLength(1);
   });
 });
